@@ -5,6 +5,7 @@ enum ToolType: String, Codable, CaseIterable {
     case color
     case pencil
     case eraser
+    case highlighter
     case lasso
     case image
     case text
@@ -14,6 +15,7 @@ enum ToolType: String, Codable, CaseIterable {
         case .color: return "paintpalette.fill"
         case .pencil: return "pencil.tip"
         case .eraser: return "eraser.fill"
+        case .highlighter: return "highlighter"
         case .lasso: return "lasso"
         case .image: return "photo"
         case .text: return "textformat"
@@ -22,6 +24,13 @@ enum ToolType: String, Codable, CaseIterable {
 
     var displayName: String {
         rawValue.capitalized
+    }
+
+    var isWritingInstrument: Bool {
+        switch self {
+        case .pencil, .eraser, .highlighter: return true
+        default: return false
+        }
     }
 }
 
@@ -32,8 +41,9 @@ struct ToolbarIcon: Identifiable, Equatable, Codable {
 
     // Type-specific properties
     var colorData: CodableColor?  // For color tools (Codable)
-    var size: CGFloat?            // For pencil/eraser size
+    var size: CGFloat?            // For pencil/eraser size (legacy)
     var name: String
+    var instrumentSettings: WritingInstrumentSettings?
 
     // Computed property for backward compatibility
     var color: Color? {
@@ -42,7 +52,7 @@ struct ToolbarIcon: Identifiable, Equatable, Codable {
 
     // Custom coding keys to exclude computed property
     enum CodingKeys: String, CodingKey {
-        case id, type, colorData, size, name
+        case id, type, colorData, size, name, instrumentSettings
     }
 
     // Essential tool types (must always have at least 1 of each)
@@ -56,8 +66,6 @@ struct ToolbarIcon: Identifiable, Equatable, Codable {
     /// Generic duplicate detection.
     /// - Color icons: delegates to `Color.isSimilar`
     /// - All other types: two icons with the same `type` are duplicates
-    /// - Note: If a future type needs distinguishing properties (e.g. pencil sizes),
-    ///   add a branch here similar to the color check to compare those properties.
     func isEquivalent(to other: ToolbarIcon, colorScheme: ColorScheme) -> Bool {
         guard type == other.type else { return false }
         if type == .color, let c1 = color, let c2 = other.color {
@@ -78,6 +86,17 @@ struct ToolbarIcon: Identifiable, Equatable, Codable {
 
     // Helper to create a tool icon
     static func toolIcon(_ type: ToolType, name: String? = nil) -> ToolbarIcon {
-        ToolbarIcon(id: UUID(), type: type, name: name ?? type.displayName)
+        let settings: WritingInstrumentSettings? = switch type {
+        case .pencil: .pen()
+        case .eraser: .eraser()
+        case .highlighter: .highlighter()
+        default: nil
+        }
+        return ToolbarIcon(
+            id: UUID(),
+            type: type,
+            name: name ?? type.displayName,
+            instrumentSettings: settings
+        )
     }
 }
