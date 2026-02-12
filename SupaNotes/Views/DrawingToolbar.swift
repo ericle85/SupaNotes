@@ -527,7 +527,8 @@ struct EditColorView: View {
             selectedColor = existing.color ?? newColor
             dismiss()
         } else if let index = toolbarIcons.firstIndex(where: { $0.id == icon.id }) {
-            toolbarIcons[index] = ToolbarIcon.colorIcon(newColor, name: icon.name)
+            // Mutate in place to preserve the icon's ID (keeps the popover open)
+            toolbarIcons[index].color = newColor
             selectedColor = newColor
         }
     }
