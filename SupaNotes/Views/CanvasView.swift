@@ -3,22 +3,26 @@ import PencilKit
 
 struct CanvasView: UIViewRepresentable {
     @Binding var drawingData: Data
-    @Binding var toolPickerIsActive: Bool
+    var tool: PKTool
+    var onUndoManagerReady: (UndoManager?) -> Void
 
     func makeUIView(context: Context) -> PKCanvasView {
         let canvasView = PKCanvasView()
         canvasView.drawingPolicy = .anyInput
         canvasView.backgroundColor = .systemBackground
+        canvasView.tool = tool
 
         context.coordinator.canvasView = canvasView
-        context.coordinator.toolPicker.addObserver(canvasView)
 
         // Load drawing before setting delegate to avoid triggering canvasViewDrawingDidChange
         let drawing = (try? PKDrawing(data: drawingData)) ?? PKDrawing()
         canvasView.drawing = drawing
 
         canvasView.delegate = context.coordinator
-        context.coordinator.showToolPicker(toolPickerIsActive)
+
+        DispatchQueue.main.async {
+            onUndoManagerReady(canvasView.undoManager)
+        }
 
         return canvasView
     }
@@ -39,13 +43,7 @@ struct CanvasView: UIViewRepresentable {
             coordinator.isLoadingDrawing = false
         }
 
-        coordinator.showToolPicker(toolPickerIsActive)
-    }
-
-    static func dismantleUIView(_ uiView: PKCanvasView, coordinator: Coordinator) {
-        coordinator.toolPicker.setVisible(false, forFirstResponder: uiView)
-        coordinator.toolPicker.removeObserver(uiView)
-        uiView.resignFirstResponder()
+        canvasView.tool = tool
     }
 
     func makeCoordinator() -> Coordinator {
@@ -56,9 +54,7 @@ struct CanvasView: UIViewRepresentable {
         var drawingData: Binding<Data>
         var isUpdatingFromCanvas = false
         var isLoadingDrawing = false
-        var toolPickerWasActive = false
         weak var canvasView: PKCanvasView?
-        let toolPicker = PKToolPicker()
 
         init(drawingData: Binding<Data>) {
             self.drawingData = drawingData
@@ -71,19 +67,6 @@ struct CanvasView: UIViewRepresentable {
             DispatchQueue.main.async {
                 self.isUpdatingFromCanvas = false
             }
-        }
-
-        func showToolPicker(_ isActive: Bool) {
-            guard let canvasView else { return }
-            if isActive {
-                toolPicker.setVisible(true, forFirstResponder: canvasView)
-                if !toolPickerWasActive {
-                    canvasView.becomeFirstResponder()
-                }
-            } else {
-                toolPicker.setVisible(false, forFirstResponder: canvasView)
-            }
-            toolPickerWasActive = isActive
         }
     }
 }
