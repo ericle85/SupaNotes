@@ -9,7 +9,8 @@ struct CanvasView: UIViewRepresentable {
     func makeUIView(context: Context) -> PKCanvasView {
         let canvasView = PKCanvasView()
         canvasView.drawingPolicy = .anyInput
-        canvasView.backgroundColor = .systemBackground
+        canvasView.backgroundColor = .white
+        canvasView.overrideUserInterfaceStyle = .light
         canvasView.tool = tool
 
         context.coordinator.canvasView = canvasView
@@ -29,9 +30,9 @@ struct CanvasView: UIViewRepresentable {
 
     func updateUIView(_ canvasView: PKCanvasView, context: Context) {
         let coordinator = context.coordinator
-
-        // Keep binding reference current in case the note changed
         coordinator.drawingData = $drawingData
+
+        canvasView.tool = tool
 
         guard !coordinator.isUpdatingFromCanvas else { return }
 
@@ -42,8 +43,6 @@ struct CanvasView: UIViewRepresentable {
             canvasView.drawing = drawing
             coordinator.isLoadingDrawing = false
         }
-
-        canvasView.tool = tool
     }
 
     func makeCoordinator() -> Coordinator {

@@ -5,14 +5,14 @@ import PencilKit
 struct NoteEditorView: View {
     @Environment(\.modelContext) private var modelContext
     let noteID: PersistentIdentifier
-    @State private var selectedColor: Color = .primary
+    @State private var selectedColor: Color = .black
     @State private var penWidth: CGFloat = 3.0
     @State private var eraserWidth: CGFloat = 40.0
     @State private var isErasing = false
     @State private var canvasUndoManager: UndoManager?
 
     private var note: Note? {
-        modelContext.model(for: noteID) as? Note
+        modelContext.registeredModel(for: noteID) as Note?
     }
 
     private var currentTool: PKTool {
