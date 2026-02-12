@@ -28,6 +28,18 @@ extension Color {
                abs(c1.g - c2.g) < threshold &&
                abs(c1.b - c2.b) < threshold
     }
+
+    /// Concrete black/white based on color scheme — avoids issues with
+    /// the semantic `Color.primary` getting stale in @State storage.
+    static func adaptiveBlack(for scheme: ColorScheme) -> Color {
+        scheme == .dark ? .white : .black
+    }
+
+    /// Whether this color is the adaptive black/white that should swap on theme change.
+    func isAdaptiveBlack(colorScheme: ColorScheme) -> Bool {
+        let target = Color.adaptiveBlack(for: colorScheme)
+        return self.isSimilar(to: target, colorScheme: colorScheme)
+    }
 }
 
 // MARK: - Tool Type Enum
@@ -98,7 +110,7 @@ struct DrawingToolbar: View {
     @State private var editingColorID: UUID?  // Track which color is being edited
 
     @State private var toolbarIcons: [ToolbarIcon] = [
-          .colorIcon(.primary, name: "Black"),
+          .colorIcon(.black, name: "Black"),
           .colorIcon(.red, name: "Red"),
           .colorIcon(.blue, name: "Blue"),
           .colorIcon(.green, name: "Green"),
@@ -248,7 +260,7 @@ struct DrawingToolbar: View {
                     .fill(color)
                     .frame(width: 24, height: 24)
                     .overlay {
-                        if selectedColor == color && !isErasing {
+                        if !isErasing && selectedColor.isSimilar(to: color, colorScheme: colorScheme) {
                             Image(systemName: "checkmark")
                                 .font(.caption2.bold())
                                 .foregroundStyle(color.isLight(colorScheme: colorScheme) ? .black : .white)
@@ -324,7 +336,7 @@ struct DrawingToolbar: View {
                     if distance < 5 {
                         // Just a tap - select the tool or edit if already selected
                         if icon.type == .color, let color = icon.color {
-                            if selectedColor == color && !isErasing {
+                            if !isErasing && selectedColor.isSimilar(to: color, colorScheme: colorScheme) {
                                 // Already selected - open color picker to edit
                                 editingColorID = icon.id
                             } else {
