@@ -18,8 +18,6 @@ final class ToolbarState {
     // Legacy keys for backward compat migration
     private static let penWidthKey = "toolbar.penWidth"
     private static let eraserWidthKey = "toolbar.eraserWidth"
-    private static let highlighterWidthKey = "toolbar.highlighterWidth"
-    private static let penPresetsKey = "toolbar.penPresets"
 
     init() {
         load()
@@ -62,21 +60,6 @@ final class ToolbarState {
             }
             defaults.removeObject(forKey: Self.eraserWidthKey)
         }
-        if let hw = defaults.object(forKey: Self.highlighterWidthKey) as? Double {
-            if let idx = toolbarIcons.firstIndex(where: { $0.type == .highlighter }) {
-                toolbarIcons[idx].instrumentSettings?.width = CGFloat(hw)
-            }
-            defaults.removeObject(forKey: Self.highlighterWidthKey)
-        }
-        if let data = defaults.data(forKey: Self.penPresetsKey),
-           let presets = try? JSONDecoder().decode([CGFloat].self, from: data),
-           presets.count == 3 {
-            if let idx = toolbarIcons.firstIndex(where: { $0.type == .pencil }) {
-                toolbarIcons[idx].instrumentSettings?.presets = presets
-            }
-            defaults.removeObject(forKey: Self.penPresetsKey)
-        }
-
         // Ensure pen and eraser always exist (essential tools)
         if !toolbarIcons.contains(where: { $0.type == .pencil }) {
             toolbarIcons.insert(ToolbarIcon.toolIcon(.pencil), at: 0)

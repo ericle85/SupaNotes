@@ -41,18 +41,17 @@ struct ToolbarIcon: Identifiable, Equatable, Codable {
 
     // Type-specific properties
     var colorData: CodableColor?  // For color tools (Codable)
-    var size: CGFloat?            // For pencil/eraser size (legacy)
     var name: String
     var instrumentSettings: WritingInstrumentSettings?
 
-    // Computed property for backward compatibility
+    // Convenience property to extract Color from colorData
     var color: Color? {
         colorData?.toColor()
     }
 
     // Custom coding keys to exclude computed property
     enum CodingKeys: String, CodingKey {
-        case id, type, colorData, size, name, instrumentSettings
+        case id, type, colorData, name, instrumentSettings
     }
 
     // Essential tool types (must always have at least 1 of each)
