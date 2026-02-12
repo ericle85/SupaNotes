@@ -5,19 +5,28 @@ import UniformTypeIdentifiers
 
 // MARK: - Color Extension for Comparison
 extension Color {
-    func isLight(in environment: EnvironmentValues) -> Bool {
-        let resolved = self.resolve(in: environment)
-        let luminance = 0.299 * Double(resolved.red) + 0.587 * Double(resolved.green) + 0.114 * Double(resolved.blue)
+    private func resolveRGB(colorScheme: ColorScheme) -> (r: CGFloat, g: CGFloat, b: CGFloat) {
+        let style: UIUserInterfaceStyle = colorScheme == .dark ? .dark : .light
+        let tc = UITraitCollection(userInterfaceStyle: style)
+        let resolved = UIColor(self).resolvedColor(with: tc)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        resolved.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return (r, g, b)
+    }
+
+    func isLight(colorScheme: ColorScheme) -> Bool {
+        let c = resolveRGB(colorScheme: colorScheme)
+        let luminance = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b
         return luminance > 0.6
     }
 
-    func isSimilar(to other: Color, in environment: EnvironmentValues) -> Bool {
-        let r1 = self.resolve(in: environment)
-        let r2 = other.resolve(in: environment)
-        let threshold: Float = 0.02
-        return abs(r1.red - r2.red) < threshold &&
-               abs(r1.green - r2.green) < threshold &&
-               abs(r1.blue - r2.blue) < threshold
+    func isSimilar(to other: Color, colorScheme: ColorScheme) -> Bool {
+        let c1 = self.resolveRGB(colorScheme: colorScheme)
+        let c2 = other.resolveRGB(colorScheme: colorScheme)
+        let threshold: CGFloat = 0.02
+        return abs(c1.r - c2.r) < threshold &&
+               abs(c1.g - c2.g) < threshold &&
+               abs(c1.b - c2.b) < threshold
     }
 }
 
@@ -81,7 +90,7 @@ struct DrawingToolbar: View {
     @Binding var eraserWidth: CGFloat
     @Binding var isErasing: Bool
     var undoManager: UndoManager?
-    @Environment(\.self) private var environment
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var showColorPicker = false
     @State private var showPenSlider = false
@@ -242,7 +251,7 @@ struct DrawingToolbar: View {
                         if selectedColor == color && !isErasing {
                             Image(systemName: "checkmark")
                                 .font(.caption2.bold())
-                                .foregroundStyle(color.isLight(in: environment) ? .black : .white)
+                                .foregroundStyle(color.isLight(colorScheme: colorScheme) ? .black : .white)
                         }
                     }
                     .overlay {
@@ -435,7 +444,7 @@ struct AddColorView: View {
     let defaultColor: Color
     var onBack: () -> Void
     @Environment(\.dismiss) var dismiss
-    @Environment(\.self) private var environment
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var newColor: Color = .blue
 
@@ -503,7 +512,7 @@ struct AddColorView: View {
     }
 
     private func addOrSelect(_ color: Color) {
-        if let existing = toolbarIcons.first(where: { $0.type == .color && $0.color?.isSimilar(to: color, in: environment) == true }) {
+        if let existing = toolbarIcons.first(where: { $0.type == .color && $0.color?.isSimilar(to: color, colorScheme: colorScheme) == true }) {
             selectedColor = existing.color ?? color
         } else {
             let newIcon = ToolbarIcon.colorIcon(color, name: "Custom")
@@ -522,7 +531,7 @@ struct EditColorView: View {
     @Binding var toolbarIcons: [ToolbarIcon]
     let icon: ToolbarIcon
     @Binding var selectedColor: Color
-    @Environment(\.self) private var environment
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) var dismiss
 
     // Preset colors
@@ -579,7 +588,7 @@ struct EditColorView: View {
 
     private func updateColor(to newColor: Color) {
         // Check if another icon already has this color
-        if let existing = toolbarIcons.first(where: { $0.id != icon.id && $0.type == .color && $0.color?.isSimilar(to: newColor, in: environment) == true }) {
+        if let existing = toolbarIcons.first(where: { $0.id != icon.id && $0.type == .color && $0.color?.isSimilar(to: newColor, colorScheme: colorScheme) == true }) {
             // Delete the icon being edited and select the existing one
             withAnimation(.spring(response: 0.3)) {
                 toolbarIcons.removeAll { $0.id == icon.id }

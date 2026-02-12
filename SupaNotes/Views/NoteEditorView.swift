@@ -1,13 +1,19 @@
 import SwiftUI
+import SwiftData
 import PencilKit
 
 struct NoteEditorView: View {
-    @Bindable var note: Note
+    @Environment(\.modelContext) private var modelContext
+    let noteID: PersistentIdentifier
     @State private var selectedColor: Color = .primary
     @State private var penWidth: CGFloat = 3.0
     @State private var eraserWidth: CGFloat = 40.0
     @State private var isErasing = false
     @State private var canvasUndoManager: UndoManager?
+
+    private var note: Note? {
+        modelContext.model(for: noteID) as? Note
+    }
 
     private var currentTool: PKTool {
         if isErasing {
@@ -18,17 +24,32 @@ struct NoteEditorView: View {
     }
 
     var body: some View {
+        if let note {
+            noteContent(note)
+        } else {
+            ContentUnavailableView("Note not found", systemImage: "exclamationmark.triangle")
+        }
+    }
+
+    @ViewBuilder
+    private func noteContent(_ note: Note) -> some View {
         VStack(spacing: 0) {
-            TextField("Note Title", text: $note.title)
-                .font(.title2)
-                .padding(.horizontal)
-                .padding(.vertical, 8)
+            TextField("Note Title", text: Binding(
+                get: { note.title },
+                set: { note.title = $0 }
+            ))
+            .font(.title2)
+            .padding(.horizontal)
+            .padding(.vertical, 8)
 
             Divider()
 
             ZStack(alignment: .leading) {
                 CanvasView(
-                    drawingData: $note.drawingData,
+                    drawingData: Binding(
+                        get: { note.drawingData },
+                        set: { note.drawingData = $0 }
+                    ),
                     tool: currentTool,
                     onUndoManagerReady: { canvasUndoManager = $0 }
                 )

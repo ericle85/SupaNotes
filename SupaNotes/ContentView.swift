@@ -2,19 +2,23 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
+    @State private var selectedNoteID: PersistentIdentifier?
+
     var body: some View {
         NavigationSplitView {
-            NoteListView()
+            NoteListView(selectedNoteID: $selectedNoteID)
                 .navigationTitle("Your Notes")
-                .navigationDestination(for: Note.self) { note in
-                    NoteEditorView(note: note)
-                }
         } detail: {
-            ContentUnavailableView(
-                "Select a Note",
-                systemImage: "pencil.and.scribble",
-                description: Text("Choose a note from the sidebar or create a new one.")
-            )
+            if let selectedNoteID {
+                NoteEditorView(noteID: selectedNoteID)
+                    .id(selectedNoteID)
+            } else {
+                ContentUnavailableView(
+                    "Select a Note",
+                    systemImage: "pencil.and.scribble",
+                    description: Text("Choose a note from the sidebar or create a new one.")
+                )
+            }
         }
         .navigationSplitViewStyle(.balanced)
     }

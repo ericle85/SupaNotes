@@ -4,11 +4,12 @@ import SwiftData
 struct NoteListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Note.updatedAt, order: .reverse) private var notes: [Note]
+    @Binding var selectedNoteID: PersistentIdentifier?
 
     var body: some View {
-        List {
+        List(selection: $selectedNoteID) {
             ForEach(notes) { note in
-                NavigationLink(value: note) {
+                NavigationLink(value: note.persistentModelID) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(note.title)
                             .font(.headline)
@@ -39,11 +40,16 @@ struct NoteListView: View {
     private func addNote() {
         let note = Note()
         modelContext.insert(note)
+        selectedNoteID = note.persistentModelID
     }
 
     private func deleteNotes(at offsets: IndexSet) {
         for index in offsets {
-            modelContext.delete(notes[index])
+            let note = notes[index]
+            if selectedNoteID == note.persistentModelID {
+                selectedNoteID = nil
+            }
+            modelContext.delete(note)
         }
     }
 }
