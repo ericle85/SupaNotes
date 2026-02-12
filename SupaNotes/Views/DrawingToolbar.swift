@@ -11,40 +11,13 @@ extension Color {
         return luminance > 0.6
     }
 
-    func isSimilar(to other: Color) -> Bool {
-        #if os(iOS)
-        let uiColor1 = UIColor(self)
-        let uiColor2 = UIColor(other)
-
-        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
-        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
-
-        // getRed can fail if color isn't in RGB color space
-        guard uiColor1.getRed(&r1, green: &g1, blue: &b1, alpha: &a1),
-              uiColor2.getRed(&r2, green: &g2, blue: &b2, alpha: &a2) else {
-            // Fallback: convert to RGB color space first
-            guard let rgb1 = uiColor1.cgColor.converted(to: CGColorSpaceCreateDeviceRGB(), intent: .defaultIntent, options: nil),
-                  let rgb2 = uiColor2.cgColor.converted(to: CGColorSpaceCreateDeviceRGB(), intent: .defaultIntent, options: nil),
-                  let components1 = rgb1.components,
-                  let components2 = rgb2.components,
-                  components1.count >= 3,
-                  components2.count >= 3 else {
-                return false
-            }
-
-            let threshold: CGFloat = 0.02  // Increased threshold
-            return abs(components1[0] - components2[0]) < threshold &&
-                   abs(components1[1] - components2[1]) < threshold &&
-                   abs(components1[2] - components2[2]) < threshold
-        }
-
-        let threshold: CGFloat = 0.02  // Increased threshold to catch visually similar colors
-        return abs(r1 - r2) < threshold &&
-               abs(g1 - g2) < threshold &&
-               abs(b1 - b2) < threshold
-        #else
-        return false
-        #endif
+    func isSimilar(to other: Color, in environment: EnvironmentValues) -> Bool {
+        let r1 = self.resolve(in: environment)
+        let r2 = other.resolve(in: environment)
+        let threshold: Float = 0.02
+        return abs(r1.red - r2.red) < threshold &&
+               abs(r1.green - r2.green) < threshold &&
+               abs(r1.blue - r2.blue) < threshold
     }
 }
 
@@ -373,88 +346,174 @@ struct AddToolMenuView: View {
     let defaultColor: Color
     @Environment(\.dismiss) var dismiss
 
+    @State private var showColorPage = false
+
+    var body: some View {
+        if showColorPage {
+            AddColorView(
+                toolbarIcons: $toolbarIcons,
+                selectedColor: $selectedColor,
+                isErasing: $isErasing,
+                defaultColor: defaultColor,
+                onBack: { showColorPage = false }
+            )
+        } else {
+            VStack(spacing: 8) {
+                Text("Add Tool")
+                    .font(.headline)
+                    .padding(.bottom, 4)
+
+                Button {
+                    showColorPage = true
+                } label: {
+                    HStack {
+                        Image(systemName: "paintpalette.fill")
+                            .foregroundStyle(.blue)
+                            .frame(width: 24)
+                        Text("Color")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                    .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                }
+
+                Button {
+                    // Future: add lasso tool
+                } label: {
+                    HStack {
+                        Image(systemName: "lasso")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 24)
+                        Text("Lasso")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("Coming Soon")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                }
+                .disabled(true)
+
+                Button {
+                    // Future: add image tool
+                } label: {
+                    HStack {
+                        Image(systemName: "photo")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 24)
+                        Text("Image")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("Coming Soon")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                }
+                .disabled(true)
+            }
+            .buttonStyle(.plain)
+            .padding(16)
+            .frame(width: 220)
+            .presentationCompactAdaptation(.popover)
+        }
+    }
+}
+
+// MARK: - Add Color View
+struct AddColorView: View {
+    @Binding var toolbarIcons: [ToolbarIcon]
+    @Binding var selectedColor: Color
+    @Binding var isErasing: Bool
+    let defaultColor: Color
+    var onBack: () -> Void
+    @Environment(\.dismiss) var dismiss
+    @Environment(\.self) private var environment
+
     @State private var newColor: Color = .blue
 
-    init(toolbarIcons: Binding<[ToolbarIcon]>, selectedColor: Binding<Color>, isErasing: Binding<Bool>, defaultColor: Color) {
+    init(toolbarIcons: Binding<[ToolbarIcon]>, selectedColor: Binding<Color>, isErasing: Binding<Bool>, defaultColor: Color, onBack: @escaping () -> Void) {
         _toolbarIcons = toolbarIcons
         _selectedColor = selectedColor
         _isErasing = isErasing
         self.defaultColor = defaultColor
+        self.onBack = onBack
         _newColor = State(initialValue: defaultColor)
     }
 
+    private let presetColors: [Color] = [
+        .white, .black, .red, .orange, .yellow, .green, .blue, .purple
+    ]
+
     var body: some View {
-        VStack(spacing: 20) {
-            Text("Add Tool")
-                .font(.headline)
+        VStack(spacing: 16) {
+            HStack {
+                Button { onBack() } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.body.bold())
+                }
+                Spacer()
+                Text("Add Color")
+                    .font(.headline)
+                Spacer()
+                // Balance the back button
+                Image(systemName: "chevron.left")
+                    .font(.body.bold())
+                    .hidden()
+            }
+
+            LazyVGrid(columns: [
+                GridItem(.adaptive(minimum: 44), spacing: 12)
+            ], spacing: 12) {
+                ForEach(presetColors, id: \.self) { color in
+                    Button {
+                        addOrSelect(color)
+                    } label: {
+                        Circle()
+                            .fill(color)
+                            .frame(width: 44, height: 44)
+                            .overlay {
+                                Circle()
+                                    .strokeBorder(Color.primary.opacity(0.2), lineWidth: 1)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
 
             Divider()
 
-            // Color option
-            VStack(spacing: 12) {
-                HStack {
-                    Image(systemName: "paintpalette.fill")
-                        .foregroundStyle(.blue)
-                    Text("Color")
-                        .font(.subheadline)
-                    Spacer()
-                }
+            ColorPicker("Custom Color", selection: $newColor, supportsOpacity: false)
 
-                ColorPicker("Choose Color", selection: $newColor, supportsOpacity: false)
-
-                Button("Add Color") {
-                    // Check if this color already exists in the toolbar
-                    if let existing = toolbarIcons.first(where: { $0.type == .color && $0.color?.isSimilar(to: newColor) == true }) {
-                        // Just select the existing one
-                        selectedColor = existing.color ?? newColor
-                    } else {
-                        let newIcon = ToolbarIcon.colorIcon(newColor, name: "Custom")
-                        withAnimation(.spring(response: 0.3)) {
-                            toolbarIcons.append(newIcon)
-                        }
-                        selectedColor = newColor
-                    }
-                    isErasing = false
-                    dismiss()
-                }
-                .buttonStyle(.borderedProminent)
+            Button("Add Color") {
+                addOrSelect(newColor)
             }
-            .padding()
-            .background {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.secondary.opacity(0.1))
-            }
-
-            // Future tools (coming soon)
-            VStack(spacing: 8) {
-                HStack {
-                    Image(systemName: "lasso")
-                        .foregroundStyle(.secondary)
-                    Text("Lasso Tool")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("Coming Soon")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-
-                HStack {
-                    Image(systemName: "photo")
-                        .foregroundStyle(.secondary)
-                    Text("Image Tool")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("Coming Soon")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .padding()
+            .buttonStyle(.borderedProminent)
         }
         .padding(20)
-        .frame(width: 280)
+        .frame(width: 260)
+        .presentationCompactAdaptation(.popover)
+    }
+
+    private func addOrSelect(_ color: Color) {
+        if let existing = toolbarIcons.first(where: { $0.type == .color && $0.color?.isSimilar(to: color, in: environment) == true }) {
+            selectedColor = existing.color ?? color
+        } else {
+            let newIcon = ToolbarIcon.colorIcon(color, name: "Custom")
+            withAnimation(.spring(response: 0.3)) {
+                toolbarIcons.append(newIcon)
+            }
+            selectedColor = color
+        }
+        isErasing = false
+        dismiss()
     }
 }
 
@@ -463,6 +522,7 @@ struct EditColorView: View {
     @Binding var toolbarIcons: [ToolbarIcon]
     let icon: ToolbarIcon
     @Binding var selectedColor: Color
+    @Environment(\.self) private var environment
     @Environment(\.dismiss) var dismiss
 
     // Preset colors
@@ -519,7 +579,7 @@ struct EditColorView: View {
 
     private func updateColor(to newColor: Color) {
         // Check if another icon already has this color
-        if let existing = toolbarIcons.first(where: { $0.id != icon.id && $0.type == .color && $0.color?.isSimilar(to: newColor) == true }) {
+        if let existing = toolbarIcons.first(where: { $0.id != icon.id && $0.type == .color && $0.color?.isSimilar(to: newColor, in: environment) == true }) {
             // Delete the icon being edited and select the existing one
             withAnimation(.spring(response: 0.3)) {
                 toolbarIcons.removeAll { $0.id == icon.id }
