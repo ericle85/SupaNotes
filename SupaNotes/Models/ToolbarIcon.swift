@@ -26,14 +26,24 @@ enum ToolType: String, Codable, CaseIterable {
 }
 
 // MARK: - Toolbar Icon Model (Generic for all tools)
-struct ToolbarIcon: Identifiable, Equatable {
-    let id = UUID()
+struct ToolbarIcon: Identifiable, Equatable, Codable {
+    let id: UUID
     let type: ToolType
 
     // Type-specific properties
-    var color: Color?       // For color tools
-    var size: CGFloat?      // For pencil/eraser size
+    var colorData: CodableColor?  // For color tools (Codable)
+    var size: CGFloat?            // For pencil/eraser size
     var name: String
+
+    // Computed property for backward compatibility
+    var color: Color? {
+        colorData?.toColor()
+    }
+
+    // Custom coding keys to exclude computed property
+    enum CodingKeys: String, CodingKey {
+        case id, type, colorData, size, name
+    }
 
     // Essential tool types (must always have at least 1 of each)
     static let essentialTypes: Set<ToolType> = [.color, .pencil, .eraser]
@@ -57,12 +67,17 @@ struct ToolbarIcon: Identifiable, Equatable {
     }
 
     // Helper to create a color icon
-    static func colorIcon(_ color: Color, name: String = "Color") -> ToolbarIcon {
-        ToolbarIcon(type: .color, color: color, name: name)
+    static func colorIcon(_ color: Color, name: String = "Color", colorScheme: ColorScheme) -> ToolbarIcon {
+        ToolbarIcon(
+            id: UUID(),
+            type: .color,
+            colorData: CodableColor(color: color, colorScheme: colorScheme),
+            name: name
+        )
     }
 
     // Helper to create a tool icon
     static func toolIcon(_ type: ToolType, name: String? = nil) -> ToolbarIcon {
-        ToolbarIcon(type: type, name: name ?? type.displayName)
+        ToolbarIcon(id: UUID(), type: type, name: name ?? type.displayName)
     }
 }

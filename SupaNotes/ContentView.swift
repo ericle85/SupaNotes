@@ -27,4 +27,5 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .modelContainer(for: Note.self, inMemory: true)
+        .environment(ToolbarState())
 }

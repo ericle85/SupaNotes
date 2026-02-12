@@ -4,11 +4,9 @@ import PencilKit
 
 struct NoteEditorView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(ToolbarState.self) private var toolbar
     let noteID: PersistentIdentifier
-    @State private var selectedColor: Color = .black
-    @State private var penWidth: CGFloat = 3.0
-    @State private var eraserWidth: CGFloat = 40.0
-    @State private var isErasing = false
     @State private var canvasUndoManager: UndoManager?
 
     private var note: Note? {
@@ -16,10 +14,10 @@ struct NoteEditorView: View {
     }
 
     private var currentTool: PKTool {
-        if isErasing {
-            return PKEraserTool(.bitmap, width: eraserWidth)
+        if toolbar.isErasing {
+            return PKEraserTool(.bitmap, width: toolbar.eraserWidth)
         } else {
-            return PKInkingTool(.pen, color: UIColor(selectedColor), width: penWidth)
+            return PKInkingTool(.pen, color: UIColor(toolbar.selectedColor), width: toolbar.penWidth)
         }
     }
 
@@ -33,6 +31,8 @@ struct NoteEditorView: View {
 
     @ViewBuilder
     private func noteContent(_ note: Note) -> some View {
+        @Bindable var toolbar = toolbar
+
         VStack(spacing: 0) {
             TextField("Note Title", text: Binding(
                 get: { note.title },
@@ -55,10 +55,11 @@ struct NoteEditorView: View {
                 )
 
                 DrawingToolbar(
-                    selectedColor: $selectedColor,
-                    penWidth: $penWidth,
-                    eraserWidth: $eraserWidth,
-                    isErasing: $isErasing,
+                    toolbarIcons: $toolbar.toolbarIcons,
+                    selectedColor: $toolbar.selectedColor,
+                    penWidth: $toolbar.penWidth,
+                    eraserWidth: $toolbar.eraserWidth,
+                    isErasing: $toolbar.isErasing,
                     undoManager: canvasUndoManager
                 )
                 .padding(.leading, 12)
@@ -72,6 +73,21 @@ struct NoteEditorView: View {
         }
         .onChange(of: note.title) {
             note.updatedAt = .now
+        }
+        .onChange(of: toolbar.selectedColor) {
+            toolbar.save(colorScheme: colorScheme)
+        }
+        .onChange(of: toolbar.penWidth) {
+            toolbar.save(colorScheme: colorScheme)
+        }
+        .onChange(of: toolbar.eraserWidth) {
+            toolbar.save(colorScheme: colorScheme)
+        }
+        .onChange(of: toolbar.isErasing) {
+            toolbar.save(colorScheme: colorScheme)
+        }
+        .onChange(of: toolbar.toolbarIcons) {
+            toolbar.save(colorScheme: colorScheme)
         }
     }
 }

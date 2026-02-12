@@ -61,7 +61,7 @@ struct EditColorView: View {
     }
 
     private func updateColor(to newColor: Color) {
-        let candidate = ToolbarIcon.colorIcon(newColor)
+        let candidate = ToolbarIcon.colorIcon(newColor, colorScheme: colorScheme)
         if let existing = toolbarIcons.first(where: { $0.id != icon.id && $0.isEquivalent(to: candidate, colorScheme: colorScheme) }) {
             // Delete the icon being edited and select the existing one
             withAnimation(.spring(response: 0.3)) {
@@ -71,7 +71,7 @@ struct EditColorView: View {
             dismiss()
         } else if let index = toolbarIcons.firstIndex(where: { $0.id == icon.id }) {
             // Mutate in place to preserve the icon's ID (keeps the popover open)
-            toolbarIcons[index].color = newColor
+            toolbarIcons[index].colorData = CodableColor(color: newColor, colorScheme: colorScheme)
             selectedColor = newColor
         }
     }

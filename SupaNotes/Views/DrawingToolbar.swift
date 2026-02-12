@@ -2,6 +2,7 @@ import SwiftUI
 import PencilKit
 
 struct DrawingToolbar: View {
+    @Binding var toolbarIcons: [ToolbarIcon]
     @Binding var selectedColor: Color
     @Binding var penWidth: CGFloat
     @Binding var eraserWidth: CGFloat
@@ -13,13 +14,6 @@ struct DrawingToolbar: View {
     @State private var showPenSlider = false
     @State private var showEraserSlider = false
     @State private var editingColorID: UUID?  // Track which color is being edited
-
-    @State private var toolbarIcons: [ToolbarIcon] = [
-          .colorIcon(.black, name: "Black"),
-          .colorIcon(.red, name: "Red"),
-          .colorIcon(.blue, name: "Blue"),
-          .colorIcon(.green, name: "Green"),
-      ]
 
     // Drag-to-delete state
     @State private var draggedIconID: UUID?

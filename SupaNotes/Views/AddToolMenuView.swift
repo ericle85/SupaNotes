@@ -165,11 +165,11 @@ struct AddColorView: View {
     }
 
     private func addOrSelect(_ color: Color) {
-        let candidate = ToolbarIcon.colorIcon(color)
+        let candidate = ToolbarIcon.colorIcon(color, colorScheme: colorScheme)
         if let existing = toolbarIcons.first(where: { $0.isEquivalent(to: candidate, colorScheme: colorScheme) }) {
             selectedColor = existing.color ?? color
         } else {
-            let newIcon = ToolbarIcon.colorIcon(color, name: "Custom")
+            let newIcon = ToolbarIcon.colorIcon(color, name: "Custom", colorScheme: colorScheme)
             withAnimation(.spring(response: 0.3)) {
                 toolbarIcons.append(newIcon)
             }
