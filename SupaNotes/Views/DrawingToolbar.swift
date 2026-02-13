@@ -5,7 +5,6 @@ struct DrawingToolbar: View {
     @Binding var toolbarIcons: [ToolbarIcon]
     @Binding var selectedColor: Color
     @Binding var activeTool: ActiveTool
-    var onImageRequested: () -> Void
     var undoManager: UndoManager?
     @Environment(\.colorScheme) private var colorScheme
 
@@ -75,8 +74,7 @@ struct DrawingToolbar: View {
                     toolbarIcons: $toolbarIcons,
                     selectedColor: $selectedColor,
                     activeTool: $activeTool,
-                    defaultColor: lastDeletedColor,
-                    onImageRequested: onImageRequested
+                    defaultColor: lastDeletedColor
                 )
             }
         }
@@ -200,7 +198,6 @@ struct DrawingToolbar: View {
         case .eraser: return activeTool == .eraser
         case .highlighter: return activeTool == .highlighter
         case .lasso: return activeTool == .lasso
-        case .text: return activeTool == .text
         default: return false
         }
     }
@@ -211,7 +208,6 @@ struct DrawingToolbar: View {
         case .eraser: return .eraser
         case .highlighter: return .highlighter
         case .lasso: return .lasso
-        case .text: return .text
         default: return .pen
         }
     }
@@ -257,7 +253,7 @@ struct DrawingToolbar: View {
                     editingIconID = icon.id
                 } else {
                     selectedColor = color
-                    if activeTool == .eraser || activeTool == .lasso || activeTool == .text {
+                    if activeTool == .eraser || activeTool == .lasso {
                         activeTool = .pen
                     }
                 }
@@ -271,8 +267,6 @@ struct DrawingToolbar: View {
             }
         case .lasso:
             activeTool = .lasso
-        case .text:
-            activeTool = .text
         default:
             break
         }

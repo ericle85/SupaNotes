@@ -9,9 +9,6 @@ final class Note {
     var createdAt: Date
     var updatedAt: Date
 
-    @Relationship(deleteRule: .cascade, inverse: \NoteImage.note) var images: [NoteImage] = []
-    @Relationship(deleteRule: .cascade, inverse: \NoteTextBox.note) var textBoxes: [NoteTextBox] = []
-
     init(title: String = "Untitled Note", drawingData: Data = Data()) {
         self.id = UUID()
         self.title = title

@@ -1,7 +1,6 @@
 import SwiftUI
 import SwiftData
 import PencilKit
-import PhotosUI
 
 struct NoteEditorView: View {
     @Environment(\.modelContext) private var modelContext
@@ -9,8 +8,6 @@ struct NoteEditorView: View {
     @Environment(ToolbarState.self) private var toolbar
     let noteID: PersistentIdentifier
     @State private var canvasUndoManager: UndoManager?
-    @State private var showPhotoPicker = false
-    @State private var selectedPhoto: PhotosPickerItem?
 
     private var note: Note? {
         modelContext.registeredModel(for: noteID) as Note?
@@ -24,7 +21,7 @@ struct NoteEditorView: View {
             return PKEraserTool(.bitmap, width: toolbar.instrumentWidth(for: .eraser))
         case .highlighter:
             return PKInkingTool(.marker, color: UIColor(toolbar.selectedColor), width: toolbar.instrumentWidth(for: .highlighter))
-        case .lasso, .text:
+        case .lasso:
             return PKLassoTool()
         }
     }
@@ -53,7 +50,7 @@ struct NoteEditorView: View {
             Divider()
 
             ZStack(alignment: .leading) {
-                // Layer 1: Canvas
+                // Canvas
                 CanvasView(
                     drawingData: Binding(
                         get: { note.drawingData },
@@ -63,33 +60,11 @@ struct NoteEditorView: View {
                     onUndoManagerReady: { canvasUndoManager = $0 }
                 )
 
-                // Layer 2: Transparent tap overlay for text tool
-                if toolbar.activeTool == .text {
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture { location in
-                            addTextBox(to: note, at: location)
-                        }
-                }
-
-                // Layer 3: Image overlays
-                ForEach(note.images) { image in
-                    DraggableImageView(noteImage: image)
-                        .allowsHitTesting(toolbar.activeTool == .lasso || toolbar.activeTool == .text)
-                }
-
-                // Layer 4: Textbox overlays
-                ForEach(note.textBoxes) { textBox in
-                    DraggableTextBoxView(noteTextBox: textBox)
-                        .allowsHitTesting(toolbar.activeTool == .lasso || toolbar.activeTool == .text)
-                }
-
-                // Layer 5: Toolbar
+                // Toolbar
                 DrawingToolbar(
                     toolbarIcons: $toolbar.toolbarIcons,
                     selectedColor: $toolbar.selectedColor,
                     activeTool: $toolbar.activeTool,
-                    onImageRequested: { showPhotoPicker = true },
                     undoManager: canvasUndoManager
                 )
                 .padding(.leading, 12)
@@ -98,15 +73,6 @@ struct NoteEditorView: View {
         }
         .navigationTitle(note.title)
         .navigationBarTitleDisplayMode(.inline)
-        .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhoto, matching: .images)
-        .onChange(of: selectedPhoto) {
-            if let selectedPhoto {
-                Task {
-                    await loadImage(from: selectedPhoto, into: note)
-                }
-                self.selectedPhoto = nil
-            }
-        }
         .onChange(of: note.drawingData) {
             note.updatedAt = .now
         }
@@ -122,41 +88,5 @@ struct NoteEditorView: View {
         .onChange(of: toolbar.toolbarIcons) {
             toolbar.save(colorScheme: colorScheme)
         }
-    }
-
-    // MARK: - Image Loading
-    private func loadImage(from item: PhotosPickerItem, into note: Note) async {
-        guard let data = try? await item.loadTransferable(type: Data.self) else { return }
-
-        let noteImage = NoteImage(
-            imageData: data,
-            x: 200,
-            y: 300,
-            width: 250,
-            height: 250
-        )
-        noteImage.note = note
-        modelContext.insert(noteImage)
-        note.updatedAt = .now
-
-        // Switch to lasso mode so user can reposition
-        await MainActor.run {
-            toolbar.activeTool = .lasso
-        }
-    }
-
-    // MARK: - Textbox Creation
-    private func addTextBox(to note: Note, at location: CGPoint? = nil) {
-        let textBox = NoteTextBox(
-            text: "Text",
-            x: Double(location?.x ?? 200),
-            y: Double(location?.y ?? 300),
-            width: 200,
-            height: 60,
-            fontSize: 18
-        )
-        textBox.note = note
-        modelContext.insert(textBox)
-        note.updatedAt = .now
     }
 }

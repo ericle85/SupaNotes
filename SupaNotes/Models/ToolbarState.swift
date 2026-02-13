@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum ActiveTool: String, Codable, Equatable {
-    case pen, eraser, highlighter, lasso, text
+    case pen, eraser, highlighter, lasso
 }
 
 @Observable

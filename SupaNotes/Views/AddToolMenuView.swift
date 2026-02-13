@@ -6,7 +6,6 @@ struct AddToolMenuView: View {
     @Binding var selectedColor: Color
     @Binding var activeTool: ActiveTool
     let defaultColor: Color
-    var onImageRequested: () -> Void
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) private var colorScheme
 
@@ -92,45 +91,6 @@ struct AddToolMenuView: View {
                     .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
                 }
 
-                // Image
-                Button {
-                    onImageRequested()
-                    dismiss()
-                } label: {
-                    HStack {
-                        Image(systemName: "photo")
-                            .foregroundStyle(.green)
-                            .frame(width: 24)
-                        Text("Image")
-                        Spacer()
-                    }
-                    .padding(.vertical, 10)
-                    .padding(.horizontal, 12)
-                    .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
-                }
-
-                // Textbox — adds as toolbar icon
-                Button {
-                    let candidate = ToolbarIcon.toolIcon(.text)
-                    if !toolbarIcons.contains(where: { $0.isEquivalent(to: candidate, colorScheme: colorScheme) }) {
-                        withAnimation(.spring(response: 0.3)) {
-                            toolbarIcons.append(candidate)
-                        }
-                    }
-                    activeTool = .text
-                    dismiss()
-                } label: {
-                    HStack {
-                        Image(systemName: "textformat")
-                            .foregroundStyle(.teal)
-                            .frame(width: 24)
-                        Text("Textbox")
-                        Spacer()
-                    }
-                    .padding(.vertical, 10)
-                    .padding(.horizontal, 12)
-                    .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
-                }
             }
             .buttonStyle(.plain)
             .padding(16)
@@ -225,7 +185,7 @@ struct AddColorView: View {
             }
             selectedColor = color
         }
-        if activeTool == .eraser || activeTool == .lasso || activeTool == .text {
+        if activeTool == .eraser || activeTool == .lasso {
             activeTool = .pen
         }
         dismiss()

@@ -7,8 +7,6 @@ enum ToolType: String, Codable, CaseIterable {
     case eraser
     case highlighter
     case lasso
-    case image
-    case text
 
     var iconName: String {
         switch self {
@@ -17,8 +15,6 @@ enum ToolType: String, Codable, CaseIterable {
         case .eraser: return "eraser.fill"
         case .highlighter: return "highlighter"
         case .lasso: return "lasso"
-        case .image: return "photo"
-        case .text: return "textformat"
         }
     }
 

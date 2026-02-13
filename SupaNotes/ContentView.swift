@@ -26,6 +26,6 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [Note.self, NoteImage.self, NoteTextBox.self], inMemory: true)
+        .modelContainer(for: Note.self, inMemory: true)
         .environment(ToolbarState())
 }
