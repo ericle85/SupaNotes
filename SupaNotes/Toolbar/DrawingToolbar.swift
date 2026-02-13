@@ -17,6 +17,10 @@ struct DrawingToolbar: View {
     @State private var isDraggingOutOfBounds = false
     @State private var lastDeletedColor: Color = .blue
 
+    // Undo/redo availability
+    @State private var canUndo = false
+    @State private var canRedo = false
+
     // Reorder state — visual only; array is not mutated until onEnded
     @State private var dragStartZoneIndex: Int?
     @State private var proposedZoneIndex: Int?
@@ -25,7 +29,7 @@ struct DrawingToolbar: View {
     // MARK: - Axis abstraction
     private var toolbarAxis: Axis { .vertical }
 
-    private let slotPitch: CGFloat = 36 // 24pt icon + 12pt spacing
+    private let slotPitch: CGFloat = ToolbarConstants.tapTargetSize + 2 // tap target + spacing
 
     private func mainAxisValue(_ size: CGSize) -> CGFloat {
         toolbarAxis == .vertical ? size.height : size.width
@@ -72,23 +76,31 @@ struct DrawingToolbar: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 2) {
             // Undo / Redo
             Button { undoManager?.undo() } label: {
                 Image(systemName: "arrow.uturn.backward")
+                    .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
+                    .contentShape(Rectangle())
             }
+            .disabled(!canUndo)
+            .opacity(canUndo ? 1 : 0.3)
             Button { undoManager?.redo() } label: {
                 Image(systemName: "arrow.uturn.forward")
+                    .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
+                    .contentShape(Rectangle())
             }
+            .disabled(!canRedo)
+            .opacity(canRedo ? 1 : 0.3)
 
-            Divider().frame(width: 28)
+            Divider().frame(width: 36)
 
             // Tool zone
             ForEach(toolIcons) { icon in
                 iconButton(for: icon)
             }
 
-            Divider().frame(width: 28)
+            Divider().frame(width: 36)
 
             // Color zone
             ForEach(colorIcons) { icon in
@@ -102,15 +114,17 @@ struct DrawingToolbar: View {
                 ZStack {
                     Circle()
                         .fill(Color.secondary.opacity(0.15))
-                        .frame(width: 24, height: 24)
+                        .frame(width: 26, height: 26)
 
                     Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.primary)
                 }
                 .overlay {
                     Circle().stroke(Color.primary.opacity(0.3), lineWidth: 1)
                 }
+                .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
+                .contentShape(Circle())
             }
             .popover(isPresented: $showColorPicker) {
                 AddToolMenuView(
@@ -131,6 +145,15 @@ struct DrawingToolbar: View {
                 .fill(.ultraThinMaterial)
                 .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 2)
         }
+        .onAppear { updateUndoState() }
+        .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidUndoChange)) { _ in updateUndoState() }
+        .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidRedoChange)) { _ in updateUndoState() }
+        .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidCloseUndoGroup)) { _ in updateUndoState() }
+    }
+
+    private func updateUndoState() {
+        canUndo = undoManager?.canUndo ?? false
+        canRedo = undoManager?.canRedo ?? false
     }
 
     // MARK: - Icon Button with Drag-to-Reorder/Delete
@@ -143,6 +166,8 @@ struct DrawingToolbar: View {
                 toolIconView(icon: icon)
             }
         }
+        .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
+        .contentShape(Rectangle())
         .scaleEffect(isDragged ? (isDraggingOutOfBounds ? 0.8 : 1.05) : 1.0)
         .shadow(color: isDragged && !isDraggingOutOfBounds ? .black.opacity(0.2) : .clear, radius: 4, x: 0, y: 2)
         .offset(isDragged ? dragTranslation : mainAxisOffset(reorderDisplacement(for: icon)))
@@ -295,7 +320,7 @@ struct DrawingToolbar: View {
     private func toolIconView(icon: ToolbarIcon) -> some View {
         let isActive = activeToolMatches(icon.type)
         return Image(systemName: icon.type.iconName)
-            .font(.system(size: 14))
+            .font(.system(size: 16))
             .fontWeight(isActive ? .bold : .regular)
             .frame(width: 24, height: 24)
             .foregroundStyle(toolForeground(for: icon.type, isActive: isActive))

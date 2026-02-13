@@ -1,5 +1,11 @@
 import SwiftUI
 
+// MARK: - Toolbar Layout Constants
+enum ToolbarConstants {
+    /// Minimum touch target size per Apple HIG (44×44 pt).
+    static let tapTargetSize: CGFloat = 38
+}
+
 // MARK: - Tool Type Enum
 enum ToolType: String, Codable, CaseIterable {
     case color
