@@ -50,7 +50,7 @@ struct AddToolMenuView: View {
                     let candidate = ToolbarIcon.toolIcon(.highlighter)
                     if !toolbarIcons.contains(where: { $0.isEquivalent(to: candidate, colorScheme: colorScheme) }) {
                         withAnimation(.spring(response: 0.3)) {
-                            toolbarIcons.append(candidate)
+                            toolbarIcons.appendToZone(candidate)
                         }
                     }
                     activeTool = .highlighter
@@ -73,7 +73,7 @@ struct AddToolMenuView: View {
                     let candidate = ToolbarIcon.toolIcon(.lasso)
                     if !toolbarIcons.contains(where: { $0.isEquivalent(to: candidate, colorScheme: colorScheme) }) {
                         withAnimation(.spring(response: 0.3)) {
-                            toolbarIcons.append(candidate)
+                            toolbarIcons.appendToZone(candidate)
                         }
                     }
                     activeTool = .lasso
@@ -181,7 +181,7 @@ struct AddColorView: View {
         } else {
             let newIcon = ToolbarIcon.colorIcon(color, name: "Custom", colorScheme: colorScheme)
             withAnimation(.spring(response: 0.3)) {
-                toolbarIcons.append(newIcon)
+                toolbarIcons.appendToZone(newIcon)
             }
             selectedColor = color
         }

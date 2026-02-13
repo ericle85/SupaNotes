@@ -95,3 +95,21 @@ struct ToolbarIcon: Identifiable, Equatable, Codable {
         )
     }
 }
+
+// MARK: - Zone-aware insertion
+extension Array where Element == ToolbarIcon {
+    /// Inserts the icon at the end of its zone (tools before colors).
+    mutating func appendToZone(_ icon: ToolbarIcon) {
+        if icon.type == .color {
+            // Append at the very end (color zone is last)
+            append(icon)
+        } else {
+            // Insert after the last non-color icon
+            if let lastToolIndex = lastIndex(where: { $0.type != .color }) {
+                insert(icon, at: lastToolIndex + 1)
+            } else {
+                insert(icon, at: 0)
+            }
+        }
+    }
+}
