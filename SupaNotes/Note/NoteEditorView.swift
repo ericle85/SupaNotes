@@ -3,14 +3,17 @@ import SwiftData
 import PencilKit
 
 struct NoteEditorView: View {
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(ToolbarState.self) private var toolbar
-    let noteID: PersistentIdentifier
+    @Query private var notes: [Note]
     @State private var canvasUndoManager: UndoManager?
 
-    private var note: Note? {
-        modelContext.registeredModel(for: noteID) as Note?
+    private var note: Note? { notes.first }
+
+    init(noteID: UUID) {
+        _notes = Query(filter: #Predicate<Note> { note in
+            note.id == noteID
+        })
     }
 
     private var currentTool: PKTool {
