@@ -29,20 +29,8 @@ struct CanvasView: UIViewRepresentable {
     }
 
     func updateUIView(_ canvasView: PKCanvasView, context: Context) {
-        let coordinator = context.coordinator
-        coordinator.drawingData = $drawingData
-
+        context.coordinator.drawingData = $drawingData
         canvasView.tool = tool
-
-        guard !coordinator.isUpdatingFromCanvas else { return }
-
-        let currentData = canvasView.drawing.dataRepresentation()
-        if currentData != drawingData {
-            coordinator.isLoadingDrawing = true
-            let drawing = (try? PKDrawing(data: drawingData)) ?? PKDrawing()
-            canvasView.drawing = drawing
-            coordinator.isLoadingDrawing = false
-        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -51,8 +39,6 @@ struct CanvasView: UIViewRepresentable {
 
     class Coordinator: NSObject, PKCanvasViewDelegate {
         var drawingData: Binding<Data>
-        var isUpdatingFromCanvas = false
-        var isLoadingDrawing = false
         weak var canvasView: PKCanvasView?
 
         init(drawingData: Binding<Data>) {
@@ -60,12 +46,7 @@ struct CanvasView: UIViewRepresentable {
         }
 
         func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
-            guard !isLoadingDrawing else { return }
-            isUpdatingFromCanvas = true
             drawingData.wrappedValue = canvasView.drawing.dataRepresentation()
-            DispatchQueue.main.async {
-                self.isUpdatingFromCanvas = false
-            }
         }
     }
 }
