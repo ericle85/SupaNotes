@@ -198,7 +198,7 @@ struct DrawingToolbar: View {
                     let mainDelta = mainAxisValue(translation)
                     let proposedSlotHome = CGFloat(curProposed - startIdx) * slotPitch
                     let deltaFromProposed = mainDelta - proposedSlotHome
-                    let threshold = slotPitch * 0.55
+                    let threshold = slotPitch * 0.5
 
                     var newProposed = curProposed
                     if deltaFromProposed > threshold {
@@ -211,7 +211,8 @@ struct DrawingToolbar: View {
                     let clamped = max(0, min(newProposed, zone.count - 1))
 
                     if clamped != curProposed {
-                        withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.8)) {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.86)) {
                             proposedZoneIndex = clamped
                         }
                     }
@@ -242,7 +243,7 @@ struct DrawingToolbar: View {
                     dragZoneIsColor = false
 
                     // Animate dragged item settling into its new slot
-                    withAnimation(.spring(response: 0.3)) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
                         draggedIconID = nil
                         dragTranslation = .zero
                         isDraggingOutOfBounds = false
