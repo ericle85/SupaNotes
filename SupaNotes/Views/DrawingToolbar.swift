@@ -17,9 +17,9 @@ struct DrawingToolbar: View {
     @State private var isDraggingOutOfBounds = false
     @State private var lastDeletedColor: Color = .blue
 
-    // Reorder state
+    // Reorder state — visual only; array is not mutated until onEnded
     @State private var dragStartZoneIndex: Int?
-    @State private var currentZoneIndex: Int?
+    @State private var proposedZoneIndex: Int?
     @State private var dragZoneIsColor: Bool = false
 
     // MARK: - Axis abstraction
@@ -39,21 +39,6 @@ struct DrawingToolbar: View {
         toolbarAxis == .vertical ? CGSize(width: 0, height: value) : CGSize(width: value, height: 0)
     }
 
-    /// The offset applied to the dragged icon so it stays glued to the finger
-    /// even as the array reorders underneath it.
-    private var residualOffset: CGSize {
-        guard let start = dragStartZoneIndex, let current = currentZoneIndex else {
-            return dragTranslation
-        }
-        let mainShift = mainAxisValue(dragTranslation) - CGFloat(current - start) * slotPitch
-        let crossShift = crossAxisValue(dragTranslation)
-        if toolbarAxis == .vertical {
-            return CGSize(width: crossShift, height: mainShift)
-        } else {
-            return CGSize(width: mainShift, height: crossShift)
-        }
-    }
-
     // Computed filtered lists
     private var toolIcons: [ToolbarIcon] {
         toolbarIcons.filter { $0.type != .color }
@@ -61,6 +46,29 @@ struct DrawingToolbar: View {
 
     private var colorIcons: [ToolbarIcon] {
         toolbarIcons.filter { $0.type == .color }
+    }
+
+    /// Main-axis displacement for a non-dragged item so it visually makes room.
+    private func reorderDisplacement(for icon: ToolbarIcon) -> CGFloat {
+        guard let dragID = draggedIconID, dragID != icon.id,
+              let startIdx = dragStartZoneIndex,
+              let proposed = proposedZoneIndex,
+              startIdx != proposed else { return 0 }
+
+        let isColor = icon.type == .color
+        guard isColor == dragZoneIsColor else { return 0 }
+
+        let zone = isColor ? colorIcons : toolIcons
+        guard let myIdx = zone.firstIndex(where: { $0.id == icon.id }) else { return 0 }
+
+        if startIdx < proposed {
+            // Dragged toward higher index: items in (startIdx, proposed] shift backward
+            if myIdx > startIdx && myIdx <= proposed { return -slotPitch }
+        } else {
+            // Dragged toward lower index: items in [proposed, startIdx) shift forward
+            if myIdx >= proposed && myIdx < startIdx { return slotPitch }
+        }
+        return 0
     }
 
     var body: some View {
@@ -137,7 +145,7 @@ struct DrawingToolbar: View {
         }
         .scaleEffect(isDragged ? (isDraggingOutOfBounds ? 0.8 : 1.05) : 1.0)
         .shadow(color: isDragged && !isDraggingOutOfBounds ? .black.opacity(0.2) : .clear, radius: 4, x: 0, y: 2)
-        .offset(isDragged ? residualOffset : .zero)
+        .offset(isDragged ? dragTranslation : mainAxisOffset(reorderDisplacement(for: icon)))
         .zIndex(isDragged ? 100 : 0)
         .popover(isPresented: Binding(
             get: { editingIconID == icon.id },
@@ -151,7 +159,7 @@ struct DrawingToolbar: View {
                     let translation = value.translation
                     guard abs(translation.width) > 2 || abs(translation.height) > 2 else { return }
 
-                    // Initialize drag on first significant movement
+                    // Initialize on first significant movement
                     if draggedIconID != icon.id {
                         draggedIconID = icon.id
                         let isColor = icon.type == .color
@@ -159,7 +167,7 @@ struct DrawingToolbar: View {
                         let zone = isColor ? colorIcons : toolIcons
                         let zoneIdx = zone.firstIndex(where: { $0.id == icon.id }) ?? 0
                         dragStartZoneIndex = zoneIdx
-                        currentZoneIndex = zoneIdx
+                        proposedZoneIndex = zoneIdx
                     }
 
                     dragTranslation = translation
@@ -182,16 +190,30 @@ struct DrawingToolbar: View {
                         return
                     }
 
-                    // Main-axis reorder
-                    guard !isDraggingOutOfBounds, let startIdx = dragStartZoneIndex, let curIdx = currentZoneIndex else { return }
-                    let mainDelta = mainAxisValue(translation)
-                    let targetIdx = max(0, startIdx + Int(round(mainDelta / slotPitch)))
-                    let zone = dragZoneIsColor ? colorIcons : toolIcons
-                    let clampedTarget = min(targetIdx, zone.count - 1)
+                    // Main-axis reorder (visual only)
+                    guard !isDraggingOutOfBounds,
+                          let startIdx = dragStartZoneIndex,
+                          let curProposed = proposedZoneIndex else { return }
 
-                    if clampedTarget != curIdx {
-                        moveIconInZone(id: icon.id, toZoneIndex: clampedTarget, isColor: dragZoneIsColor)
-                        currentZoneIndex = clampedTarget
+                    let mainDelta = mainAxisValue(translation)
+                    let proposedSlotHome = CGFloat(curProposed - startIdx) * slotPitch
+                    let deltaFromProposed = mainDelta - proposedSlotHome
+                    let threshold = slotPitch * 0.55
+
+                    var newProposed = curProposed
+                    if deltaFromProposed > threshold {
+                        newProposed = curProposed + 1
+                    } else if deltaFromProposed < -threshold {
+                        newProposed = curProposed - 1
+                    }
+
+                    let zone = dragZoneIsColor ? colorIcons : toolIcons
+                    let clamped = max(0, min(newProposed, zone.count - 1))
+
+                    if clamped != curProposed {
+                        withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.8)) {
+                            proposedZoneIndex = clamped
+                        }
                     }
                 }
                 .onEnded { value in
@@ -200,42 +222,54 @@ struct DrawingToolbar: View {
                         handleIconTap(icon)
                     }
 
+                    // Commit reorder to actual array
+                    if let startIdx = dragStartZoneIndex,
+                       let targetIdx = proposedZoneIndex,
+                       startIdx != targetIdx {
+                        moveIconInZone(id: icon.id, toZoneIndex: targetIdx, isColor: dragZoneIsColor)
+                        // Adjust translation so visual position stays put after layout shift
+                        let layoutDelta = CGFloat(startIdx - targetIdx) * slotPitch
+                        if toolbarAxis == .vertical {
+                            dragTranslation.height += layoutDelta
+                        } else {
+                            dragTranslation.width += layoutDelta
+                        }
+                    }
+
+                    // Clear reorder tracking instantly (net visual change = 0)
+                    dragStartZoneIndex = nil
+                    proposedZoneIndex = nil
+                    dragZoneIsColor = false
+
+                    // Animate dragged item settling into its new slot
                     withAnimation(.spring(response: 0.3)) {
                         draggedIconID = nil
                         dragTranslation = .zero
                         isDraggingOutOfBounds = false
-                        dragStartZoneIndex = nil
-                        currentZoneIndex = nil
                     }
                 }
         )
     }
 
-    // MARK: - Reorder Helper
-    /// Moves an icon to a target zone-local index within its zone (tools or colors).
+    // MARK: - Reorder Commit
     private func moveIconInZone(id: UUID, toZoneIndex target: Int, isColor: Bool) {
         guard let currentFlatIndex = toolbarIcons.firstIndex(where: { $0.id == id }) else { return }
-
-        // Build list of flat indices for this zone
-        let zoneIndices = toolbarIcons.indices.filter { isColor ? toolbarIcons[$0].type == .color : toolbarIcons[$0].type != .color }
-        let clampedTarget = min(max(target, 0), zoneIndices.count - 1)
-        let targetFlatIndex = zoneIndices[clampedTarget]
-
-        guard currentFlatIndex != targetFlatIndex else { return }
-
-        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-            let icon = toolbarIcons.remove(at: currentFlatIndex)
-            // After removal, recalculate zone indices
-            let newZoneIndices = toolbarIcons.indices.filter { isColor ? toolbarIcons[$0].type == .color : toolbarIcons[$0].type != .color }
-            let insertAt: Int
-            if clampedTarget >= newZoneIndices.count {
-                // Insert after the last item in zone
-                insertAt = (newZoneIndices.last ?? toolbarIcons.count - 1) + 1
-            } else {
-                insertAt = newZoneIndices[clampedTarget]
-            }
-            toolbarIcons.insert(icon, at: insertAt)
+        let icon = toolbarIcons.remove(at: currentFlatIndex)
+        let newZoneIndices = toolbarIcons.indices.filter {
+            isColor ? toolbarIcons[$0].type == .color : toolbarIcons[$0].type != .color
         }
+        let clampedTarget = min(max(target, 0), newZoneIndices.count)
+        let insertAt: Int
+        if clampedTarget >= newZoneIndices.count {
+            if let last = newZoneIndices.last {
+                insertAt = last + 1
+            } else {
+                insertAt = isColor ? toolbarIcons.count : 0
+            }
+        } else {
+            insertAt = newZoneIndices[clampedTarget]
+        }
+        toolbarIcons.insert(icon, at: insertAt)
     }
 
     // MARK: - Color Icon
