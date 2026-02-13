@@ -60,7 +60,8 @@ struct NoteEditorView: View {
                         set: { note.drawingData = $0 }
                     ),
                     tool: currentTool,
-                    onUndoManagerReady: { canvasUndoManager = $0 }
+                    onUndoManagerReady: { canvasUndoManager = $0 },
+                    onPencilDoubleTap: { toolbar.switchToPreviousTool() }
                 )
 
                 // Toolbar
@@ -85,7 +86,10 @@ struct NoteEditorView: View {
         .onChange(of: toolbar.selectedColor) {
             toolbar.save(colorScheme: colorScheme)
         }
-        .onChange(of: toolbar.activeTool) {
+        .onChange(of: toolbar.activeTool) { oldValue, newValue in
+            if oldValue != newValue {
+                toolbar.previousTool = oldValue
+            }
             toolbar.save(colorScheme: colorScheme)
         }
         .onChange(of: toolbar.toolbarIcons) {

@@ -10,6 +10,14 @@ final class ToolbarState {
     var activeTool: ActiveTool = .pen
     var toolbarIcons: [ToolbarIcon] = []
 
+    var previousTool: ActiveTool = .eraser
+
+    func switchToPreviousTool() {
+        let oldTool = activeTool
+        activeTool = previousTool
+        previousTool = oldTool
+    }
+
     private static let selectedColorKey = "toolbar.selectedColor"
     private static let activeToolKey = "toolbar.activeTool"
     private static let isErasingKey = "toolbar.isErasing" // backward compat
