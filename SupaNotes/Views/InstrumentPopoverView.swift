@@ -6,6 +6,8 @@ struct InstrumentPopoverView: View {
     let displayColor: Color
     let colorOpacity: Double
 
+    @State private var selectedPresetIndex: Int?
+
     var body: some View {
         VStack(spacing: 16) {
             // Size preview
@@ -31,9 +33,10 @@ struct InstrumentPopoverView: View {
             HStack(spacing: 16) {
                 ForEach(0..<3, id: \.self) { index in
                     Button {
+                        selectedPresetIndex = index
                         settings.width = settings.presets[index]
                     } label: {
-                        let isActive = abs(settings.width - settings.presets[index]) < 0.5
+                        let isActive = selectedPresetIndex == index
                         Circle()
                             .fill(displayColor.opacity(colorOpacity))
                             .frame(
@@ -54,6 +57,18 @@ struct InstrumentPopoverView: View {
         }
         .padding(20)
         .presentationCompactAdaptation(.popover)
+        .onAppear {
+            // Determine initially selected preset
+            selectedPresetIndex = settings.presets.firstIndex(where: {
+                abs(settings.width - $0) < 0.5
+            })
+        }
+        .onChange(of: settings.width) {
+            // Update the selected preset's value when the slider moves
+            if let index = selectedPresetIndex {
+                settings.presets[index] = settings.width
+            }
+        }
     }
 
     private var previewScale: CGFloat {
