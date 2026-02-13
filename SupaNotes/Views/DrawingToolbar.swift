@@ -2,30 +2,74 @@ import SwiftUI
 import PencilKit
 
 struct DrawingToolbar: View {
+    @Binding var toolbarIcons: [ToolbarIcon]
     @Binding var selectedColor: Color
-    @Binding var penWidth: CGFloat
-    @Binding var eraserWidth: CGFloat
-    @Binding var isErasing: Bool
+    @Binding var activeTool: ActiveTool
     var undoManager: UndoManager?
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var showColorPicker = false
-    @State private var showPenSlider = false
-    @State private var showEraserSlider = false
-    @State private var editingColorID: UUID?  // Track which color is being edited
+    @State private var editingIconID: UUID?
 
-    @State private var toolbarIcons: [ToolbarIcon] = [
-          .colorIcon(.black, name: "Black"),
-          .colorIcon(.red, name: "Red"),
-          .colorIcon(.blue, name: "Blue"),
-          .colorIcon(.green, name: "Green"),
-      ]
-
-    // Drag-to-delete state
+    // Drag state
     @State private var draggedIconID: UUID?
-    @State private var dragOffset: CGSize = .zero
-    @State private var isOutOfBounds = false
+    @State private var dragTranslation: CGSize = .zero
+    @State private var isDraggingOutOfBounds = false
     @State private var lastDeletedColor: Color = .blue
+
+    // Reorder state — visual only; array is not mutated until onEnded
+    @State private var dragStartZoneIndex: Int?
+    @State private var proposedZoneIndex: Int?
+    @State private var dragZoneIsColor: Bool = false
+
+    // MARK: - Axis abstraction
+    private var toolbarAxis: Axis { .vertical }
+
+    private let slotPitch: CGFloat = 36 // 24pt icon + 12pt spacing
+
+    private func mainAxisValue(_ size: CGSize) -> CGFloat {
+        toolbarAxis == .vertical ? size.height : size.width
+    }
+
+    private func crossAxisValue(_ size: CGSize) -> CGFloat {
+        toolbarAxis == .vertical ? size.width : size.height
+    }
+
+    private func mainAxisOffset(_ value: CGFloat) -> CGSize {
+        toolbarAxis == .vertical ? CGSize(width: 0, height: value) : CGSize(width: value, height: 0)
+    }
+
+    // Computed filtered lists
+    private var toolIcons: [ToolbarIcon] {
+        toolbarIcons.filter { $0.type != .color }
+    }
+
+    private var colorIcons: [ToolbarIcon] {
+        toolbarIcons.filter { $0.type == .color }
+    }
+
+    /// Main-axis displacement for a non-dragged item so it visually makes room.
+    private func reorderDisplacement(for icon: ToolbarIcon) -> CGFloat {
+        guard let dragID = draggedIconID, dragID != icon.id,
+              let startIdx = dragStartZoneIndex,
+              let proposed = proposedZoneIndex,
+              startIdx != proposed else { return 0 }
+
+        let isColor = icon.type == .color
+        guard isColor == dragZoneIsColor else { return 0 }
+
+        let zone = isColor ? colorIcons : toolIcons
+        guard let myIdx = zone.firstIndex(where: { $0.id == icon.id }) else { return 0 }
+
+        if startIdx < proposed {
+            // Dragged toward higher index: items in (startIdx, proposed] shift backward
+            if myIdx > startIdx && myIdx <= proposed { return -slotPitch }
+        } else {
+            // Dragged toward lower index: items in [proposed, startIdx) shift forward
+            if myIdx >= proposed && myIdx < startIdx { return slotPitch }
+        }
+        return 0
+    }
 
     var body: some View {
         VStack(spacing: 12) {
@@ -39,77 +83,19 @@ struct DrawingToolbar: View {
 
             Divider().frame(width: 28)
 
-            // Pen
-            Button {
-                if !isErasing {
-                    showPenSlider.toggle()
-                } else {
-                    isErasing = false
-                }
-                showEraserSlider = false
-            } label: {
-                Image(systemName: "pencil.tip")
-                    .fontWeight(!isErasing ? .bold : .regular)
-            }
-            .foregroundStyle(!isErasing ? selectedColor : .secondary)
-            .popover(isPresented: $showPenSlider, arrowEdge: .trailing) {
-                VStack(spacing: 16) {
-                    Circle()
-                        .fill(selectedColor)
-                        .frame(width: max(penWidth, 6), height: max(penWidth, 6))
-                        .frame(width: 50, height: 50)
-
-                    Slider(value: $penWidth, in: 1...50)
-                        .frame(width: 200)
-
-                    Text("\(Int(penWidth)) pt")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(20)
-                .presentationCompactAdaptation(.popover)
-            }
-
-            // Eraser
-            Button {
-                if isErasing {
-                    showEraserSlider.toggle()
-                } else {
-                    isErasing = true
-                }
-                showPenSlider = false
-            } label: {
-                Image(systemName: "eraser.fill")
-                    .fontWeight(isErasing ? .bold : .regular)
-            }
-            .foregroundStyle(isErasing ? .primary : .secondary)
-            .popover(isPresented: $showEraserSlider, arrowEdge: .trailing) {
-                VStack(spacing: 16) {
-                    Circle()
-                        .fill(Color.primary)
-                        .frame(width: max(eraserWidth * 0.5, 6), height: max(eraserWidth * 0.5, 6))
-                        .frame(width: 50, height: 50)
-
-                    Slider(value: $eraserWidth, in: 10...150)
-                        .frame(width: 200)
-
-                    Text("\(Int(eraserWidth)) pt")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(20)
-                .presentationCompactAdaptation(.popover)
+            // Tool zone
+            ForEach(toolIcons) { icon in
+                iconButton(for: icon)
             }
 
             Divider().frame(width: 28)
 
-            // Toolbar icons (colors and tools)
-            ForEach(toolbarIcons) { icon in
+            // Color zone
+            ForEach(colorIcons) { icon in
                 iconButton(for: icon)
-                    .opacity(draggedIconID == icon.id ? 0.3 : 1.0)
             }
 
-            // Plus button - hub to add new tools
+            // Plus button
             Button {
                 showColorPicker = true
             } label: {
@@ -130,7 +116,7 @@ struct DrawingToolbar: View {
                 AddToolMenuView(
                     toolbarIcons: $toolbarIcons,
                     selectedColor: $selectedColor,
-                    isErasing: $isErasing,
+                    activeTool: $activeTool,
                     defaultColor: lastDeletedColor
                 )
             }
@@ -147,109 +133,271 @@ struct DrawingToolbar: View {
         }
     }
 
-    // MARK: - Icon Button with Drag-to-Delete
+    // MARK: - Icon Button with Drag-to-Reorder/Delete
     private func iconButton(for icon: ToolbarIcon) -> some View {
-        // Render based on tool type
-        Group {
+        let isDragged = draggedIconID == icon.id
+        return Group {
             if icon.type == .color, let color = icon.color {
-                // Color circle
-                Circle()
-                    .fill(color)
-                    .frame(width: 24, height: 24)
-                    .overlay {
-                        if !isErasing && selectedColor.isSimilar(to: color, colorScheme: colorScheme) {
-                            Image(systemName: "checkmark")
-                                .font(.caption2.bold())
-                                .foregroundStyle(color.isLight(colorScheme: colorScheme) ? .black : .white)
-                        }
-                    }
-                    .overlay {
-                        Circle().stroke(Color.primary.opacity(0.3), lineWidth: 1)
-                    }
+                colorIconView(icon: icon, color: color)
             } else {
-                // Other tool types (future: lasso, image, etc.)
-                Image(systemName: icon.type.iconName)
-                    .font(.system(size: 14))
-                    .frame(width: 24, height: 24)
+                toolIconView(icon: icon)
             }
         }
-        .scaleEffect(draggedIconID == icon.id ? (isOutOfBounds ? 0.8 : 1.0) : 1.0)
-        .offset(draggedIconID == icon.id ? dragOffset : .zero)
+        .scaleEffect(isDragged ? (isDraggingOutOfBounds ? 0.8 : 1.05) : 1.0)
+        .shadow(color: isDragged && !isDraggingOutOfBounds ? .black.opacity(0.2) : .clear, radius: 4, x: 0, y: 2)
+        .offset(isDragged ? dragTranslation : mainAxisOffset(reorderDisplacement(for: icon)))
+        .zIndex(isDragged ? 100 : 0)
         .popover(isPresented: Binding(
-            get: { editingColorID == icon.id },
-            set: { if !$0 { editingColorID = nil } }
+            get: { editingIconID == icon.id },
+            set: { if !$0 { editingIconID = nil } }
         )) {
-            if icon.type == .color {
-                EditColorView(
-                    toolbarIcons: $toolbarIcons,
-                    icon: icon,
-                    selectedColor: $selectedColor
-                )
-            }
+            popoverContent(for: icon)
         }
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
-                    // Track dragging
-                    if value.translation.width != 0 || value.translation.height != 0 {
+                    let translation = value.translation
+                    guard abs(translation.width) > 2 || abs(translation.height) > 2 else { return }
+
+                    // Initialize on first significant movement
+                    if draggedIconID != icon.id {
                         draggedIconID = icon.id
-                        dragOffset = value.translation
+                        let isColor = icon.type == .color
+                        dragZoneIsColor = isColor
+                        let zone = isColor ? colorIcons : toolIcons
+                        let zoneIdx = zone.firstIndex(where: { $0.id == icon.id }) ?? 0
+                        dragStartZoneIndex = zoneIdx
+                        proposedZoneIndex = zoneIdx
+                    }
 
-                        // Check if out of bounds (60px threshold)
-                        let distance = sqrt(pow(value.translation.width, 2) + pow(value.translation.height, 2))
+                    dragTranslation = translation
 
-                        // Check if we can delete this icon
-                        let canDelete: Bool = {
-                            if !icon.isEssential {
-                                return true  // Non-essential tools can always be deleted
-                            } else {
-                                // For essential tools, check if there's at least one other of the same type
-                                let countOfType = toolbarIcons.filter { $0.type == icon.type }.count
-                                return countOfType > 1
-                            }
-                        }()
+                    let crossAxis = abs(crossAxisValue(translation))
+                    let canDelete: Bool = {
+                        if !icon.isEssential { return true }
+                        return toolbarIcons.filter { $0.type == icon.type }.count > 1
+                    }()
 
-                        // Auto-delete when dragged far enough
-                        if distance > 45 && !isOutOfBounds && canDelete {
-                            isOutOfBounds = true
+                    // Cross-axis deletion
+                    if crossAxis > 50 && !isDraggingOutOfBounds && canDelete {
+                        isDraggingOutOfBounds = true
+                        if icon.type == .color, let deletedColor = icon.color {
+                            lastDeletedColor = deletedColor
+                        }
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            toolbarIcons.removeAll { $0.id == icon.id }
+                        }
+                        return
+                    }
 
-                            // Save the color if it's a color icon (for quick re-add)
-                            if icon.type == .color, let deletedColor = icon.color {
-                                lastDeletedColor = deletedColor
-                            }
+                    // Main-axis reorder (visual only)
+                    guard !isDraggingOutOfBounds,
+                          let startIdx = dragStartZoneIndex,
+                          let curProposed = proposedZoneIndex else { return }
 
-                            // Remove from array - others will auto-slide in
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                toolbarIcons.removeAll { $0.id == icon.id }
-                            }
+                    let mainDelta = mainAxisValue(translation)
+                    let proposedSlotHome = CGFloat(curProposed - startIdx) * slotPitch
+                    let deltaFromProposed = mainDelta - proposedSlotHome
+                    let threshold = slotPitch * 0.5
+
+                    var newProposed = curProposed
+                    if deltaFromProposed > threshold {
+                        newProposed = curProposed + 1
+                    } else if deltaFromProposed < -threshold {
+                        newProposed = curProposed - 1
+                    }
+
+                    let zone = dragZoneIsColor ? colorIcons : toolIcons
+                    let clamped = max(0, min(newProposed, zone.count - 1))
+
+                    if clamped != curProposed {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.86)) {
+                            proposedZoneIndex = clamped
                         }
                     }
                 }
                 .onEnded { value in
                     let distance = sqrt(pow(value.translation.width, 2) + pow(value.translation.height, 2))
-
                     if distance < 5 {
-                        // Just a tap - select the tool or edit if already selected
-                        if icon.type == .color, let color = icon.color {
-                            if !isErasing && selectedColor.isSimilar(to: color, colorScheme: colorScheme) {
-                                // Already selected - open color picker to edit
-                                editingColorID = icon.id
-                            } else {
-                                // Not selected - select it
-                                selectedColor = color
-                                isErasing = false
-                            }
-                        }
-                        // Future: handle other tool types
+                        handleIconTap(icon)
                     }
 
-                    // Reset drag state
-                    withAnimation(.spring(response: 0.3)) {
+                    // Commit reorder to actual array
+                    if let startIdx = dragStartZoneIndex,
+                       let targetIdx = proposedZoneIndex,
+                       startIdx != targetIdx {
+                        moveIconInZone(id: icon.id, toZoneIndex: targetIdx, isColor: dragZoneIsColor)
+                        // Adjust translation so visual position stays put after layout shift
+                        let layoutDelta = CGFloat(startIdx - targetIdx) * slotPitch
+                        if toolbarAxis == .vertical {
+                            dragTranslation.height += layoutDelta
+                        } else {
+                            dragTranslation.width += layoutDelta
+                        }
+                    }
+
+                    // Clear reorder tracking instantly (net visual change = 0)
+                    dragStartZoneIndex = nil
+                    proposedZoneIndex = nil
+                    dragZoneIsColor = false
+
+                    // Animate dragged item settling into its new slot
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
                         draggedIconID = nil
-                        dragOffset = .zero
-                        isOutOfBounds = false
+                        dragTranslation = .zero
+                        isDraggingOutOfBounds = false
                     }
                 }
+        )
+    }
+
+    // MARK: - Reorder Commit
+    private func moveIconInZone(id: UUID, toZoneIndex target: Int, isColor: Bool) {
+        guard let currentFlatIndex = toolbarIcons.firstIndex(where: { $0.id == id }) else { return }
+        let icon = toolbarIcons.remove(at: currentFlatIndex)
+        let newZoneIndices = toolbarIcons.indices.filter {
+            isColor ? toolbarIcons[$0].type == .color : toolbarIcons[$0].type != .color
+        }
+        let clampedTarget = min(max(target, 0), newZoneIndices.count)
+        let insertAt: Int
+        if clampedTarget >= newZoneIndices.count {
+            if let last = newZoneIndices.last {
+                insertAt = last + 1
+            } else {
+                insertAt = isColor ? toolbarIcons.count : 0
+            }
+        } else {
+            insertAt = newZoneIndices[clampedTarget]
+        }
+        toolbarIcons.insert(icon, at: insertAt)
+    }
+
+    // MARK: - Color Icon
+    private func colorIconView(icon: ToolbarIcon, color: Color) -> some View {
+        let isDrawingTool = activeTool == .pen || activeTool == .highlighter
+        return Circle()
+            .fill(color)
+            .frame(width: 24, height: 24)
+            .overlay {
+                if isDrawingTool && selectedColor.isSimilar(to: color, colorScheme: colorScheme) {
+                    Image(systemName: "checkmark")
+                        .font(.caption2.bold())
+                        .foregroundStyle(color.isLight(colorScheme: colorScheme) ? .black : .white)
+                }
+            }
+            .overlay {
+                Circle().stroke(Color.primary.opacity(0.3), lineWidth: 1)
+            }
+    }
+
+    // MARK: - Tool Icon
+    private func toolIconView(icon: ToolbarIcon) -> some View {
+        let isActive = activeToolMatches(icon.type)
+        return Image(systemName: icon.type.iconName)
+            .font(.system(size: 14))
+            .fontWeight(isActive ? .bold : .regular)
+            .frame(width: 24, height: 24)
+            .foregroundStyle(toolForeground(for: icon.type, isActive: isActive))
+    }
+
+    private func toolForeground(for type: ToolType, isActive: Bool) -> some ShapeStyle {
+        if !isActive { return AnyShapeStyle(.secondary) }
+        switch type {
+        case .pencil, .highlighter:
+            return AnyShapeStyle(selectedColor)
+        default:
+            return AnyShapeStyle(.primary)
+        }
+    }
+
+    private func activeToolMatches(_ type: ToolType) -> Bool {
+        switch type {
+        case .pencil: return activeTool == .pen
+        case .eraser: return activeTool == .eraser
+        case .highlighter: return activeTool == .highlighter
+        case .lasso: return activeTool == .lasso
+        default: return false
+        }
+    }
+
+    private func activeToolFor(_ type: ToolType) -> ActiveTool {
+        switch type {
+        case .pencil: return .pen
+        case .eraser: return .eraser
+        case .highlighter: return .highlighter
+        case .lasso: return .lasso
+        default: return .pen
+        }
+    }
+
+    // MARK: - Popover Content
+    @ViewBuilder
+    private func popoverContent(for icon: ToolbarIcon) -> some View {
+        if icon.type == .color {
+            EditColorView(
+                toolbarIcons: $toolbarIcons,
+                icon: icon,
+                selectedColor: $selectedColor
+            )
+        } else if icon.type.isWritingInstrument,
+                  let idx = toolbarIcons.firstIndex(where: { $0.id == icon.id }) {
+            let range = sliderRange(for: icon.type)
+            let opacity: Double = icon.type == .highlighter ? 0.4 : 1.0
+            let color = icon.type == .eraser ? Color.primary : selectedColor
+            InstrumentPopoverView(
+                settings: $toolbarIcons[idx].instrumentSettings ?? .constant(.pen()),
+                sliderRange: range,
+                displayColor: color,
+                colorOpacity: opacity
+            )
+        }
+    }
+
+    private func sliderRange(for type: ToolType) -> ClosedRange<CGFloat> {
+        switch type {
+        case .pencil: return 1...50
+        case .eraser: return 10...150
+        case .highlighter: return 5...40
+        default: return 1...50
+        }
+    }
+
+    // MARK: - Icon Tap Handler
+    private func handleIconTap(_ icon: ToolbarIcon) {
+        switch icon.type {
+        case .color:
+            if let color = icon.color {
+                if (activeTool == .pen || activeTool == .highlighter) && selectedColor.isSimilar(to: color, colorScheme: colorScheme) {
+                    editingIconID = icon.id
+                } else {
+                    selectedColor = color
+                    if activeTool == .eraser || activeTool == .lasso {
+                        activeTool = .pen
+                    }
+                }
+            }
+        case .pencil, .eraser, .highlighter:
+            let targetTool = activeToolFor(icon.type)
+            if activeTool == targetTool {
+                editingIconID = icon.id // show instrument popover
+            } else {
+                activeTool = targetTool
+            }
+        case .lasso:
+            activeTool = .lasso
+        default:
+            break
+        }
+    }
+}
+
+// MARK: - Binding helper for optional instrumentSettings
+private extension Binding where Value == WritingInstrumentSettings? {
+    static func ?? (lhs: Binding<WritingInstrumentSettings?>, rhs: Binding<WritingInstrumentSettings>) -> Binding<WritingInstrumentSettings> {
+        Binding<WritingInstrumentSettings>(
+            get: { lhs.wrappedValue ?? rhs.wrappedValue },
+            set: { lhs.wrappedValue = $0 }
         )
     }
 }

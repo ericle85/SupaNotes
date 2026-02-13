@@ -1,0 +1,2 @@
+- Build on ipad
+- UI needs to be intuitive

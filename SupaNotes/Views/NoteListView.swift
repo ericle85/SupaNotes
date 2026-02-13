@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-struct NoteListView: View {
+struct  NoteListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Note.updatedAt, order: .reverse) private var notes: [Note]
     @Binding var selectedNoteID: PersistentIdentifier?

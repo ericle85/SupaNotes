@@ -4,9 +4,10 @@ import SwiftUI
 struct AddToolMenuView: View {
     @Binding var toolbarIcons: [ToolbarIcon]
     @Binding var selectedColor: Color
-    @Binding var isErasing: Bool
+    @Binding var activeTool: ActiveTool
     let defaultColor: Color
     @Environment(\.dismiss) var dismiss
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var showColorPage = false
 
@@ -15,7 +16,7 @@ struct AddToolMenuView: View {
             AddColorView(
                 toolbarIcons: $toolbarIcons,
                 selectedColor: $selectedColor,
-                isErasing: $isErasing,
+                activeTool: $activeTool,
                 defaultColor: defaultColor,
                 onBack: { showColorPage = false }
             )
@@ -25,6 +26,7 @@ struct AddToolMenuView: View {
                     .font(.headline)
                     .padding(.bottom, 4)
 
+                // Color
                 Button {
                     showColorPage = true
                 } label: {
@@ -43,43 +45,52 @@ struct AddToolMenuView: View {
                     .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
                 }
 
+                // Highlighter
                 Button {
-                    // Future: add lasso tool
+                    let candidate = ToolbarIcon.toolIcon(.highlighter)
+                    if !toolbarIcons.contains(where: { $0.isEquivalent(to: candidate, colorScheme: colorScheme) }) {
+                        withAnimation(.spring(response: 0.3)) {
+                            toolbarIcons.appendToZone(candidate)
+                        }
+                    }
+                    activeTool = .highlighter
+                    dismiss()
+                } label: {
+                    HStack {
+                        Image(systemName: "highlighter")
+                            .foregroundStyle(.orange)
+                            .frame(width: 24)
+                        Text("Highlighter")
+                        Spacer()
+                    }
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                    .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                }
+
+                // Lasso
+                Button {
+                    let candidate = ToolbarIcon.toolIcon(.lasso)
+                    if !toolbarIcons.contains(where: { $0.isEquivalent(to: candidate, colorScheme: colorScheme) }) {
+                        withAnimation(.spring(response: 0.3)) {
+                            toolbarIcons.appendToZone(candidate)
+                        }
+                    }
+                    activeTool = .lasso
+                    dismiss()
                 } label: {
                     HStack {
                         Image(systemName: "lasso")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.purple)
                             .frame(width: 24)
                         Text("Lasso")
-                            .foregroundStyle(.secondary)
                         Spacer()
-                        Text("Coming Soon")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
                     }
                     .padding(.vertical, 10)
                     .padding(.horizontal, 12)
+                    .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
                 }
-                .disabled(true)
 
-                Button {
-                    // Future: add image tool
-                } label: {
-                    HStack {
-                        Image(systemName: "photo")
-                            .foregroundStyle(.secondary)
-                            .frame(width: 24)
-                        Text("Image")
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text("Coming Soon")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(.vertical, 10)
-                    .padding(.horizontal, 12)
-                }
-                .disabled(true)
             }
             .buttonStyle(.plain)
             .padding(16)
@@ -93,7 +104,7 @@ struct AddToolMenuView: View {
 struct AddColorView: View {
     @Binding var toolbarIcons: [ToolbarIcon]
     @Binding var selectedColor: Color
-    @Binding var isErasing: Bool
+    @Binding var activeTool: ActiveTool
     let defaultColor: Color
     var onBack: () -> Void
     @Environment(\.dismiss) var dismiss
@@ -101,10 +112,10 @@ struct AddColorView: View {
 
     @State private var newColor: Color = .blue
 
-    init(toolbarIcons: Binding<[ToolbarIcon]>, selectedColor: Binding<Color>, isErasing: Binding<Bool>, defaultColor: Color, onBack: @escaping () -> Void) {
+    init(toolbarIcons: Binding<[ToolbarIcon]>, selectedColor: Binding<Color>, activeTool: Binding<ActiveTool>, defaultColor: Color, onBack: @escaping () -> Void) {
         _toolbarIcons = toolbarIcons
         _selectedColor = selectedColor
-        _isErasing = isErasing
+        _activeTool = activeTool
         self.defaultColor = defaultColor
         self.onBack = onBack
         _newColor = State(initialValue: defaultColor)
@@ -125,7 +136,6 @@ struct AddColorView: View {
                 Text("Add Color")
                     .font(.headline)
                 Spacer()
-                // Balance the back button
                 Image(systemName: "chevron.left")
                     .font(.body.bold())
                     .hidden()
@@ -165,17 +175,19 @@ struct AddColorView: View {
     }
 
     private func addOrSelect(_ color: Color) {
-        let candidate = ToolbarIcon.colorIcon(color)
+        let candidate = ToolbarIcon.colorIcon(color, colorScheme: colorScheme)
         if let existing = toolbarIcons.first(where: { $0.isEquivalent(to: candidate, colorScheme: colorScheme) }) {
             selectedColor = existing.color ?? color
         } else {
-            let newIcon = ToolbarIcon.colorIcon(color, name: "Custom")
+            let newIcon = ToolbarIcon.colorIcon(color, name: "Custom", colorScheme: colorScheme)
             withAnimation(.spring(response: 0.3)) {
-                toolbarIcons.append(newIcon)
+                toolbarIcons.appendToZone(newIcon)
             }
             selectedColor = color
         }
-        isErasing = false
+        if activeTool == .eraser || activeTool == .lasso {
+            activeTool = .pen
+        }
         dismiss()
     }
 }
