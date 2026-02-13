@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
-    @State private var selectedNoteID: PersistentIdentifier?
+    @State private var selectedNoteID: UUID?
 
     var body: some View {
         NavigationSplitView {
