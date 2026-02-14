@@ -8,6 +8,8 @@ final class Note {
     @Attribute(.externalStorage) var drawingData: Data
     var createdAt: Date
     var updatedAt: Date
+    @Relationship(deleteRule: .cascade, inverse: \Page.note)
+    var pages: [Page] = []
 
     init(title: String = "Untitled Note", drawingData: Data = Data()) {
         self.id = UUID()
