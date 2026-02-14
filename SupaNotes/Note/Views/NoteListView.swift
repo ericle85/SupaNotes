@@ -47,21 +47,14 @@ struct NoteListView: View {
                     Button {
                         onOpenNote(note.id)
                     } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(note.title)
-                                .font(.body)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.primary)
-                            Text(note.updatedAt, format: .relative(presentation: .named))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 4)
+                        NoteRowView(
+                            title: note.title,
+                            subtitle: note.updatedAt.formatted(.relative(presentation: .named))
+                        )
                     }
                     .swipeActions(edge: .trailing) {
                         Button("Delete", role: .destructive) {
-                            note.isDeleted = true
-                            note.deletedAt = .now
+                            note.moveToTrash()
                         }
                     }
                     .contextMenu {
@@ -69,8 +62,7 @@ struct NoteListView: View {
                             // TODO: Inline rename
                         }
                         Button("Move to Trash", role: .destructive) {
-                            note.isDeleted = true
-                            note.deletedAt = .now
+                            note.moveToTrash()
                         }
                     }
                 }

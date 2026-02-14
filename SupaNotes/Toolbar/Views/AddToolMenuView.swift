@@ -1,6 +1,5 @@
 import SwiftUI
 
-// MARK: - Add Tool Menu View
 struct AddToolMenuView: View {
     @Binding var toolbarIcons: [ToolbarIcon]
     @Binding var selectedColor: Color
@@ -26,76 +25,56 @@ struct AddToolMenuView: View {
                     .font(.headline)
                     .padding(.bottom, 4)
 
-                // Color
-                Button {
+                toolRow(icon: "paintpalette.fill", color: .blue, label: "Color", showChevron: true) {
                     showColorPage = true
-                } label: {
-                    HStack {
-                        Image(systemName: "paintpalette.fill")
-                            .foregroundStyle(.blue)
-                            .frame(width: 24)
-                        Text("Color")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(.vertical, 10)
-                    .padding(.horizontal, 12)
-                    .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
                 }
 
-                // Highlighter
-                Button {
-                    let candidate = ToolbarIcon.toolIcon(.highlighter)
-                    if !toolbarIcons.contains(where: { $0.isEquivalent(to: candidate, colorScheme: colorScheme) }) {
-                        withAnimation(.spring(response: 0.3)) {
-                            toolbarIcons.appendToZone(candidate)
-                        }
-                    }
+                toolRow(icon: "highlighter", color: .orange, label: "Highlighter") {
+                    addToolIfNeeded(.highlighter)
                     activeTool = .highlighter
                     dismiss()
-                } label: {
-                    HStack {
-                        Image(systemName: "highlighter")
-                            .foregroundStyle(.orange)
-                            .frame(width: 24)
-                        Text("Highlighter")
-                        Spacer()
-                    }
-                    .padding(.vertical, 10)
-                    .padding(.horizontal, 12)
-                    .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
                 }
 
-                // Lasso
-                Button {
-                    let candidate = ToolbarIcon.toolIcon(.lasso)
-                    if !toolbarIcons.contains(where: { $0.isEquivalent(to: candidate, colorScheme: colorScheme) }) {
-                        withAnimation(.spring(response: 0.3)) {
-                            toolbarIcons.appendToZone(candidate)
-                        }
-                    }
+                toolRow(icon: "lasso", color: .purple, label: "Lasso") {
+                    addToolIfNeeded(.lasso)
                     activeTool = .lasso
                     dismiss()
-                } label: {
-                    HStack {
-                        Image(systemName: "lasso")
-                            .foregroundStyle(.purple)
-                            .frame(width: 24)
-                        Text("Lasso")
-                        Spacer()
-                    }
-                    .padding(.vertical, 10)
-                    .padding(.horizontal, 12)
-                    .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
                 }
-
             }
             .buttonStyle(.plain)
             .padding(16)
             .frame(width: 220)
             .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    @ViewBuilder
+    private func toolRow(icon: String, color: Color, label: String, showChevron: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundStyle(color)
+                    .frame(width: Design.Layout.sidebarIconWidth)
+                Text(label)
+                Spacer()
+                if showChevron {
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: Design.CornerRadius.small))
+        }
+    }
+
+    private func addToolIfNeeded(_ type: ToolType) {
+        let candidate = ToolbarIcon.toolIcon(type)
+        if !toolbarIcons.contains(where: { $0.isEquivalent(to: candidate, colorScheme: colorScheme) }) {
+            withAnimation(.spring(response: 0.3)) {
+                toolbarIcons.appendToZone(candidate)
+            }
         }
     }
 }
@@ -121,10 +100,6 @@ struct AddColorView: View {
         _newColor = State(initialValue: defaultColor)
     }
 
-    private let presetColors: [Color] = [
-        .white, .black, .red, .orange, .yellow, .green, .blue, .purple
-    ]
-
     var body: some View {
         VStack(spacing: 16) {
             HStack {
@@ -141,23 +116,8 @@ struct AddColorView: View {
                     .hidden()
             }
 
-            LazyVGrid(columns: [
-                GridItem(.adaptive(minimum: 44), spacing: 12)
-            ], spacing: 12) {
-                ForEach(presetColors, id: \.self) { color in
-                    Button {
-                        addOrSelect(color)
-                    } label: {
-                        Circle()
-                            .fill(color)
-                            .frame(width: 44, height: 44)
-                            .overlay {
-                                Circle()
-                                    .strokeBorder(Color.primary.opacity(0.2), lineWidth: 1)
-                            }
-                    }
-                    .buttonStyle(.plain)
-                }
+            ColorSwatchGrid(colors: ColorPresets.all) { color in
+                addOrSelect(color)
             }
 
             Divider()
@@ -170,7 +130,7 @@ struct AddColorView: View {
             .buttonStyle(.borderedProminent)
         }
         .padding(20)
-        .frame(width: 260)
+        .frame(width: Design.Layout.sidebarWidth)
         .presentationCompactAdaptation(.popover)
     }
 

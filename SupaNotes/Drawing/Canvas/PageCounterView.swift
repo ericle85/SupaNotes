@@ -12,9 +12,14 @@ struct PageCounterView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: Design.CornerRadius.small)
                     .fill(Color("ToolbarBackground"))
-                    .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 1)
+                    .shadow(
+                        color: .black.opacity(Design.Shadow.subtle.color),
+                        radius: Design.Shadow.subtle.radius,
+                        x: Design.Shadow.subtle.x,
+                        y: Design.Shadow.subtle.y
+                    )
             )
     }
 }

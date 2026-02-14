@@ -10,46 +10,39 @@ enum NoteSortOrder: String, CaseIterable {
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var isSidebarVisible = true
-    @State private var selectedFolder: Folder?
-    @State private var showingAllNotes = true
-    @State private var showingTrash = false
-    @State private var showingSettings = false
+    @State private var destination: SidebarDestination = .allNotes
     @State private var sortOrder: NoteSortOrder = .lastEdited
     @State private var navigationPath = NavigationPath()
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
             HStack(spacing: 0) {
-                // Sidebar
                 if isSidebarVisible {
-                    FolderSidebarView(
-                        selectedFolder: $selectedFolder,
-                        showingAllNotes: $showingAllNotes,
-                        showingTrash: $showingTrash,
-                        showingSettings: $showingSettings
-                    )
-                    .frame(width: 260)
-                    .transition(.move(edge: .leading))
+                    FolderSidebarView(destination: $destination)
+                        .frame(width: Design.Layout.sidebarWidth)
+                        .transition(.move(edge: .leading))
                 }
 
-                // Main content
                 VStack(spacing: 0) {
-                    // Header
                     headerView
                     Divider()
 
-                    // Content
-                    if showingTrash {
+                    switch destination {
+                    case .trash:
                         TrashView()
-                    } else if showingSettings {
+                    case .settings:
                         SettingsView()
-                    } else {
+                    case .allNotes:
                         NoteListView(
-                            folder: showingAllNotes ? nil : selectedFolder,
+                            folder: nil,
                             sortOrder: sortOrder,
-                            onOpenNote: { noteID in
-                                navigationPath.append(noteID)
-                            }
+                            onOpenNote: { navigationPath.append($0) }
+                        )
+                    case .folder(let folder):
+                        NoteListView(
+                            folder: folder,
+                            sortOrder: sortOrder,
+                            onOpenNote: { navigationPath.append($0) }
                         )
                     }
                 }
@@ -65,27 +58,24 @@ struct HomeView: View {
     @ViewBuilder
     private var headerView: some View {
         HStack(spacing: 12) {
-            // Sidebar toggle
             Button {
-                withAnimation(.easeInOut(duration: 0.25)) {
+                withAnimation(.easeInOut(duration: Design.Animation.sidebarDuration)) {
                     isSidebarVisible.toggle()
                 }
             } label: {
                 Image(systemName: "sidebar.left")
-                    .font(.system(size: 18))
+                    .font(.system(size: Design.FontSize.headerIcon))
                     .foregroundStyle(.primary)
-                    .frame(width: 36, height: 36)
+                    .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
             }
 
-            // Title
             Text(headerTitle)
                 .font(.title2)
                 .fontWeight(.semibold)
 
             Spacer()
 
-            if !showingTrash && !showingSettings {
-                // Sort menu
+            if destination.showsNoteActions {
                 Menu {
                     ForEach(NoteSortOrder.allCases, id: \.self) { order in
                         Button {
@@ -101,50 +91,50 @@ struct HomeView: View {
                     }
                 } label: {
                     Image(systemName: "arrow.up.arrow.down")
-                        .font(.system(size: 16))
+                        .font(.system(size: Design.FontSize.toolIcon))
                         .foregroundStyle(.secondary)
-                        .frame(width: 36, height: 36)
+                        .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
                 }
 
-                // New folder
                 Button {
                     let folder = Folder()
                     modelContext.insert(folder)
                 } label: {
                     Image(systemName: "folder.badge.plus")
-                        .font(.system(size: 16))
+                        .font(.system(size: Design.FontSize.toolIcon))
                         .foregroundStyle(.secondary)
-                        .frame(width: 36, height: 36)
+                        .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
                 }
 
-                // New note
                 Button {
                     let note = Note()
-                    if !showingAllNotes, let folder = selectedFolder {
+                    if let folder = destination.folder {
                         note.folder = folder
                     }
                     modelContext.insert(note)
                     navigationPath.append(note.id)
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: Design.FontSize.headerIcon, weight: .semibold))
                         .foregroundStyle(.white)
-                        .frame(width: 36, height: 36)
+                        .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
                         .background(
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: Design.CornerRadius.small)
                                 .fill(Color.accentColor)
                         )
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, Design.Spacing.headerHorizontal)
+        .padding(.vertical, Design.Spacing.headerVertical)
     }
 
     private var headerTitle: String {
-        if showingTrash { return "Trash" }
-        if showingSettings { return "Settings" }
-        if showingAllNotes { return "All Notes" }
-        return selectedFolder?.name ?? "Notes"
+        switch destination {
+        case .trash: return "Trash"
+        case .settings: return "Settings"
+        case .allNotes: return "All Notes"
+        case .folder(let folder): return folder.name
+        }
     }
 }

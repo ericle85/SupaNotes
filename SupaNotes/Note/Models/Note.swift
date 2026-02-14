@@ -23,4 +23,14 @@ final class Note {
         self.updatedAt = .now
         self.pages = [Page(orderIndex: 0)]
     }
+
+    func moveToTrash() {
+        isDeleted = true
+        deletedAt = .now
+    }
+
+    func restore() {
+        isDeleted = false
+        deletedAt = nil
+    }
 }

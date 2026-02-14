@@ -20,16 +20,10 @@ struct TrashView: View {
             List {
                 ForEach(trashedNotes) { note in
                     HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(note.title)
-                                .font(.body)
-                                .fontWeight(.medium)
-                            if let deletedAt = note.deletedAt {
-                                Text("Deleted \(deletedAt, format: .relative(presentation: .named))")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+                        NoteRowView(
+                            title: note.title,
+                            subtitle: note.deletedAt.map { "Deleted \($0.formatted(.relative(presentation: .named)))" } ?? ""
+                        )
                         Spacer()
                     }
                     .swipeActions(edge: .trailing) {
@@ -39,8 +33,7 @@ struct TrashView: View {
                     }
                     .swipeActions(edge: .leading) {
                         Button("Restore") {
-                            note.isDeleted = false
-                            note.deletedAt = nil
+                            note.restore()
                         }
                         .tint(.green)
                     }

@@ -5,32 +5,24 @@ struct FolderSidebarView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Folder.createdAt) private var folders: [Folder]
     @Query(filter: #Predicate<Note> { $0.isDeleted == true }) private var trashedNotes: [Note]
-    @Binding var selectedFolder: Folder?
-    @Binding var showingAllNotes: Bool
-    @Binding var showingTrash: Bool
-    @Binding var showingSettings: Bool
+    @Binding var destination: SidebarDestination
 
     @State private var editingFolder: Folder?
     @State private var editingName: String = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Home (All Notes)
             sidebarButton(
                 icon: "house",
                 label: "All Notes",
-                isSelected: showingAllNotes && !showingTrash && !showingSettings
+                isSelected: destination.isAllNotes
             ) {
-                showingAllNotes = true
-                showingTrash = false
-                showingSettings = false
-                selectedFolder = nil
+                destination = .allNotes
             }
 
             Divider()
                 .padding(.vertical, 8)
 
-            // Folders section
             Text("FOLDERS")
                 .font(.caption)
                 .fontWeight(.semibold)
@@ -50,27 +42,21 @@ struct FolderSidebarView: View {
 
             Divider()
 
-            // Trash
             sidebarButton(
                 icon: "trash",
                 label: "Trash",
-                isSelected: showingTrash,
+                isSelected: destination.isTrash,
                 badge: trashedNotes.count > 0 ? trashedNotes.count : nil
             ) {
-                showingTrash = true
-                showingSettings = false
-                showingAllNotes = false
+                destination = .trash
             }
 
-            // Settings
             sidebarButton(
                 icon: "gearshape",
                 label: "Settings",
-                isSelected: showingSettings
+                isSelected: destination.isSettings
             ) {
-                showingSettings = true
-                showingTrash = false
-                showingAllNotes = false
+                destination = .settings
             }
         }
         .padding(.vertical, 8)
@@ -82,8 +68,8 @@ struct FolderSidebarView: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(.system(size: 16))
-                    .frame(width: 24)
+                    .font(.system(size: Design.FontSize.toolIcon))
+                    .frame(width: Design.Layout.sidebarIconWidth)
                 Text(label)
                     .font(.body)
                 Spacer()
@@ -101,7 +87,7 @@ struct FolderSidebarView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: Design.CornerRadius.small)
                     .fill(isSelected ? Color.primary.opacity(0.08) : .clear)
                     .padding(.horizontal, 8)
             )
@@ -111,13 +97,13 @@ struct FolderSidebarView: View {
 
     @ViewBuilder
     private func folderRow(_ folder: Folder) -> some View {
-        let isSelected = !showingAllNotes && !showingTrash && !showingSettings && selectedFolder?.id == folder.id
+        let isSelected = destination == .folder(folder)
 
         if editingFolder?.id == folder.id {
             HStack(spacing: 10) {
                 Image(systemName: "folder")
-                    .font(.system(size: 16))
-                    .frame(width: 24)
+                    .font(.system(size: Design.FontSize.toolIcon))
+                    .frame(width: Design.Layout.sidebarIconWidth)
                 TextField("Folder name", text: $editingName)
                     .textFieldStyle(.plain)
                     .font(.body)
@@ -135,10 +121,7 @@ struct FolderSidebarView: View {
                 label: folder.name,
                 isSelected: isSelected
             ) {
-                selectedFolder = folder
-                showingAllNotes = false
-                showingTrash = false
-                showingSettings = false
+                destination = .folder(folder)
             }
             .contextMenu {
                 Button("Rename") {
