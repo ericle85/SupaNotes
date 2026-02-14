@@ -142,7 +142,8 @@ struct DrawingToolbar: View {
             )
             .offset(isDraggingToolbar ? toolbarDragOffset : .zero)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: toolbarAlignment)
-            .padding(edge == .leading || edge == .trailing ? .horizontal : .vertical, 8)
+            .padding(.vertical, 0)
+            .padding(.horizontal, edge == .leading || edge == .trailing ? 18 : 0)
     }
 
     @ViewBuilder
