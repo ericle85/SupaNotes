@@ -406,6 +406,7 @@ struct DrawingToolbar: View {
         return Image(systemName: icon.type.iconName)
             .font(.system(size: 16))
             .fontWeight(isActive ? .bold : .regular)
+            .scaleEffect(isActive ? 1.2 : 1.0)
             .frame(width: 24, height: 24)
             .foregroundStyle(toolForeground(for: icon.type, isActive: isActive))
     }

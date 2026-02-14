@@ -14,10 +14,11 @@ enum ToolType: String, Codable, CaseIterable {
     case highlighter
     case lasso
 
+    // SF Symbols for each tool type
     var iconName: String {
         switch self {
         case .color: return "paintpalette.fill"
-        case .pencil: return "pencil.tip"
+        case .pencil: return "pencil"
         case .eraser: return "eraser.fill"
         case .highlighter: return "highlighter"
         case .lasso: return "lasso"
