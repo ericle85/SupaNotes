@@ -197,11 +197,10 @@ struct PagedCanvasContainer: UIViewRepresentable {
             topIndicator?.removeFromSuperview()
             bottomIndicator?.removeFromSuperview()
 
-            // Create top indicator (pull down to add page above)
+            // Add to scrollView (not containerView) so they DON'T zoom
             let top = PullToAddPageIndicator(direction: .down)
             scrollView.addSubview(top)
 
-            // Create bottom indicator (pull up to add page below)
             let bottom = PullToAddPageIndicator(direction: .up)
             scrollView.addSubview(bottom)
 
@@ -209,33 +208,33 @@ struct PagedCanvasContainer: UIViewRepresentable {
             bottomIndicator = bottom
             hasTriggeredTop = false
             hasTriggeredBottom = false
-
-            // Position indicators initially
-            updateIndicatorPositions()
         }
 
+        /// Position indicators based on where the containerView actually is (accounts for zoom + centering)
         private func updateIndicatorPositions() {
-            guard let scrollView = scrollView else { return }
+            guard let scrollView = scrollView, let containerView = containerView else { return }
 
             let indicatorWidth: CGFloat = 150
             let indicatorHeight: CGFloat = 100
-            let contentHeight = scrollView.contentSize.height
-            let centerX = scrollView.bounds.width / 2 - indicatorWidth / 2
+            let indicatorGap: CGFloat = 40
 
-            // Top indicator - fixed right above content (y = -indicatorHeight)
-            // As user pulls down, the bounce area reveals it from below like a curtain
+            // Horizontally centered on screen (not on content)
+            let centerX = scrollView.bounds.midX - indicatorWidth / 2
+
+            // Vertically positioned relative to actual content edges
+            let contentTop = containerView.frame.minY
+            let contentBottom = containerView.frame.maxY
+
             topIndicator?.frame = CGRect(
                 x: centerX,
-                y: -indicatorHeight,
+                y: contentTop - indicatorHeight - indicatorGap,
                 width: indicatorWidth,
                 height: indicatorHeight
             )
 
-            // Bottom indicator - fixed right below content (y = contentHeight)
-            // As user pulls up, the bounce area reveals it from above
             bottomIndicator?.frame = CGRect(
                 x: centerX,
-                y: contentHeight,
+                y: contentBottom + indicatorGap,
                 width: indicatorWidth,
                 height: indicatorHeight
             )
@@ -257,17 +256,41 @@ struct PagedCanvasContainer: UIViewRepresentable {
         }
 
         func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-            // Check if we should trigger page addition
             if hasTriggeredTop {
                 topIndicator?.setTriggered()
                 hapticFeedback.impactOccurred()
+                // Remember current content height to adjust scroll after page added above
+                let oldContentHeight = scrollView.contentSize.height
                 addPageAbove?()
                 hasTriggeredTop = false
+                // After page is added above, adjust scroll offset to keep view on same content
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                    guard let scrollView = self?.scrollView else { return }
+                    let newContentHeight = scrollView.contentSize.height
+                    let heightDelta = newContentHeight - oldContentHeight
+                    if heightDelta > 0 {
+                        scrollView.setContentOffset(
+                            CGPoint(x: scrollView.contentOffset.x, y: scrollView.contentOffset.y + heightDelta),
+                            animated: true
+                        )
+                    }
+                }
             } else if hasTriggeredBottom {
                 bottomIndicator?.setTriggered()
                 hapticFeedback.impactOccurred()
                 addPage()
                 hasTriggeredBottom = false
+                // Scroll to show the new page at the bottom
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                    guard let scrollView = self?.scrollView else { return }
+                    let bottomY = scrollView.contentSize.height - scrollView.bounds.height
+                    if bottomY > 0 {
+                        scrollView.setContentOffset(
+                            CGPoint(x: scrollView.contentOffset.x, y: bottomY),
+                            animated: true
+                        )
+                    }
+                }
             }
 
             // Reset indicators after drag ends
@@ -277,30 +300,29 @@ struct PagedCanvasContainer: UIViewRepresentable {
         }
 
         private func updatePullIndicators(_ scrollView: UIScrollView) {
-            // Update indicator positions for current content size
             updateIndicatorPositions()
 
             let offsetY = scrollView.contentOffset.y
             let contentHeight = scrollView.contentSize.height
             let viewHeight = scrollView.bounds.height
-            let zoomScale = scrollView.zoomScale
 
-            let triggerThreshold: CGFloat = 200 / max(zoomScale, 0.5)
+            // Max scrollable offset - 0 when content fits in viewport
+            let maxOffsetY = max(0, contentHeight - viewHeight)
+
+            let triggerThreshold: CGFloat = 200
 
             // Top pull (pulling down at top) - negative offset means bouncing past top
             if offsetY < 0 {
                 let pullDistance = -offsetY
-                // Always visible when bouncing - position handles the slide-in
                 topIndicator?.alpha = 1
                 topIndicator?.updateProgress(pullDistance)
                 hasTriggeredTop = scrollView.isDragging && pullDistance >= triggerThreshold
                 bottomIndicator?.alpha = 0
                 hasTriggeredBottom = false
             }
-            // Bottom pull (pulling up at bottom)
-            else if offsetY + viewHeight > contentHeight && contentHeight > 0 {
-                let pullDistance = (offsetY + viewHeight) - contentHeight
-                // Always visible when bouncing - position handles the slide-in
+            // Bottom pull (pulling up past max scroll position)
+            else if offsetY > maxOffsetY && contentHeight > 0 {
+                let pullDistance = offsetY - maxOffsetY
                 bottomIndicator?.alpha = 1
                 bottomIndicator?.updateProgress(pullDistance)
                 hasTriggeredBottom = scrollView.isDragging && pullDistance >= triggerThreshold
