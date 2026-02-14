@@ -28,6 +28,11 @@ struct PagedCanvasContainer: UIViewRepresentable {
         context.coordinator.scrollView = scrollView
         context.coordinator.containerView = containerView
 
+        // Add pencil interaction once on the scroll view (not per-page)
+        let pencilInteraction = UIPencilInteraction()
+        pencilInteraction.delegate = context.coordinator
+        scrollView.addInteraction(pencilInteraction)
+
         // Build initial pages
         context.coordinator.rebuildPages(pages: pages, tool: tool)
 
@@ -48,8 +53,10 @@ struct PagedCanvasContainer: UIViewRepresentable {
             canvasView.tool = tool
         }
 
-        // Rebuild if page count changed
-        if coordinator.canvasViews.count != pages.count {
+        // Rebuild if page count changed or container width is stale (initial layout had zero bounds)
+        let containerWidth = coordinator.containerView?.frame.width ?? 0
+        if coordinator.canvasViews.count != pages.count ||
+           (scrollView.bounds.width > 0 && abs(containerWidth - scrollView.bounds.width) > 1) {
             coordinator.rebuildPages(pages: pages, tool: tool)
         }
     }
@@ -139,11 +146,6 @@ struct PagedCanvasContainer: UIViewRepresentable {
                 }
 
                 canvasView.delegate = self
-
-                // Add pencil interaction
-                let pencilInteraction = UIPencilInteraction()
-                pencilInteraction.delegate = self
-                canvasView.addInteraction(pencilInteraction)
 
                 // Add page shadow
                 canvasView.layer.shadowColor = UIColor.black.cgColor
