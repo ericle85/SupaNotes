@@ -193,22 +193,27 @@ struct PagedCanvasContainer: UIViewRepresentable {
             return canvasView
         }
 
-        /// After rebuild, scroll to the newly added page (zoom already reset in rebuildPages)
+        /// After rebuild, animate scroll to the newly added page (zoom already reset in rebuildPages)
         private func applyPendingScroll(pageH: CGFloat, gap: CGFloat, pageCount: Int) {
             guard let scrollView = scrollView else { return }
             let action = pendingScroll
             pendingScroll = .none
 
+            let target: CGPoint
             switch action {
             case .none:
                 return
             case .scrollToFirst:
-                scrollView.setContentOffset(.zero, animated: false)
+                target = .zero
             case .scrollToLast:
                 let lastPageY = gap + CGFloat(pageCount - 1) * (pageH + gap)
                 let targetY = max(0, lastPageY - 20)
                 let maxY = max(0, scrollView.contentSize.height - scrollView.bounds.height)
-                scrollView.setContentOffset(CGPoint(x: 0, y: min(targetY, maxY)), animated: false)
+                target = CGPoint(x: 0, y: min(targetY, maxY))
+            }
+
+            UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut) {
+                scrollView.contentOffset = target
             }
         }
 
