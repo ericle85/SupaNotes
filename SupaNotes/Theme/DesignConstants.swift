@@ -20,8 +20,16 @@ enum Design {
 
     // MARK: - Pull to Add
     enum PullToAdd {
+        /// How far you drag before the indicator starts filling up
+        static let activationThreshold: CGFloat = 80
+        /// How far you drag to actually add a new page
         static let triggerThreshold: CGFloat = 200
+        /// Minimum drag before the indicator appears at all
         static let showThreshold: CGFloat = 10
+        /// Width of the indicator area
+        static let indicatorWidth: CGFloat = 150
+        /// Height of the indicator area
+        static let indicatorHeight: CGFloat = 100
     }
 
     // MARK: - Corner Radii

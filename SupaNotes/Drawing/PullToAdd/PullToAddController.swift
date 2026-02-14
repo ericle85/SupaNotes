@@ -23,8 +23,8 @@ class PullToAddController {
     }
 
     func updatePositions(in scrollView: UIScrollView) {
-        let w: CGFloat = 150
-        let h: CGFloat = 100
+        let w = Design.PullToAdd.indicatorWidth
+        let h = Design.PullToAdd.indicatorHeight
         let contentH = scrollView.contentSize.height
         let viewH = scrollView.bounds.height
         let topInset = scrollView.adjustedContentInset.top

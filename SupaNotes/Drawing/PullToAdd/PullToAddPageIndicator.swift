@@ -16,8 +16,24 @@ class PullToAddPageIndicator: UIView {
 
     // MARK: - Constants
     private let circleSize: CGFloat = 56
-    private let activationThreshold: CGFloat = 80
-    private let triggerThreshold: CGFloat = 200
+    private let circleStrokeWidth: CGFloat = 3
+    private let iconPointSize: CGFloat = 22
+    private let iconFrameSize: CGFloat = 28
+    private let labelFontSize: CGFloat = 13
+    private let edgePadding: CGFloat = 12
+    private let circleToTextSpacing: CGFloat = 8
+    /// Once you've dragged 30% of the way, the icon turns blue to show it's responding
+    private let colorChangeProgress: CGFloat = 0.3
+    /// Quick pop to this size when you hit the trigger point
+    private let readyBounceScale: CGFloat = 1.2
+    /// Bigger pop when the page is actually added
+    private let triggeredScale: CGFloat = 1.3
+    private let readyBounceDuration: Double = 0.6
+    private let readyBounceDamping: CGFloat = 0.3
+    private let snapBackDuration: Double = 0.2
+    private let triggeredAnimationDuration: Double = 0.3
+    private let intrinsicWidth: CGFloat = 120
+    private let intrinsicBottomPadding: CGFloat = 40
 
     // MARK: - Properties
     let direction: Direction
@@ -60,14 +76,14 @@ class PullToAddPageIndicator: UIView {
         circleBackgroundLayer.path = circlePath.cgPath
         circleBackgroundLayer.fillColor = UIColor.clear.cgColor
         circleBackgroundLayer.strokeColor = idleColor.cgColor
-        circleBackgroundLayer.lineWidth = 3
+        circleBackgroundLayer.lineWidth = circleStrokeWidth
         containerView.layer.addSublayer(circleBackgroundLayer)
 
         // Circle progress (blue stroke that fills)
         circleProgressLayer.path = circlePath.cgPath
         circleProgressLayer.fillColor = UIColor.clear.cgColor
         circleProgressLayer.strokeColor = activeColor.cgColor
-        circleProgressLayer.lineWidth = 3
+        circleProgressLayer.lineWidth = circleStrokeWidth
         circleProgressLayer.strokeEnd = 0
         circleProgressLayer.lineCap = .round
         // Start from top (rotate -90 degrees)
@@ -77,7 +93,7 @@ class PullToAddPageIndicator: UIView {
         containerView.layer.addSublayer(circleProgressLayer)
 
         // Icon
-        let config = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
+        let config = UIImage.SymbolConfiguration(pointSize: iconPointSize, weight: .medium)
         iconImageView.image = UIImage(systemName: "doc.badge.plus", withConfiguration: config)
         iconImageView.tintColor = idleColor
         iconImageView.contentMode = .scaleAspectFit
@@ -86,7 +102,7 @@ class PullToAddPageIndicator: UIView {
 
         // Text label
         textLabel.text = "Pull to Add Page"
-        textLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        textLabel.font = .systemFont(ofSize: labelFontSize, weight: .medium)
         textLabel.textColor = idleColor
         textLabel.textAlignment = .center
         textLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -102,8 +118,8 @@ class PullToAddPageIndicator: UIView {
 
             iconImageView.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
             iconImageView.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
-            iconImageView.widthAnchor.constraint(equalToConstant: 28),
-            iconImageView.heightAnchor.constraint(equalToConstant: 28),
+            iconImageView.widthAnchor.constraint(equalToConstant: iconFrameSize),
+            iconImageView.heightAnchor.constraint(equalToConstant: iconFrameSize),
 
             textLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
             textLabel.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 8),
@@ -113,16 +129,16 @@ class PullToAddPageIndicator: UIView {
         if isUp {
             // Bottom indicator: circle above text
             NSLayoutConstraint.activate([
-                containerView.topAnchor.constraint(equalTo: topAnchor, constant: 12),
-                textLabel.topAnchor.constraint(equalTo: containerView.bottomAnchor, constant: 8),
-                textLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12)
+                containerView.topAnchor.constraint(equalTo: topAnchor, constant: edgePadding),
+                textLabel.topAnchor.constraint(equalTo: containerView.bottomAnchor, constant: circleToTextSpacing),
+                textLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -edgePadding)
             ])
         } else {
             // Top indicator: text above circle
             NSLayoutConstraint.activate([
-                textLabel.topAnchor.constraint(equalTo: topAnchor, constant: 12),
-                containerView.topAnchor.constraint(equalTo: textLabel.bottomAnchor, constant: 8),
-                containerView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12)
+                textLabel.topAnchor.constraint(equalTo: topAnchor, constant: edgePadding),
+                containerView.topAnchor.constraint(equalTo: textLabel.bottomAnchor, constant: circleToTextSpacing),
+                containerView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -edgePadding)
             ])
         }
     }
@@ -131,10 +147,10 @@ class PullToAddPageIndicator: UIView {
 
     /// Update the indicator based on pull distance (0 to triggerThreshold+)
     func updateProgress(_ pullDistance: CGFloat) {
-        let progress = min(1.0, max(0, pullDistance / triggerThreshold))
+        let progress = min(1.0, max(0, pullDistance / Design.PullToAdd.triggerThreshold))
 
         // Update state based on activation threshold
-        if pullDistance >= activationThreshold && state == .idle {
+        if pullDistance >= Design.PullToAdd.activationThreshold && state == .idle {
             state = .pulling
         }
 
@@ -145,7 +161,7 @@ class PullToAddPageIndicator: UIView {
         CATransaction.commit()
 
         // Update colors based on progress
-        let isReady = pullDistance >= triggerThreshold
+        let isReady = pullDistance >= Design.PullToAdd.triggerThreshold
 
         if isReady && state == .pulling {
             setReadyState()
@@ -159,12 +175,12 @@ class PullToAddPageIndicator: UIView {
             circleBackgroundLayer.strokeColor = idleColor.cgColor
 
             // Reset scale
-            UIView.animate(withDuration: 0.2) {
+            UIView.animate(withDuration: snapBackDuration) {
                 self.containerView.transform = .identity
             }
         } else if state == .pulling || state == .idle {
             // Interpolate colors based on progress
-            let color = progress > 0.3 ? activeColor : idleColor
+            let color = progress > colorChangeProgress ? activeColor : idleColor
             iconImageView.tintColor = color
             textLabel.textColor = color
         }
@@ -185,11 +201,11 @@ class PullToAddPageIndicator: UIView {
         circleProgressLayer.strokeColor = activeColor.cgColor
 
         // Instantly scale up, then single bouncy spring back to normal
-        containerView.transform = CGAffineTransform(scaleX: 1.2, y: 1.2)
+        containerView.transform = CGAffineTransform(scaleX: readyBounceScale, y: readyBounceScale)
         UIView.animate(
-            withDuration: 0.6,
+            withDuration: readyBounceDuration,
             delay: 0,
-            usingSpringWithDamping: 0.3,
+            usingSpringWithDamping: readyBounceDamping,
             initialSpringVelocity: 0,
             options: [.allowUserInteraction]
         ) {
@@ -201,8 +217,8 @@ class PullToAddPageIndicator: UIView {
     func setTriggered() {
         state = .triggered
 
-        UIView.animate(withDuration: 0.3) {
-            self.containerView.transform = CGAffineTransform(scaleX: 1.3, y: 1.3)
+        UIView.animate(withDuration: triggeredAnimationDuration) {
+            self.containerView.transform = CGAffineTransform(scaleX: self.triggeredScale, y: self.triggeredScale)
         } completion: { _ in
             self.reset()
         }
@@ -225,6 +241,6 @@ class PullToAddPageIndicator: UIView {
 
     // MARK: - Intrinsic Size
     override var intrinsicContentSize: CGSize {
-        CGSize(width: 120, height: circleSize + 40)
+        CGSize(width: intrinsicWidth, height: circleSize + intrinsicBottomPadding)
     }
 }
