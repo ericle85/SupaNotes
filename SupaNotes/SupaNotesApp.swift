@@ -10,6 +10,6 @@ struct SupaNotesApp: App {
             ContentView()
                 .environment(toolbarState)
         }
-        .modelContainer(for: [Note.self, Page.self])
+        .modelContainer(for: Note.self)
     }
 }
