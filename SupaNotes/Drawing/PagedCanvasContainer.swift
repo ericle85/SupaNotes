@@ -9,6 +9,7 @@ struct PagedCanvasContainer: UIViewRepresentable {
     var onWritingStateChanged: ((Bool) -> Void)?
     var onCurrentPageChanged: ((Int) -> Void)?
     var addPage: () -> Void
+    var addPageAbove: (() -> Void)?
 
     func makeUIView(context: Context) -> UIScrollView {
         let scrollView = UIScrollView()
@@ -47,6 +48,7 @@ struct PagedCanvasContainer: UIViewRepresentable {
         coordinator.onWritingStateChanged = onWritingStateChanged
         coordinator.onCurrentPageChanged = onCurrentPageChanged
         coordinator.addPage = addPage
+        coordinator.addPageAbove = addPageAbove
 
         // Update tool on all canvas views
         for canvasView in coordinator.canvasViews {
@@ -70,7 +72,8 @@ struct PagedCanvasContainer: UIViewRepresentable {
             onPencilDoubleTap: onPencilDoubleTap,
             onWritingStateChanged: onWritingStateChanged,
             onCurrentPageChanged: onCurrentPageChanged,
-            addPage: addPage
+            addPage: addPage,
+            addPageAbove: addPageAbove
         )
     }
 
@@ -83,6 +86,7 @@ struct PagedCanvasContainer: UIViewRepresentable {
         var onWritingStateChanged: ((Bool) -> Void)?
         var onCurrentPageChanged: ((Int) -> Void)?
         var addPage: () -> Void
+        var addPageAbove: (() -> Void)?
 
         weak var scrollView: UIScrollView?
         weak var containerView: UIView?
@@ -91,6 +95,13 @@ struct PagedCanvasContainer: UIViewRepresentable {
         var hasCompletedInitialLayout = false
         private var saveWorkItem: DispatchWorkItem?
 
+        // Pull-to-add indicators
+        private var topIndicator: PullToAddPageIndicator?
+        private var bottomIndicator: PullToAddPageIndicator?
+        private var hasTriggeredTop = false
+        private var hasTriggeredBottom = false
+        private let hapticFeedback = UIImpactFeedbackGenerator(style: .medium)
+
         init(
             pages: [Page],
             tool: PKTool,
@@ -98,7 +109,8 @@ struct PagedCanvasContainer: UIViewRepresentable {
             onPencilDoubleTap: (() -> Void)?,
             onWritingStateChanged: ((Bool) -> Void)?,
             onCurrentPageChanged: ((Int) -> Void)?,
-            addPage: @escaping () -> Void
+            addPage: @escaping () -> Void,
+            addPageAbove: (() -> Void)?
         ) {
             self.pages = pages
             self.tool = tool
@@ -107,6 +119,7 @@ struct PagedCanvasContainer: UIViewRepresentable {
             self.onWritingStateChanged = onWritingStateChanged
             self.onCurrentPageChanged = onCurrentPageChanged
             self.addPage = addPage
+            self.addPageAbove = addPageAbove
         }
 
         func rebuildPages(pages: [Page], tool: PKTool) {
@@ -166,12 +179,66 @@ struct PagedCanvasContainer: UIViewRepresentable {
             // Reset add-page guard after rebuild
             isAddingPage = false
 
+            // Setup pull indicators
+            setupPullIndicators()
+
             // Report undo manager from first page
             if let firstCanvas = canvasViews.first {
                 DispatchQueue.main.async { [weak self] in
                     self?.onUndoManagerReady(firstCanvas.undoManager)
                 }
             }
+        }
+
+        private func setupPullIndicators() {
+            guard let scrollView = scrollView else { return }
+
+            // Remove existing indicators
+            topIndicator?.removeFromSuperview()
+            bottomIndicator?.removeFromSuperview()
+
+            // Create top indicator (pull down to add page above)
+            let top = PullToAddPageIndicator(direction: .down)
+            scrollView.addSubview(top)
+
+            // Create bottom indicator (pull up to add page below)
+            let bottom = PullToAddPageIndicator(direction: .up)
+            scrollView.addSubview(bottom)
+
+            topIndicator = top
+            bottomIndicator = bottom
+            hasTriggeredTop = false
+            hasTriggeredBottom = false
+
+            // Position indicators initially
+            updateIndicatorPositions()
+        }
+
+        private func updateIndicatorPositions() {
+            guard let scrollView = scrollView else { return }
+
+            let indicatorWidth: CGFloat = 150
+            let indicatorHeight: CGFloat = 100
+            let contentHeight = scrollView.contentSize.height
+            let centerX = scrollView.bounds.width / 2 - indicatorWidth / 2
+
+            // Top indicator - fixed right above content (y = -indicatorHeight)
+            // As user pulls down, the bounce area reveals it from below like a curtain
+            topIndicator?.frame = CGRect(
+                x: centerX,
+                y: -indicatorHeight,
+                width: indicatorWidth,
+                height: indicatorHeight
+            )
+
+            // Bottom indicator - fixed right below content (y = contentHeight)
+            // As user pulls up, the bounce area reveals it from above
+            bottomIndicator?.frame = CGRect(
+                x: centerX,
+                y: contentHeight,
+                width: indicatorWidth,
+                height: indicatorHeight
+            )
         }
 
         // MARK: - UIScrollViewDelegate
@@ -182,11 +249,80 @@ struct PagedCanvasContainer: UIViewRepresentable {
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             updateCurrentPage()
-            checkForNewPageNeeded(scrollView)
+            updatePullIndicators(scrollView)
         }
 
         func scrollViewDidZoom(_ scrollView: UIScrollView) {
             centerContainerIfNeeded()
+        }
+
+        func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+            // Check if we should trigger page addition
+            if hasTriggeredTop {
+                topIndicator?.setTriggered()
+                hapticFeedback.impactOccurred()
+                addPageAbove?()
+                hasTriggeredTop = false
+            } else if hasTriggeredBottom {
+                bottomIndicator?.setTriggered()
+                hapticFeedback.impactOccurred()
+                addPage()
+                hasTriggeredBottom = false
+            }
+
+            // Reset indicators after drag ends
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.resetPullIndicators()
+            }
+        }
+
+        private func updatePullIndicators(_ scrollView: UIScrollView) {
+            // Update indicator positions for current content size
+            updateIndicatorPositions()
+
+            let offsetY = scrollView.contentOffset.y
+            let contentHeight = scrollView.contentSize.height
+            let viewHeight = scrollView.bounds.height
+            let zoomScale = scrollView.zoomScale
+
+            let triggerThreshold: CGFloat = 200 / max(zoomScale, 0.5)
+
+            // Top pull (pulling down at top) - negative offset means bouncing past top
+            if offsetY < 0 {
+                let pullDistance = -offsetY
+                // Always visible when bouncing - position handles the slide-in
+                topIndicator?.alpha = 1
+                topIndicator?.updateProgress(pullDistance)
+                hasTriggeredTop = scrollView.isDragging && pullDistance >= triggerThreshold
+                bottomIndicator?.alpha = 0
+                hasTriggeredBottom = false
+            }
+            // Bottom pull (pulling up at bottom)
+            else if offsetY + viewHeight > contentHeight && contentHeight > 0 {
+                let pullDistance = (offsetY + viewHeight) - contentHeight
+                // Always visible when bouncing - position handles the slide-in
+                bottomIndicator?.alpha = 1
+                bottomIndicator?.updateProgress(pullDistance)
+                hasTriggeredBottom = scrollView.isDragging && pullDistance >= triggerThreshold
+                topIndicator?.alpha = 0
+                hasTriggeredTop = false
+            }
+            // In middle - hide both
+            else {
+                topIndicator?.alpha = 0
+                bottomIndicator?.alpha = 0
+                topIndicator?.reset()
+                bottomIndicator?.reset()
+                hasTriggeredTop = false
+                hasTriggeredBottom = false
+            }
+        }
+
+        private func resetPullIndicators() {
+            topIndicator?.reset()
+            bottomIndicator?.reset()
+            hasTriggeredTop = false
+            hasTriggeredBottom = false
         }
 
         private func centerContainerIfNeeded() {
@@ -213,22 +349,6 @@ struct PagedCanvasContainer: UIViewRepresentable {
             let pageIndex = max(0, Int(adjustedY / (pageH + gap)))
             let clampedIndex = min(pageIndex, max(0, pages.count - 1))
             onCurrentPageChanged?(clampedIndex)
-        }
-
-        private func checkForNewPageNeeded(_ scrollView: UIScrollView) {
-            // Guard: don't add multiple pages at once, and don't add during zoom
-            guard !isAddingPage else { return }
-            guard scrollView.zoomScale >= 0.9 && scrollView.zoomScale <= 1.1 else { return }
-
-            let contentHeight = scrollView.contentSize.height
-            let offsetY = scrollView.contentOffset.y
-            let viewHeight = scrollView.bounds.height
-
-            // Only add if scrolled near the bottom
-            if offsetY + viewHeight > contentHeight - 50 && contentHeight > 0 && offsetY > 0 {
-                isAddingPage = true
-                addPage()
-            }
         }
 
         // MARK: - PKCanvasViewDelegate

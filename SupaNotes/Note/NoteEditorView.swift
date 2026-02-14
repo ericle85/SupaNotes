@@ -63,6 +63,17 @@ struct NoteEditorView: View {
                     page.note = note
                     modelContext.insert(page)
                     note.updatedAt = .now
+                },
+                addPageAbove: {
+                    // Shift existing pages' orderIndex
+                    for existingPage in note.pages {
+                        existingPage.orderIndex += 1
+                    }
+                    // Insert new page at index 0
+                    let page = Page(orderIndex: 0)
+                    page.note = note
+                    modelContext.insert(page)
+                    note.updatedAt = .now
                 }
             )
             .ignoresSafeArea()
