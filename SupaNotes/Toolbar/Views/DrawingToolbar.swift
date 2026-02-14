@@ -21,21 +21,24 @@ struct DrawingToolbar: View {
     private var colorIcons: [ToolbarIcon] { toolbarIcons.filter { $0.type == .color } }
 
     var body: some View {
-        toolbarContent
-            .fixedSize()
-            .simultaneousGesture(
-                ToolbarPositioning.repositionGesture(
-                    draggedIconID: dragState.draggedIconID,
-                    isDraggingToolbar: $isDraggingToolbar,
-                    didRepositionToolbar: $didRepositionToolbar,
-                    toolbarDragOffset: $toolbarDragOffset,
-                    toolbarEdge: $positioning.toolbarEdge
+        GeometryReader { geometry in
+            toolbarContent
+                .fixedSize()
+                .simultaneousGesture(
+                    ToolbarPositioning.repositionGesture(
+                        draggedIconID: dragState.draggedIconID,
+                        isDraggingToolbar: $isDraggingToolbar,
+                        didRepositionToolbar: $didRepositionToolbar,
+                        toolbarDragOffset: $toolbarDragOffset,
+                        toolbarEdge: $positioning.toolbarEdge,
+                        screenSize: geometry.size
+                    )
                 )
-            )
-            .offset(isDraggingToolbar ? toolbarDragOffset : .zero)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: positioning.alignment)
-            .padding(.vertical, 0)
-            .padding(.horizontal, positioning.edge == .leading || positioning.edge == .trailing ? Design.Spacing.toolbarEdgePadding : 0)
+                .offset(isDraggingToolbar ? toolbarDragOffset : .zero)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: positioning.alignment)
+                .padding(.vertical, 0)
+                .padding(.horizontal, positioning.edge == .leading || positioning.edge == .trailing ? Design.Spacing.toolbarEdgePadding : 0)
+        }
     }
 
     @ViewBuilder

@@ -44,7 +44,8 @@ struct ToolbarPositioning {
         isDraggingToolbar: Binding<Bool>,
         didRepositionToolbar: Binding<Bool>,
         toolbarDragOffset: Binding<CGSize>,
-        toolbarEdge: Binding<String>
+        toolbarEdge: Binding<String>,
+        screenSize: CGSize
     ) -> some Gesture {
         DragGesture(minimumDistance: Design.Drag.toolbarMinDragDistance, coordinateSpace: .global)
             .onChanged { value in
@@ -61,7 +62,6 @@ struct ToolbarPositioning {
                     didRepositionToolbar.wrappedValue = false
                 }
 
-                let screenSize = UIScreen.main.bounds.size
                 let loc = value.location
                 let distTop = loc.y
                 let distBottom = screenSize.height - loc.y
