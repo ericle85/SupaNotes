@@ -6,6 +6,8 @@ struct CanvasView: UIViewRepresentable {
     var tool: PKTool
     var onUndoManagerReady: (UndoManager?) -> Void
     var onPencilDoubleTap: (() -> Void)?
+    var onScratchDetected: (() -> Void)?
+    var onEraseStrokeComplete: (() -> Void)?
 
     func makeUIView(context: Context) -> PKCanvasView {
         let canvasView = PKCanvasView()
@@ -30,31 +32,93 @@ struct CanvasView: UIViewRepresentable {
             onUndoManagerReady(canvasView.undoManager)
         }
 
+        context.coordinator.startObservingUndo(canvasView.undoManager)
+
         return canvasView
     }
 
     func updateUIView(_ canvasView: PKCanvasView, context: Context) {
         context.coordinator.drawingData = $drawingData
         context.coordinator.onPencilDoubleTap = onPencilDoubleTap
+        context.coordinator.onScratchDetected = onScratchDetected
+        context.coordinator.onEraseStrokeComplete = onEraseStrokeComplete
         canvasView.tool = tool
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(drawingData: $drawingData, onPencilDoubleTap: onPencilDoubleTap)
+        Coordinator(drawingData: $drawingData, onPencilDoubleTap: onPencilDoubleTap, onScratchDetected: onScratchDetected, onEraseStrokeComplete: onEraseStrokeComplete)
     }
 
     class Coordinator: NSObject, PKCanvasViewDelegate, UIPencilInteractionDelegate {
         var drawingData: Binding<Data>
         weak var canvasView: PKCanvasView?
         var onPencilDoubleTap: (() -> Void)?
+        var onScratchDetected: (() -> Void)?
+        var onEraseStrokeComplete: (() -> Void)?
 
-        init(drawingData: Binding<Data>, onPencilDoubleTap: (() -> Void)?) {
+        // Scratch detection: quick scribble = multiple strokes in short time in small region
+        private var previousStrokeCount = 0
+        private var firstStrokeAddTime: Date?
+        private var recentStrokeAddCount = 0
+        private let scratchTimeWindow: TimeInterval = 0.5
+        private let scratchMinStrokes = 3
+
+        private var undoJustPerformed = false
+        private var undoObserver: NSObjectProtocol?
+
+        init(drawingData: Binding<Data>, onPencilDoubleTap: (() -> Void)?, onScratchDetected: (() -> Void)?, onEraseStrokeComplete: (() -> Void)?) {
             self.drawingData = drawingData
             self.onPencilDoubleTap = onPencilDoubleTap
+            self.onScratchDetected = onScratchDetected
+            self.onEraseStrokeComplete = onEraseStrokeComplete
+        }
+
+        func startObservingUndo(_ undoManager: UndoManager) {
+            guard undoObserver == nil else { return }
+            undoObserver = NotificationCenter.default.addObserver(forName: .NSUndoManagerDidUndoChange, object: undoManager, queue: .main) { [weak self] _ in
+                self?.undoJustPerformed = true
+            }
         }
 
         func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
             drawingData.wrappedValue = canvasView.drawing.dataRepresentation()
+
+            let strokes = canvasView.drawing.strokes
+            let newCount = strokes.count
+            let now = Date()
+
+            if newCount > previousStrokeCount {
+                if recentStrokeAddCount == 0 {
+                    firstStrokeAddTime = now
+                }
+                recentStrokeAddCount += 1
+
+                if recentStrokeAddCount >= scratchMinStrokes, let first = firstStrokeAddTime, now.timeIntervalSince(first) <= scratchTimeWindow {
+                    onScratchDetected?()
+                    recentStrokeAddCount = 0
+                    firstStrokeAddTime = nil
+                }
+            } else if newCount < previousStrokeCount {
+                recentStrokeAddCount = 0
+                firstStrokeAddTime = nil
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    if !self.undoJustPerformed {
+                        self.onEraseStrokeComplete?()
+                    }
+                    self.undoJustPerformed = false
+                }
+            } else {
+                recentStrokeAddCount = 0
+                firstStrokeAddTime = nil
+            }
+
+            if let first = firstStrokeAddTime, now.timeIntervalSince(first) > scratchTimeWindow + 0.2 {
+                recentStrokeAddCount = 0
+                firstStrokeAddTime = nil
+            }
+
+            previousStrokeCount = newCount
         }
 
         func pencilInteractionDidTap(_ interaction: UIPencilInteraction) {

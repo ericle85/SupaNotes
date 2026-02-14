@@ -4,9 +4,12 @@ import PencilKit
 
 struct NoteEditorView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.modelContext) private var modelContext
     @Environment(ToolbarState.self) private var toolbar
     @Query private var notes: [Note]
     @State private var canvasUndoManager: UndoManager?
+    @State private var currentPageIndex: Int = 0
+    @State private var revertToPenAfterNextErase = false
 
     private var note: Note? { notes.first }
 
@@ -37,9 +40,21 @@ struct NoteEditorView: View {
         }
     }
 
+    /// Sorted pages for this note; ensures at least one page (migrates from legacy drawingData if needed).
+    private func ensuredPages(for note: Note) -> [Page] {
+        if note.pages.isEmpty {
+            let page = Page(drawingData: note.drawingData, sortOrder: 0)
+            page.note = note
+            note.pages.append(page)
+            try? modelContext.save()
+        }
+        return note.pages.sorted { $0.sortOrder < $1.sortOrder }
+    }
+
     @ViewBuilder
     private func noteContent(_ note: Note) -> some View {
         @Bindable var toolbar = toolbar
+        let pages = ensuredPages(for: note)
 
         VStack(spacing: 0) {
             TextField("Note Title", text: Binding(
@@ -53,16 +68,36 @@ struct NoteEditorView: View {
             Divider()
 
             ZStack(alignment: .leading) {
-                // Canvas
-                CanvasView(
-                    drawingData: Binding(
-                        get: { note.drawingData },
-                        set: { note.drawingData = $0 }
-                    ),
-                    tool: currentTool,
-                    onUndoManagerReady: { canvasUndoManager = $0 },
-                    onPencilDoubleTap: { toolbar.switchToPreviousTool() }
-                )
+                TabView(selection: $currentPageIndex) {
+                    ForEach(Array(pages.enumerated()), id: \.element.id) { index, page in
+                        CanvasView(
+                            drawingData: Binding(
+                                get: { page.drawingData },
+                                set: {
+                                    page.drawingData = $0
+                                    note.updatedAt = .now
+                                }
+                            ),
+                            tool: currentTool,
+                            onUndoManagerReady: { canvasUndoManager = $0 },
+                            onPencilDoubleTap: { toolbar.switchToPreviousTool() },
+                            onScratchDetected: {
+                                toolbar.activeTool = .eraser
+                                revertToPenAfterNextErase = true
+                            },
+                            onEraseStrokeComplete: {
+                                if revertToPenAfterNextErase {
+                                    toolbar.activeTool = toolbar.previousTool
+                                    revertToPenAfterNextErase = false
+                                }
+                            }
+                        )
+                        .id(page.id)
+                        .tag(index)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .indexViewStyle(.page(backgroundDisplayMode: .never))
 
                 // Toolbar
                 DrawingToolbar(
@@ -74,12 +109,44 @@ struct NoteEditorView: View {
                 .padding(.leading, 12)
             }
             .id(note.id)
+
+            // Page controls
+            HStack(spacing: 16) {
+                Text("Page \(currentPageIndex + 1) of \(pages.count)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    let newPage = Page(drawingData: Data(), sortOrder: (note.pages.map(\.sortOrder).max() ?? -1) + 1)
+                    newPage.note = note
+                    note.pages.append(newPage)
+                    currentPageIndex = note.pages.count - 1
+                    note.updatedAt = .now
+                    try? modelContext.save()
+                } label: {
+                    Image(systemName: "plus.rectangle.on.rectangle")
+                }
+                if pages.count > 1 {
+                    Button(role: .destructive) {
+                        let sorted = note.pages.sorted { $0.sortOrder < $1.sortOrder }
+                        guard currentPageIndex >= 0, currentPageIndex < sorted.count else { return }
+                        let toRemove = sorted[currentPageIndex]
+                        note.pages.removeAll { $0.id == toRemove.id }
+                        modelContext.delete(toRemove)
+                        currentPageIndex = min(currentPageIndex, max(0, note.pages.count - 1))
+                        note.updatedAt = .now
+                        try? modelContext.save()
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(.bar)
         }
         .navigationTitle(note.title)
         .navigationBarTitleDisplayMode(.inline)
-        .onChange(of: note.drawingData) {
-            note.updatedAt = .now
-        }
         .onChange(of: note.title) {
             note.updatedAt = .now
         }
