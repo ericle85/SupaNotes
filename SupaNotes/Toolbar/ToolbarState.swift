@@ -9,7 +9,6 @@ final class ToolbarState {
     var selectedColor: Color = .black
     var activeTool: ActiveTool = .pen
     var toolbarIcons: [ToolbarIcon] = []
-
     var previousTool: ActiveTool = .eraser
 
     func switchToPreviousTool() {
@@ -20,12 +19,7 @@ final class ToolbarState {
 
     private static let selectedColorKey = "toolbar.selectedColor"
     private static let activeToolKey = "toolbar.activeTool"
-    private static let isErasingKey = "toolbar.isErasing" // backward compat
     private static let toolbarIconsKey = "toolbar.toolbarIcons"
-
-    // Legacy keys for backward compat migration
-    private static let penWidthKey = "toolbar.penWidth"
-    private static let eraserWidthKey = "toolbar.eraserWidth"
 
     init() {
         load()
@@ -44,7 +38,6 @@ final class ToolbarState {
            !icons.isEmpty {
             toolbarIcons = icons
         } else {
-            // First launch defaults
             toolbarIcons = [
                 ToolbarIcon.toolIcon(.pencil),
                 ToolbarIcon.toolIcon(.eraser),
@@ -55,20 +48,7 @@ final class ToolbarState {
             ]
         }
 
-        // Backward compat: migrate old pen/eraser/highlighter width keys into instrumentSettings
-        if let pw = defaults.object(forKey: Self.penWidthKey) as? Double {
-            if let idx = toolbarIcons.firstIndex(where: { $0.type == .pencil }) {
-                toolbarIcons[idx].instrumentSettings?.width = CGFloat(pw)
-            }
-            defaults.removeObject(forKey: Self.penWidthKey)
-        }
-        if let ew = defaults.object(forKey: Self.eraserWidthKey) as? Double {
-            if let idx = toolbarIcons.firstIndex(where: { $0.type == .eraser }) {
-                toolbarIcons[idx].instrumentSettings?.width = CGFloat(ew)
-            }
-            defaults.removeObject(forKey: Self.eraserWidthKey)
-        }
-        // Ensure pen and eraser always exist (essential tools)
+        // Ensure pen and eraser always exist
         if !toolbarIcons.contains(where: { $0.type == .pencil }) {
             toolbarIcons.insert(ToolbarIcon.toolIcon(.pencil), at: 0)
         }
@@ -82,12 +62,9 @@ final class ToolbarState {
             selectedColor = codable.toColor()
         }
 
-        // Load activeTool with backward compat for old isErasing key
         if let rawTool = defaults.string(forKey: Self.activeToolKey),
            let tool = ActiveTool(rawValue: rawTool) {
             activeTool = tool
-        } else if let isErasing = defaults.object(forKey: Self.isErasingKey) as? Bool {
-            activeTool = isErasing ? .eraser : .pen
         }
     }
 

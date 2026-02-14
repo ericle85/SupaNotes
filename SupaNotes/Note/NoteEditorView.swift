@@ -4,9 +4,13 @@ import PencilKit
 
 struct NoteEditorView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.modelContext) private var modelContext
     @Environment(ToolbarState.self) private var toolbar
+    @Environment(\.dismiss) private var dismiss
     @Query private var notes: [Note]
     @State private var canvasUndoManager: UndoManager?
+    @State private var isWriting: Bool = false
+    @State private var currentPageIndex: Int = 0
 
     private var note: Note? { notes.first }
 
@@ -41,48 +45,77 @@ struct NoteEditorView: View {
     private func noteContent(_ note: Note) -> some View {
         @Bindable var toolbar = toolbar
 
-        VStack(spacing: 0) {
-            TextField("Note Title", text: Binding(
-                get: { note.title },
-                set: { note.title = $0 }
-            ))
-            .font(.title2)
-            .padding(.horizontal)
-            .padding(.vertical, 8)
+        ZStack {
+            // Canvas
+            PagedCanvasContainer(
+                pages: Binding(
+                    get: { note.sortedPages },
+                    set: { _ in }
+                ),
+                tool: currentTool,
+                onUndoManagerReady: { canvasUndoManager = $0 },
+                onPencilDoubleTap: { toolbar.switchToPreviousTool() },
+                onWritingStateChanged: { isWriting = $0 },
+                onCurrentPageChanged: { currentPageIndex = $0 },
+                addPage: {
+                    let newIndex = note.pages.count
+                    let page = Page(orderIndex: newIndex)
+                    page.note = note
+                    modelContext.insert(page)
+                    note.updatedAt = .now
+                }
+            )
+            .ignoresSafeArea()
 
-            Divider()
+            // Home button - top left
+            VStack {
+                HStack {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 40, height: 40)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color("ToolbarBackground"))
+                                    .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                            )
+                    }
+                    .padding(.leading, 16)
+                    .padding(.top, 12)
 
-            ZStack(alignment: .leading) {
-                // Canvas
-                CanvasView(
-                    drawingData: Binding(
-                        get: { note.drawingData },
-                        set: { note.drawingData = $0 }
-                    ),
-                    tool: currentTool,
-                    onUndoManagerReady: { canvasUndoManager = $0 },
-                    onPencilDoubleTap: { toolbar.switchToPreviousTool() }
-                )
-
-                // Toolbar
-                DrawingToolbar(
-                    toolbarIcons: $toolbar.toolbarIcons,
-                    selectedColor: $toolbar.selectedColor,
-                    activeTool: $toolbar.activeTool,
-                    undoManager: canvasUndoManager
-                )
-                .padding(.leading, 12)
+                    Spacer()
+                }
+                Spacer()
             }
-            .id(note.id)
+            .opacity(isWriting ? 0 : 1)
+            .animation(.easeInOut(duration: 0.2), value: isWriting)
+
+            // Toolbar
+            DrawingToolbar(
+                toolbarIcons: $toolbar.toolbarIcons,
+                selectedColor: $toolbar.selectedColor,
+                activeTool: $toolbar.activeTool,
+                undoManager: canvasUndoManager
+            )
+            .opacity(1)
+            .animation(.easeInOut(duration: 0.2), value: isWriting)
+
+            VStack {
+                Spacer()
+                HStack {
+                    PageCounterView(currentPage: currentPageIndex, totalPages: note.pages.count)
+                        .padding(.leading, 20)
+                        .padding(.bottom, 20)
+                    Spacer()
+                }
+            }
+            .opacity(isWriting ? 0 : 1)
+            .animation(.easeInOut(duration: 0.2), value: isWriting)
         }
-        .navigationTitle(note.title)
-        .navigationBarTitleDisplayMode(.inline)
-        .onChange(of: note.drawingData) {
-            note.updatedAt = .now
-        }
-        .onChange(of: note.title) {
-            note.updatedAt = .now
-        }
+        .navigationBarHidden(true)
         .onChange(of: toolbar.selectedColor) {
             toolbar.save(colorScheme: colorScheme)
         }

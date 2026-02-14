@@ -11,7 +11,7 @@ struct DrawingToolbar: View {
     @State private var showColorPicker = false
     @State private var editingIconID: UUID?
 
-    // Drag state
+    // Drag state for icons
     @State private var draggedIconID: UUID?
     @State private var dragTranslation: CGSize = .zero
     @State private var isDraggingOutOfBounds = false
@@ -21,15 +21,32 @@ struct DrawingToolbar: View {
     @State private var canUndo = false
     @State private var canRedo = false
 
-    // Reorder state — visual only; array is not mutated until onEnded
+    // Reorder state
     @State private var dragStartZoneIndex: Int?
     @State private var proposedZoneIndex: Int?
     @State private var dragZoneIsColor: Bool = false
 
-    // MARK: - Axis abstraction
-    private var toolbarAxis: Axis { .vertical }
+    // 4-edge snapping
+    @AppStorage("toolbarEdge") private var toolbarEdge: String = "bottom"
 
-    private let slotPitch: CGFloat = ToolbarConstants.tapTargetSize + 2 // tap target + spacing
+    // Toolbar repositioning drag
+    @State private var toolbarDragOffset: CGSize = .zero
+    @State private var isDraggingToolbar = false
+
+    private var edge: Edge {
+        switch toolbarEdge {
+        case "top": return .top
+        case "left": return .leading
+        case "right": return .trailing
+        default: return .bottom
+        }
+    }
+
+    private var toolbarAxis: Axis {
+        edge == .top || edge == .bottom ? .horizontal : .vertical
+    }
+
+    private let slotPitch: CGFloat = ToolbarConstants.tapTargetSize + 2
 
     private func mainAxisValue(_ size: CGSize) -> CGFloat {
         toolbarAxis == .vertical ? size.height : size.width
@@ -52,7 +69,6 @@ struct DrawingToolbar: View {
         toolbarIcons.filter { $0.type == .color }
     }
 
-    /// Main-axis displacement for a non-dragged item so it visually makes room.
     private func reorderDisplacement(for icon: ToolbarIcon) -> CGFloat {
         guard let dragID = draggedIconID, dragID != icon.id,
               let startIdx = dragStartZoneIndex,
@@ -66,17 +82,74 @@ struct DrawingToolbar: View {
         guard let myIdx = zone.firstIndex(where: { $0.id == icon.id }) else { return 0 }
 
         if startIdx < proposed {
-            // Dragged toward higher index: items in (startIdx, proposed] shift backward
             if myIdx > startIdx && myIdx <= proposed { return -slotPitch }
         } else {
-            // Dragged toward lower index: items in [proposed, startIdx) shift forward
             if myIdx >= proposed && myIdx < startIdx { return slotPitch }
         }
         return 0
     }
 
     var body: some View {
-        VStack(spacing: 2) {
+        GeometryReader { geo in
+            toolbarContent
+                .position(toolbarPosition(in: geo))
+                .offset(isDraggingToolbar ? toolbarDragOffset : .zero)
+                .gesture(toolbarRepositionGesture(in: geo))
+        }
+    }
+
+    private func toolbarPosition(in geo: GeometryProxy) -> CGPoint {
+        let size = geo.size
+        switch edge {
+        case .top: return CGPoint(x: size.width / 2, y: 15)
+        case .bottom: return CGPoint(x: size.width / 2, y: size.height - 15)
+        case .leading: return CGPoint(x: 40, y: size.height / 2)
+        case .trailing: return CGPoint(x: size.width - 40, y: size.height / 2)
+        }
+    }
+
+    private func toolbarRepositionGesture(in geo: GeometryProxy) -> some Gesture {
+        DragGesture()
+            .onChanged { value in
+                isDraggingToolbar = true
+                toolbarDragOffset = value.translation
+            }
+            .onEnded { value in
+                isDraggingToolbar = false
+                toolbarDragOffset = .zero
+
+                let pos = toolbarPosition(in: geo)
+                let finalX = pos.x + value.translation.width
+                let finalY = pos.y + value.translation.height
+
+                // Determine nearest edge
+                let distTop = finalY
+                let distBottom = geo.size.height - finalY
+                let distLeft = finalX
+                let distRight = geo.size.width - finalX
+
+                let minDist = min(distTop, distBottom, distLeft, distRight)
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    if minDist == distTop {
+                        toolbarEdge = "top"
+                    } else if minDist == distBottom {
+                        toolbarEdge = "bottom"
+                    } else if minDist == distLeft {
+                        toolbarEdge = "left"
+                    } else {
+                        toolbarEdge = "right"
+                    }
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var toolbarContent: some View {
+        let layout = toolbarAxis == .horizontal
+            ? AnyLayout(HStackLayout(spacing: 2))
+            : AnyLayout(VStackLayout(spacing: 2))
+
+        layout {
             // Undo / Redo
             Button { undoManager?.undo() } label: {
                 Image(systemName: "arrow.uturn.backward")
@@ -93,14 +166,14 @@ struct DrawingToolbar: View {
             .disabled(!canRedo)
             .opacity(canRedo ? 1 : 0.3)
 
-            Divider().frame(width: 36)
+            dividerView
 
             // Tool zone
             ForEach(toolIcons) { icon in
                 iconButton(for: icon)
             }
 
-            Divider().frame(width: 36)
+            dividerView
 
             // Color zone
             ForEach(colorIcons) { icon in
@@ -115,7 +188,6 @@ struct DrawingToolbar: View {
                     Circle()
                         .fill(Color.secondary.opacity(0.15))
                         .frame(width: 26, height: 26)
-
                     Image(systemName: "plus")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.primary)
@@ -138,17 +210,26 @@ struct DrawingToolbar: View {
         .font(.title3)
         .buttonStyle(.plain)
         .foregroundStyle(.primary)
-        .padding(.vertical, 16)
-        .padding(.horizontal, 8)
+        .padding(toolbarAxis == .horizontal ? .horizontal : .vertical, 16)
+        .padding(toolbarAxis == .horizontal ? .vertical : .horizontal, 8)
         .background {
-            Capsule()
-                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color("ToolbarBackground"))
                 .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 2)
         }
         .onAppear { updateUndoState() }
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidUndoChange)) { _ in updateUndoState() }
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidRedoChange)) { _ in updateUndoState() }
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidCloseUndoGroup)) { _ in updateUndoState() }
+    }
+
+    @ViewBuilder
+    private var dividerView: some View {
+        if toolbarAxis == .horizontal {
+            Divider().frame(height: 36)
+        } else {
+            Divider().frame(width: 36)
+        }
     }
 
     private func updateUndoState() {
@@ -184,7 +265,6 @@ struct DrawingToolbar: View {
                     let translation = value.translation
                     guard abs(translation.width) > 2 || abs(translation.height) > 2 else { return }
 
-                    // Initialize on first significant movement
                     if draggedIconID != icon.id {
                         draggedIconID = icon.id
                         let isColor = icon.type == .color
@@ -203,7 +283,6 @@ struct DrawingToolbar: View {
                         return toolbarIcons.filter { $0.type == icon.type }.count > 1
                     }()
 
-                    // Cross-axis deletion
                     if crossAxis > 50 && !isDraggingOutOfBounds && canDelete {
                         isDraggingOutOfBounds = true
                         if icon.type == .color, let deletedColor = icon.color {
@@ -215,7 +294,6 @@ struct DrawingToolbar: View {
                         return
                     }
 
-                    // Main-axis reorder (visual only)
                     guard !isDraggingOutOfBounds,
                           let startIdx = dragStartZoneIndex,
                           let curProposed = proposedZoneIndex else { return }
@@ -248,12 +326,10 @@ struct DrawingToolbar: View {
                         handleIconTap(icon)
                     }
 
-                    // Commit reorder to actual array
                     if let startIdx = dragStartZoneIndex,
                        let targetIdx = proposedZoneIndex,
                        startIdx != targetIdx {
                         moveIconInZone(id: icon.id, toZoneIndex: targetIdx, isColor: dragZoneIsColor)
-                        // Adjust translation so visual position stays put after layout shift
                         let layoutDelta = CGFloat(startIdx - targetIdx) * slotPitch
                         if toolbarAxis == .vertical {
                             dragTranslation.height += layoutDelta
@@ -262,12 +338,10 @@ struct DrawingToolbar: View {
                         }
                     }
 
-                    // Clear reorder tracking instantly (net visual change = 0)
                     dragStartZoneIndex = nil
                     proposedZoneIndex = nil
                     dragZoneIsColor = false
 
-                    // Animate dragged item settling into its new slot
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
                         draggedIconID = nil
                         dragTranslation = .zero
@@ -405,7 +479,7 @@ struct DrawingToolbar: View {
         case .pencil, .eraser, .highlighter:
             let targetTool = activeToolFor(icon.type)
             if activeTool == targetTool {
-                editingIconID = icon.id // show instrument popover
+                editingIconID = icon.id
             } else {
                 activeTool = targetTool
             }

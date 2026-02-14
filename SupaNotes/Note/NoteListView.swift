@@ -1,55 +1,81 @@
 import SwiftUI
 import SwiftData
 
-struct  NoteListView: View {
+struct NoteListView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Note.updatedAt, order: .reverse) private var notes: [Note]
-    @Binding var selectedNoteID: UUID?
+    @Query private var notes: [Note]
+    var folder: Folder?
+    var sortOrder: NoteSortOrder
+    var onOpenNote: (UUID) -> Void
+
+    init(folder: Folder?, sortOrder: NoteSortOrder, onOpenNote: @escaping (UUID) -> Void) {
+        self.folder = folder
+        self.sortOrder = sortOrder
+        self.onOpenNote = onOpenNote
+
+        let sortDescriptor: SortDescriptor<Note> = switch sortOrder {
+        case .name: SortDescriptor(\Note.title)
+        case .lastEdited: SortDescriptor(\Note.updatedAt, order: .reverse)
+        case .dateCreated: SortDescriptor(\Note.createdAt, order: .reverse)
+        }
+
+        _notes = Query(
+            filter: #Predicate<Note> { note in
+                note.isDeleted == false
+            },
+            sort: [sortDescriptor]
+        )
+    }
+
+    private var filteredNotes: [Note] {
+        if let folder {
+            return notes.filter { $0.folder?.id == folder.id }
+        }
+        return notes
+    }
 
     var body: some View {
-        List(selection: $selectedNoteID) {
-            ForEach(notes) { note in
-                NavigationLink(value: note.id) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(note.title)
-                            .font(.headline)
+        if filteredNotes.isEmpty {
+            ContentUnavailableView(
+                "No Notes",
+                systemImage: "note.text",
+                description: Text("Tap + to create a new note.")
+            )
+        } else {
+            List {
+                ForEach(filteredNotes) { note in
+                    Button {
+                        onOpenNote(note.id)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(note.title)
+                                .font(.body)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.primary)
+                            Text(note.updatedAt, format: .relative(presentation: .named))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
                     }
-                    .padding(.vertical, 4)
+                    .swipeActions(edge: .trailing) {
+                        Button("Delete", role: .destructive) {
+                            note.isDeleted = true
+                            note.deletedAt = .now
+                        }
+                    }
+                    .contextMenu {
+                        Button("Rename") {
+                            // TODO: Inline rename
+                        }
+                        Button("Move to Trash", role: .destructive) {
+                            note.isDeleted = true
+                            note.deletedAt = .now
+                        }
+                    }
                 }
             }
-            .onDelete(perform: deleteNotes)
-        }
-        .overlay {
-            if notes.isEmpty {
-                ContentUnavailableView(
-                    "No Notes",
-                    systemImage: "note.text",
-                    description: Text("Tap + to create a new note.")
-                )
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(action: addNote) {
-                    Label("New Note", systemImage: "plus")
-                }
-            }
-        }
-    }
-
-    private func addNote() {
-        let note = Note()
-        modelContext.insert(note)
-        selectedNoteID = note.id
-    }
-
-    private func deleteNotes(at offsets: IndexSet) {
-        for index in offsets {
-            let note = notes[index]
-            if selectedNoteID == note.id {
-                selectedNoteID = nil
-            }
-            modelContext.delete(note)
+            .listStyle(.plain)
         }
     }
 }

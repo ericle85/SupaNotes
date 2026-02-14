@@ -5,15 +5,22 @@ import SwiftData
 final class Note {
     var id: UUID
     var title: String
-    @Attribute(.externalStorage) var drawingData: Data
     var createdAt: Date
     var updatedAt: Date
+    var isDeleted: Bool = false
+    var deletedAt: Date?
+    var folder: Folder?
+    @Relationship(deleteRule: .cascade, inverse: \Page.note) var pages: [Page]
 
-    init(title: String = "Untitled Note", drawingData: Data = Data()) {
+    var sortedPages: [Page] {
+        pages.sorted { $0.orderIndex < $1.orderIndex }
+    }
+
+    init(title: String = "Untitled Note") {
         self.id = UUID()
         self.title = title
-        self.drawingData = drawingData
         self.createdAt = .now
         self.updatedAt = .now
+        self.pages = [Page(orderIndex: 0)]
     }
 }
