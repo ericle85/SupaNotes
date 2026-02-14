@@ -32,6 +32,7 @@ struct DrawingToolbar: View {
     // Toolbar repositioning drag
     @State private var toolbarDragOffset: CGSize = .zero
     @State private var isDraggingToolbar = false
+    @State private var didRepositionToolbar = false
 
     private var edge: Edge {
         switch toolbarEdge {
@@ -89,58 +90,59 @@ struct DrawingToolbar: View {
         return 0
     }
 
-    var body: some View {
-        GeometryReader { geo in
-            toolbarContent
-                .position(toolbarPosition(in: geo))
-                .offset(isDraggingToolbar ? toolbarDragOffset : .zero)
-                .gesture(toolbarRepositionGesture(in: geo))
-        }
-    }
-
-    private func toolbarPosition(in geo: GeometryProxy) -> CGPoint {
-        let size = geo.size
+    private var toolbarAlignment: Alignment {
         switch edge {
-        case .top: return CGPoint(x: size.width / 2, y: 15)
-        case .bottom: return CGPoint(x: size.width / 2, y: size.height - 15)
-        case .leading: return CGPoint(x: 40, y: size.height / 2)
-        case .trailing: return CGPoint(x: size.width - 40, y: size.height / 2)
+        case .top: return .top
+        case .bottom: return .bottom
+        case .leading: return .leading
+        case .trailing: return .trailing
         }
     }
 
-    private func toolbarRepositionGesture(in geo: GeometryProxy) -> some Gesture {
-        DragGesture()
-            .onChanged { value in
-                isDraggingToolbar = true
-                toolbarDragOffset = value.translation
-            }
-            .onEnded { value in
-                isDraggingToolbar = false
-                toolbarDragOffset = .zero
-
-                let pos = toolbarPosition(in: geo)
-                let finalX = pos.x + value.translation.width
-                let finalY = pos.y + value.translation.height
-
-                // Determine nearest edge
-                let distTop = finalY
-                let distBottom = geo.size.height - finalY
-                let distLeft = finalX
-                let distRight = geo.size.width - finalX
-
-                let minDist = min(distTop, distBottom, distLeft, distRight)
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    if minDist == distTop {
-                        toolbarEdge = "top"
-                    } else if minDist == distBottom {
-                        toolbarEdge = "bottom"
-                    } else if minDist == distLeft {
-                        toolbarEdge = "left"
-                    } else {
-                        toolbarEdge = "right"
+    var body: some View {
+        toolbarContent
+            .fixedSize()
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 15, coordinateSpace: .global)
+                    .onChanged { value in
+                        guard draggedIconID == nil else { return }
+                        isDraggingToolbar = true
+                        didRepositionToolbar = true
+                        toolbarDragOffset = value.translation
                     }
-                }
-            }
+                    .onEnded { value in
+                        guard isDraggingToolbar else { return }
+                        isDraggingToolbar = false
+                        toolbarDragOffset = .zero
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            didRepositionToolbar = false
+                        }
+
+                        let screenSize = UIScreen.main.bounds.size
+                        let loc = value.location
+
+                        let distTop = loc.y
+                        let distBottom = screenSize.height - loc.y
+                        let distLeft = loc.x
+                        let distRight = screenSize.width - loc.x
+
+                        let minDist = min(distTop, distBottom, distLeft, distRight)
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            if minDist == distTop {
+                                toolbarEdge = "top"
+                            } else if minDist == distBottom {
+                                toolbarEdge = "bottom"
+                            } else if minDist == distLeft {
+                                toolbarEdge = "left"
+                            } else {
+                                toolbarEdge = "right"
+                            }
+                        }
+                    }
+            )
+            .offset(isDraggingToolbar ? toolbarDragOffset : .zero)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: toolbarAlignment)
+            .padding(edge == .leading || edge == .trailing ? .horizontal : .vertical, 8)
     }
 
     @ViewBuilder
@@ -151,14 +153,20 @@ struct DrawingToolbar: View {
 
         layout {
             // Undo / Redo
-            Button { undoManager?.undo() } label: {
+            Button {
+                guard !didRepositionToolbar else { return }
+                undoManager?.undo()
+            } label: {
                 Image(systemName: "arrow.uturn.backward")
                     .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
                     .contentShape(Rectangle())
             }
             .disabled(!canUndo)
             .opacity(canUndo ? 1 : 0.3)
-            Button { undoManager?.redo() } label: {
+            Button {
+                guard !didRepositionToolbar else { return }
+                undoManager?.redo()
+            } label: {
                 Image(systemName: "arrow.uturn.forward")
                     .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
                     .contentShape(Rectangle())
@@ -182,6 +190,7 @@ struct DrawingToolbar: View {
 
             // Plus button
             Button {
+                guard !didRepositionToolbar else { return }
                 showColorPicker = true
             } label: {
                 ZStack {
@@ -210,7 +219,7 @@ struct DrawingToolbar: View {
         .font(.title3)
         .buttonStyle(.plain)
         .foregroundStyle(.primary)
-        .padding(toolbarAxis == .horizontal ? .horizontal : .vertical, 16)
+        .padding(toolbarAxis == .horizontal ? .horizontal : .vertical, 8)
         .padding(toolbarAxis == .horizontal ? .vertical : .horizontal, 8)
         .background {
             RoundedRectangle(cornerRadius: 12)

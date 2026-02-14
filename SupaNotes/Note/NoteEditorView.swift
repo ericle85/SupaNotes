@@ -91,7 +91,7 @@ struct NoteEditorView: View {
                 Spacer()
             }
             .opacity(isWriting ? 0 : 1)
-            .animation(.easeInOut(duration: 0.2), value: isWriting)
+            .animation(.easeInOut(duration: 0.5), value: isWriting)
 
             // Toolbar
             DrawingToolbar(
@@ -101,7 +101,7 @@ struct NoteEditorView: View {
                 undoManager: canvasUndoManager
             )
             .opacity(1)
-            .animation(.easeInOut(duration: 0.2), value: isWriting)
+            .animation(.easeInOut(duration: 0.5), value: isWriting)
 
             VStack {
                 Spacer()
@@ -113,7 +113,7 @@ struct NoteEditorView: View {
                 }
             }
             .opacity(isWriting ? 0 : 1)
-            .animation(.easeInOut(duration: 0.2), value: isWriting)
+            .animation(.easeInOut(duration: 0.5), value: isWriting)
         }
         .navigationBarHidden(true)
         .onChange(of: toolbar.selectedColor) {

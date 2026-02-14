@@ -53,10 +53,11 @@ struct PagedCanvasContainer: UIViewRepresentable {
             canvasView.tool = tool
         }
 
-        // Rebuild if page count changed or container width is stale (initial layout had zero bounds)
+        // Rebuild if page count changed or initial layout had zero bounds
         let containerWidth = coordinator.containerView?.frame.width ?? 0
         if coordinator.canvasViews.count != pages.count ||
-           (scrollView.bounds.width > 0 && abs(containerWidth - scrollView.bounds.width) > 1) {
+           (!coordinator.hasCompletedInitialLayout && scrollView.bounds.width > 0 && abs(containerWidth - scrollView.bounds.width) > 1) {
+            coordinator.hasCompletedInitialLayout = scrollView.bounds.width > 0
             coordinator.rebuildPages(pages: pages, tool: tool)
         }
     }
@@ -87,6 +88,7 @@ struct PagedCanvasContainer: UIViewRepresentable {
         weak var containerView: UIView?
         var canvasViews: [PKCanvasView] = []
         private var isAddingPage = false
+        var hasCompletedInitialLayout = false
         private var saveWorkItem: DispatchWorkItem?
 
         init(
