@@ -18,16 +18,16 @@ class PageLayoutManager {
         guard let containerView = containerView, let scrollView = scrollView else { return }
 
         if pendingScroll != .none {
-            scrollView.zoomScale = 1.0
+            scrollView.zoomScale = 1.0 / PageConstants.renderScale
         }
 
         canvasViews.forEach { $0.removeFromSuperview() }
         canvasViews.removeAll()
 
         let sortedPages = pages.sorted { $0.orderIndex < $1.orderIndex }
-        let pageW = PageConstants.pageWidth
-        let pageH = PageConstants.pageHeight
-        let gap = PageConstants.pageGap
+        let pageW = PageConstants.internalWidth
+        let pageH = PageConstants.internalHeight
+        let gap = PageConstants.internalGap
         let totalHeight = CGFloat(sortedPages.count) * pageH + CGFloat(max(0, sortedPages.count - 1)) * gap + gap * 2
 
         containerView.frame = CGRect(
@@ -55,7 +55,7 @@ class PageLayoutManager {
     }
 
     private func makeCanvasView(for page: Page, at index: Int, tool: PKTool, pageW: CGFloat, pageH: CGFloat, gap: CGFloat, containerWidth: CGFloat, delegate: PKCanvasViewDelegate) -> PKCanvasView {
-        let canvasView = PKCanvasView()
+        let canvasView = SupaCanvasView()
         canvasView.drawingPolicy = .pencilOnly
         canvasView.backgroundColor = .white
         canvasView.overrideUserInterfaceStyle = .light
@@ -116,8 +116,8 @@ class PageLayoutManager {
     func updateCurrentPage(pages: [Page], onCurrentPageChanged: ((Int) -> Void)?) {
         guard let scrollView = scrollView else { return }
         let centerY = (scrollView.contentOffset.y + scrollView.bounds.height / 2) / scrollView.zoomScale
-        let pageH = PageConstants.pageHeight
-        let gap = PageConstants.pageGap
+        let pageH = PageConstants.internalHeight
+        let gap = PageConstants.internalGap
         let pageIndex = max(0, Int((centerY - gap) / (pageH + gap)))
         onCurrentPageChanged?(min(pageIndex, max(0, pages.count - 1)))
     }

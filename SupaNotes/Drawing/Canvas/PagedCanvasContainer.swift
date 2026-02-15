@@ -34,6 +34,11 @@ struct PagedCanvasContainer: UIViewRepresentable {
         scrollView.addInteraction(pencilInteraction)
 
         c.rebuildPages(pages: pages, tool: tool)
+
+        DispatchQueue.main.async {
+            scrollView.zoomScale = 1.0 / PageConstants.renderScale
+        }
+
         return scrollView
     }
 

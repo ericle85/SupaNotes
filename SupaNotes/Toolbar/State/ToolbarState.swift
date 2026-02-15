@@ -28,13 +28,14 @@ final class ToolbarState {
     }
 
     var currentPKTool: PKTool {
+        let scale = PageConstants.renderScale
         switch activeTool {
         case .pen:
-            return PKInkingTool(.pen, color: UIColor(selectedColor), width: instrumentWidth(for: .pen))
+            return PKInkingTool(.pen, color: UIColor(selectedColor), width: instrumentWidth(for: .pen) * scale)
         case .eraser:
-            return PKEraserTool(.bitmap, width: instrumentWidth(for: .eraser))
+            return PKEraserTool(.bitmap, width: instrumentWidth(for: .eraser) * scale)
         case .highlighter:
-            return PKInkingTool(.marker, color: UIColor(selectedColor), width: instrumentWidth(for: .highlighter))
+            return PKInkingTool(.marker, color: UIColor(selectedColor), width: instrumentWidth(for: .highlighter) * scale)
         case .lasso:
             return PKLassoTool()
         }
