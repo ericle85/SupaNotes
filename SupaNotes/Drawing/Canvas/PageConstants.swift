@@ -7,7 +7,7 @@ enum PageConstants {
     static let pageGap: CGFloat = 24
 
     // 2x internal resolution for crisper PencilKit strokes
-    static let renderScale: CGFloat = 2.0
+    static let renderScale: CGFloat = 4.0
 
     static let internalWidth: CGFloat = pageWidth * renderScale
     static let internalHeight: CGFloat = pageHeight * renderScale
