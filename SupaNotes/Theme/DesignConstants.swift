@@ -14,8 +14,8 @@ enum Design {
 
     // MARK: - Zoom
     enum Zoom {
-        static let min: CGFloat = 0.25
-        static let max: CGFloat = 1.5
+        static let min: CGFloat = 0.125
+        static let max: CGFloat = 0.75
     }
 
     // MARK: - Pull to Add

@@ -55,7 +55,7 @@ class PageLayoutManager {
     }
 
     private func makeCanvasView(for page: Page, at index: Int, tool: PKTool, pageW: CGFloat, pageH: CGFloat, gap: CGFloat, containerWidth: CGFloat, delegate: PKCanvasViewDelegate) -> PKCanvasView {
-        let canvasView = PKCanvasView()
+        let canvasView = SupaCanvasView()
         canvasView.drawingPolicy = .pencilOnly
         canvasView.backgroundColor = .white
         canvasView.overrideUserInterfaceStyle = .light
