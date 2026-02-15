@@ -63,9 +63,10 @@ struct AddToolMenuView: View {
                         .foregroundStyle(.tertiary)
                 }
             }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 12)
-            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: Design.CornerRadius.small))
+            .roundedButton(
+                background: .secondaryFill(),
+                padding: .comfortable
+            )
         }
     }
 
@@ -150,4 +151,45 @@ struct AddColorView: View {
         }
         dismiss()
     }
+}
+
+#Preview("Tool Menu") {
+    struct PreviewWrapper: View {
+        @State private var toolbarIcons: [ToolbarIcon] = []
+        @State private var selectedColor: Color = .blue
+        @State private var activeTool: ActiveTool = .pen
+
+        var body: some View {
+            AddToolMenuView(
+                toolbarIcons: $toolbarIcons,
+                selectedColor: $selectedColor,
+                activeTool: $activeTool,
+                defaultColor: .blue
+            )
+            .frame(width: 220)
+        }
+    }
+
+    return PreviewWrapper()
+}
+
+#Preview("Color Picker") {
+    struct PreviewWrapper: View {
+        @State private var toolbarIcons: [ToolbarIcon] = []
+        @State private var selectedColor: Color = .blue
+        @State private var activeTool: ActiveTool = .pen
+
+        var body: some View {
+            AddColorView(
+                toolbarIcons: $toolbarIcons,
+                selectedColor: $selectedColor,
+                activeTool: $activeTool,
+                defaultColor: .blue,
+                onBack: {}
+            )
+            .frame(width: 260)
+        }
+    }
+
+    return PreviewWrapper()
 }

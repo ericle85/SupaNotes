@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 enum Design {
     // MARK: - Layout
@@ -97,5 +98,56 @@ enum Design {
     enum Debounce {
         static let drawingSave: Double = 0.3
         static let pullReset: Double = 0.3
+    }
+
+    // MARK: - Button Styles
+    enum ButtonBackgroundStyle {
+        case clear
+        case conditionalFill(isSelected: Bool, selectedOpacity: CGFloat = 0.08)
+        case secondaryFill(opacity: CGFloat = 0.1)
+        case solidFill(Color)
+        case customColor(String) // Named color from assets
+
+        func color(colorScheme: ColorScheme) -> Color {
+            switch self {
+            case .clear:
+                return .clear
+            case .conditionalFill(let isSelected, let opacity):
+                return isSelected ? Color.primary.opacity(opacity) : .clear
+            case .secondaryFill(let opacity):
+                return Color.secondary.opacity(opacity)
+            case .solidFill(let color):
+                return color
+            case .customColor(let name):
+                return Color(name)
+            }
+        }
+    }
+
+    enum ButtonPaddingStyle {
+        case compact        // 12pt horizontal, 6pt vertical
+        case comfortable    // 12pt horizontal, 10pt vertical
+        case sidebar        // 16pt horizontal, 10pt vertical
+
+        var horizontal: CGFloat {
+            switch self {
+            case .compact: return 12
+            case .comfortable, .sidebar: return 12
+            }
+        }
+
+        var vertical: CGFloat {
+            switch self {
+            case .compact: return 6
+            case .comfortable, .sidebar: return 10
+            }
+        }
+
+        var margin: CGFloat {
+            switch self {
+            case .sidebar: return 8
+            default: return 0
+            }
+        }
     }
 }

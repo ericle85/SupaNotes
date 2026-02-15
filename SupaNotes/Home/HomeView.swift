@@ -118,9 +118,8 @@ struct HomeView: View {
                         .font(.system(size: Design.FontSize.headerIcon, weight: .semibold))
                         .foregroundStyle(.white)
                         .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
-                        .background(
-                            RoundedRectangle(cornerRadius: Design.CornerRadius.small)
-                                .fill(Color.accentColor)
+                        .roundedButton(
+                            background: .solidFill(Color.accentColor)
                         )
                 }
             }
@@ -137,4 +136,16 @@ struct HomeView: View {
         case .folder(let folder): return folder.name
         }
     }
+}
+
+#Preview("Home - iPad") {
+    HomeView()
+        .modelContainer(for: [Note.self, Folder.self], inMemory: true)
+        .previewDevice(PreviewDevice(rawValue: "iPad Pro (12.9-inch) (6th generation)"))
+}
+
+#Preview("Home - iPad Mini") {
+    HomeView()
+        .modelContainer(for: [Note.self, Folder.self], inMemory: true)
+        .previewDevice(PreviewDevice(rawValue: "iPad mini (6th generation)"))
 }

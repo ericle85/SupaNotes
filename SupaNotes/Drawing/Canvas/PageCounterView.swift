@@ -9,17 +9,20 @@ struct PageCounterView: View {
             .font(.caption)
             .fontWeight(.medium)
             .foregroundStyle(.secondary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: Design.CornerRadius.small)
-                    .fill(Color("ToolbarBackground"))
-                    .shadow(
-                        color: .black.opacity(Design.Shadow.subtle.color),
-                        radius: Design.Shadow.subtle.radius,
-                        x: Design.Shadow.subtle.x,
-                        y: Design.Shadow.subtle.y
-                    )
+            .roundedButton(
+                background: .customColor("ToolbarBackground"),
+                padding: .compact,
+                shadow: Design.Shadow.subtle
             )
     }
+}
+
+#Preview {
+    VStack(spacing: 20) {
+        PageCounterView(currentPage: 1, totalPages: 1)
+        PageCounterView(currentPage: 5, totalPages: 12)
+        PageCounterView(currentPage: 100, totalPages: 100)
+    }
+    .padding()
+    .background(Color.gray.opacity(0.2))
 }

@@ -84,12 +84,9 @@ struct FolderSidebarView: View {
                 }
             }
             .foregroundStyle(isSelected ? .primary : .secondary)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: Design.CornerRadius.small)
-                    .fill(isSelected ? Color.primary.opacity(0.08) : .clear)
-                    .padding(.horizontal, 8)
+            .roundedButton(
+                background: .conditionalFill(isSelected: isSelected),
+                padding: .sidebar
             )
         }
         .buttonStyle(.plain)
@@ -134,4 +131,23 @@ struct FolderSidebarView: View {
             }
         }
     }
+}
+
+#Preview("Sidebar with Folders") {
+    FolderSidebarView(destination: .constant(.allNotes))
+        .frame(width: Design.Layout.sidebarWidth)
+        .modelContainer(for: [Folder.self, Note.self], inMemory: true)
+}
+
+#Preview("Sidebar - Selected States") {
+    VStack(spacing: 0) {
+        FolderSidebarView(destination: .constant(.allNotes))
+            .frame(width: Design.Layout.sidebarWidth)
+
+        Divider()
+
+        FolderSidebarView(destination: .constant(.trash))
+            .frame(width: Design.Layout.sidebarWidth)
+    }
+    .modelContainer(for: [Folder.self, Note.self], inMemory: true)
 }

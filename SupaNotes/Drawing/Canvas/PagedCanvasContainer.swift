@@ -80,7 +80,7 @@ struct PagedCanvasContainer: UIViewRepresentable {
     }
 
     // MARK: - Coordinator
-    class Coordinator: NSObject, UIScrollViewDelegate, PKCanvasViewDelegate, UIPencilInteractionDelegate {
+    class Coordinator: NSObject {
         var pages: [Page]
         var tool: PKTool
         var onUndoManagerReady: (UndoManager?) -> Void
@@ -125,42 +125,52 @@ struct PagedCanvasContainer: UIViewRepresentable {
                 onUndoManagerReady: onUndoManagerReady
             )
         }
+    }
+}
 
-        // MARK: - UIScrollViewDelegate
-        func viewForZooming(in scrollView: UIScrollView) -> UIView? { layoutManager.containerView }
+// MARK: - UIScrollViewDelegate
+extension PagedCanvasContainer.Coordinator: UIScrollViewDelegate {
+    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+        layoutManager.containerView
+    }
 
-        func scrollViewDidScroll(_ scrollView: UIScrollView) {
-            layoutManager.updateCurrentPage(pages: pages, onCurrentPageChanged: onCurrentPageChanged)
-            pullController.update(for: scrollView)
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        layoutManager.updateCurrentPage(pages: pages, onCurrentPageChanged: onCurrentPageChanged)
+        pullController.update(for: scrollView)
+    }
+
+    func scrollViewDidZoom(_ scrollView: UIScrollView) {
+        layoutManager.centerContainerIfNeeded()
+    }
+
+    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        let scroll = pullController.handleEndDragging(addPage: addPage, addPageAbove: addPageAbove)
+        if scroll != .none {
+            pendingScroll = scroll
         }
+    }
+}
 
-        func scrollViewDidZoom(_ scrollView: UIScrollView) { layoutManager.centerContainerIfNeeded() }
+// MARK: - PKCanvasViewDelegate
+extension PagedCanvasContainer.Coordinator: PKCanvasViewDelegate {
+    func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
+        saveController.debouncedSave(canvasView: canvasView, pages: pages)
+    }
 
-        func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-            let scroll = pullController.handleEndDragging(addPage: addPage, addPageAbove: addPageAbove)
-            if scroll != .none {
-                pendingScroll = scroll
-            }
-        }
+    func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
+        onWritingStateChanged?(true)
+        onUndoManagerReady(canvasView.undoManager)
+    }
 
-        // MARK: - PKCanvasViewDelegate
-        func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
-            saveController.debouncedSave(canvasView: canvasView, pages: pages)
-        }
+    func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
+        onWritingStateChanged?(false)
+        saveController.immediateSave(canvasView: canvasView, pages: pages)
+    }
+}
 
-        func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
-            onWritingStateChanged?(true)
-            onUndoManagerReady(canvasView.undoManager)
-        }
-
-        func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
-            onWritingStateChanged?(false)
-            saveController.immediateSave(canvasView: canvasView, pages: pages)
-        }
-
-        // MARK: - UIPencilInteractionDelegate
-        func pencilInteractionDidTap(_ interaction: UIPencilInteraction) {
-            onPencilDoubleTap?()
-        }
+// MARK: - UIPencilInteractionDelegate
+extension PagedCanvasContainer.Coordinator: UIPencilInteractionDelegate {
+    func pencilInteractionDidTap(_ interaction: UIPencilInteraction) {
+        onPencilDoubleTap?()
     }
 }

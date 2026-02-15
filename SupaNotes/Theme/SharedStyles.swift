@@ -51,6 +51,58 @@ extension View {
     }
 }
 
+// MARK: - Rounded Button Style
+struct RoundedButtonStyle: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var background: Design.ButtonBackgroundStyle = .clear
+    var padding: Design.ButtonPaddingStyle = .comfortable
+    var cornerRadius: CGFloat = Design.CornerRadius.small
+    var shadow: Design.Shadow? = nil
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, padding.horizontal)
+            .padding(.vertical, padding.vertical)
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(background.color(colorScheme: colorScheme))
+                    .applyShadowIfNeeded(shadow)
+                    .padding(.horizontal, padding.margin)
+            )
+    }
+}
+
+extension View {
+    func roundedButton(
+        background: Design.ButtonBackgroundStyle = .clear,
+        padding: Design.ButtonPaddingStyle = .comfortable,
+        cornerRadius: CGFloat = Design.CornerRadius.small,
+        shadow: Design.Shadow? = nil
+    ) -> some View {
+        modifier(RoundedButtonStyle(
+            background: background,
+            padding: padding,
+            cornerRadius: cornerRadius,
+            shadow: shadow
+        ))
+    }
+
+    @ViewBuilder
+    func applyShadowIfNeeded(_ shadow: Design.Shadow?) -> some View {
+        if let shadow = shadow {
+            self.shadow(
+                color: .black.opacity(shadow.color),
+                radius: shadow.radius,
+                x: shadow.x,
+                y: shadow.y
+            )
+        } else {
+            self
+        }
+    }
+}
+
 // MARK: - Binding Helper for Optional Values
 extension Binding where Value == WritingInstrumentSettings? {
     static func ?? (lhs: Binding<WritingInstrumentSettings?>, rhs: Binding<WritingInstrumentSettings>) -> Binding<WritingInstrumentSettings> {
