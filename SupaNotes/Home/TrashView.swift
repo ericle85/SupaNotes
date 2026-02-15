@@ -78,9 +78,9 @@ struct TrashView: View {
                 emptyTrash()
             }
         } message: {
-            Text("This will permanently delete all \(trashedNotes.count) notes. This action cannot be undone.")
+            Text("This will permanently delete all \(trashedNotes.count) " + (trashedNotes.count == 1 ? "note" : "notes") + ". This action cannot be undone.")
         }
-        .alert("Delete \(selectedNotes.count) notes?", isPresented: $showDeleteSelectedAlert) {
+        .alert(selectedNotes.count == 1 ? "Delete 1 note?" : "Delete \(selectedNotes.count) notes?", isPresented: $showDeleteSelectedAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
                 deleteSelectedNotes()
