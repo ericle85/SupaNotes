@@ -25,7 +25,7 @@ struct AgentControlBar: View {
     private var sendButton: some View {
         if let sender, let token = captureToken {
             Button {
-                if let image = token.captureCurrentPage?() {
+                if let image = token.captureCurrentPage?(state.selectedRect) {
                     sender.send(image)
                 }
             } label: {

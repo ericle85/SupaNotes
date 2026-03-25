@@ -37,8 +37,9 @@ struct PagedCanvasContainer: UIViewRepresentable {
         c.rebuildPages(pages: pages, tool: tool)
 
         // Register page capture on the token
-        captureToken?.captureCurrentPage = { [weak c] in
-            c?.captureCurrentPageImage()
+        c.scrollViewRef = scrollView
+        captureToken?.captureCurrentPage = { [weak c] (screenRect: CGRect?) in
+            c?.captureCurrentPageImage(highlightScreenRect: screenRect)
         }
 
         DispatchQueue.main.async {
@@ -101,6 +102,7 @@ struct PagedCanvasContainer: UIViewRepresentable {
         var addPage: () -> Void
         var addPageAbove: (() -> Void)?
         var currentVisiblePageIndex: Int = 0
+        weak var scrollViewRef: UIScrollView?
 
         let layoutManager = PageLayoutManager()
         let pullController = PullToAddController()
@@ -149,22 +151,49 @@ struct PagedCanvasContainer: UIViewRepresentable {
             pullController.update(for: scrollView)
         }
 
-        func captureCurrentPageImage() -> UIImage? {
+        func captureCurrentPageImage(highlightScreenRect: CGRect? = nil) -> UIImage? {
             let canvasViews = layoutManager.canvasViews
             guard currentVisiblePageIndex < canvasViews.count else { return nil }
             let canvasView = canvasViews[currentVisiblePageIndex]
-            // Render the view hierarchy at display scale (1/renderScale) so output = pageWidth × pageHeight
             let pageSize = CGSize(width: PageConstants.pageWidth, height: PageConstants.pageHeight)
+            let canvasScale = 1.0 / PageConstants.renderScale
+
             let renderer = UIGraphicsImageRenderer(size: pageSize)
             return renderer.image { ctx in
-                // White background
                 UIColor.white.setFill()
                 UIRectFill(CGRect(origin: .zero, size: pageSize))
-                // Scale canvas (internalWidth × internalHeight) down to page display size
-                let scale = 1.0 / PageConstants.renderScale
-                ctx.cgContext.scaleBy(x: scale, y: scale)
+                // Draw canvas scaled down to page size
+                ctx.cgContext.scaleBy(x: canvasScale, y: canvasScale)
                 canvasView.drawHierarchy(in: canvasView.bounds, afterScreenUpdates: true)
+                ctx.cgContext.scaleBy(x: 1.0 / canvasScale, y: 1.0 / canvasScale)
+                // Draw selected region annotation
+                if let screenRect = highlightScreenRect, let sv = scrollViewRef {
+                    let imageRect = screenRectToImageRect(screenRect, scrollView: sv)
+                    ctx.cgContext.setFillColor(UIColor.systemBlue.withAlphaComponent(0.15).cgColor)
+                    ctx.cgContext.setStrokeColor(UIColor.systemBlue.cgColor)
+                    ctx.cgContext.setLineWidth(2)
+                    ctx.cgContext.fill(imageRect)
+                    ctx.cgContext.stroke(imageRect)
+                }
             }
+        }
+
+        private func screenRectToImageRect(_ screenRect: CGRect, scrollView: UIScrollView) -> CGRect {
+            guard let containerView = layoutManager.containerView else { return .zero }
+            let canvasViews = layoutManager.canvasViews
+            guard currentVisiblePageIndex < canvasViews.count else { return .zero }
+            let pageOriginInContainer = canvasViews[currentVisiblePageIndex].frame.origin
+            // Convert screen coords → container coords, subtract current page origin
+            func toCanvas(_ p: CGPoint) -> CGPoint { containerView.convert(p, from: nil) }
+            let o = toCanvas(screenRect.origin)
+            let c = toCanvas(CGPoint(x: screenRect.maxX, y: screenRect.maxY))
+            let s = 1.0 / PageConstants.renderScale
+            return CGRect(
+                x: (o.x - pageOriginInContainer.x) * s,
+                y: (o.y - pageOriginInContainer.y) * s,
+                width: (c.x - o.x) * s,
+                height: (c.y - o.y) * s
+            )
         }
 
         func scrollViewDidZoom(_ scrollView: UIScrollView) { layoutManager.centerContainerIfNeeded() }
