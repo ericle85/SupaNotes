@@ -14,6 +14,7 @@ struct NoteEditorView: View {
     @State private var agentRegionState = AgentRegionState()
     @State private var captureToken = AgentCaptureToken()
     @State private var visionSender = AgentVisionSender()
+    @State private var agentRunner = AgentRunner()
 
     private var note: Note? { notes.first }
 
@@ -85,7 +86,7 @@ struct NoteEditorView: View {
             }
             .ignoresSafeArea()
 
-            AgentControlBar(state: agentRegionState, captureToken: captureToken, sender: visionSender)
+            AgentControlBar(state: agentRegionState, captureToken: captureToken, sender: visionSender, runner: agentRunner)
 
             DrawingToolbar(
                 toolbarIcons: $toolbar.toolbarIcons,

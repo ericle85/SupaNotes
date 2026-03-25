@@ -41,6 +41,22 @@ struct PagedCanvasContainer: UIViewRepresentable {
         captureToken?.captureCurrentPage = { [weak c] (screenRect: CGRect?) in
             c?.captureCurrentPageImage(highlightScreenRect: screenRect)
         }
+        captureToken?.imageRectToScreenRect = { [weak c] (imageRect: CGRect) in
+            c?.imageRectToScreenRect(imageRect) ?? .zero
+        }
+        captureToken?.tapAtImagePoint = { [weak c] (imagePoint: CGPoint) in
+            // Caller converts normalized point → image space before calling this.
+            // Build a fixed-size crop box and return screen rect via imageRectToScreenRect.
+            let boxW: CGFloat = 120
+            let boxH: CGFloat = 40
+            let imageRect = CGRect(
+                x: imagePoint.x - boxW / 2,
+                y: imagePoint.y - boxH / 2,
+                width: boxW,
+                height: boxH
+            )
+            let _ = c?.imageRectToScreenRect(imageRect)
+        }
 
         DispatchQueue.main.async {
             scrollView.zoomScale = 1.0 / PageConstants.renderScale
@@ -194,6 +210,21 @@ struct PagedCanvasContainer: UIViewRepresentable {
                 width: (c.x - o.x) * s,
                 height: (c.y - o.y) * s
             )
+        }
+
+        func imageRectToScreenRect(_ imageRect: CGRect) -> CGRect {
+            guard let containerView = layoutManager.containerView else { return .zero }
+            let canvasViews = layoutManager.canvasViews
+            guard currentVisiblePageIndex < canvasViews.count else { return .zero }
+            let pageOrigin = canvasViews[currentVisiblePageIndex].frame.origin
+            func toScreen(_ p: CGPoint) -> CGPoint {
+                let cx = p.x * PageConstants.renderScale + pageOrigin.x
+                let cy = p.y * PageConstants.renderScale + pageOrigin.y
+                return containerView.convert(CGPoint(x: cx, y: cy), to: nil)
+            }
+            let o = toScreen(imageRect.origin)
+            let c = toScreen(CGPoint(x: imageRect.maxX, y: imageRect.maxY))
+            return CGRect(x: o.x, y: o.y, width: c.x - o.x, height: c.y - o.y)
         }
 
         func scrollViewDidZoom(_ scrollView: UIScrollView) { layoutManager.centerContainerIfNeeded() }

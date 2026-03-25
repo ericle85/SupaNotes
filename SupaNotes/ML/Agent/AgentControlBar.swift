@@ -4,20 +4,59 @@ struct AgentControlBar: View {
     let state: AgentRegionState
     var captureToken: AgentCaptureToken?
     var sender: AgentVisionSender?
+    var runner: AgentRunner?
 
     var body: some View {
         VStack {
             Spacer()
             HStack {
-                // Debug: send current page to vision server
-                sendButton
-                    .padding(.leading, 20)
-                    .padding(.bottom, 100)
+                VStack(alignment: .leading, spacing: 8) {
+                    runAgentButton
+                    sendButton
+                }
+                .padding(.leading, 20)
+                .padding(.bottom, 100)
                 Spacer()
                 content
                     .padding(.trailing, 20)
                     .padding(.bottom, 100)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var runAgentButton: some View {
+        if let runner, let token = captureToken, let sender {
+            Button {
+                runner.run(captureToken: token, regionState: state, sender: sender)
+            } label: {
+                runAgentLabel(for: runner.status)
+            }
+            .disabled({
+                switch runner.status {
+                case .capturing, .thinking: return true
+                default: return false
+                }
+            }())
+        }
+    }
+
+    @ViewBuilder
+    private func runAgentLabel(for status: AgentRunner.Status) -> some View {
+        switch status {
+        case .idle, .done:
+            Label("Run Agent", systemImage: "wand.and.stars")
+                .capsuleButton()
+        case .capturing:
+            Label("Capturing…", systemImage: "camera.circle")
+                .capsuleButton()
+        case .thinking:
+            Label("Thinking…", systemImage: "brain")
+                .capsuleButton()
+        case .failed(let msg):
+            Label(msg.prefix(30).description, systemImage: "exclamationmark.circle")
+                .capsuleButton()
+                .foregroundStyle(.red)
         }
     }
 
