@@ -11,6 +11,7 @@ struct NoteEditorView: View {
     @State private var canvasUndoManager: UndoManager?
     @State private var isWriting: Bool = false
     @State private var currentPageIndex: Int = 0
+    @State private var agentRegionState = AgentRegionState()
 
     private var note: Note? { notes.first }
 
@@ -66,6 +67,22 @@ struct NoteEditorView: View {
             }
             .opacity(isWriting ? 0 : 1)
             .animation(.easeInOut(duration: Design.Animation.writingFadeDuration), value: isWriting)
+
+            // Shared coordinate space for gesture capture + overlay rendering
+            GeometryReader { _ in
+                if agentRegionState.isActive {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(
+                            DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                                .onEnded { agentRegionState.handleTap($0.location) }
+                        )
+                }
+                AgentRegionOverlayView(state: agentRegionState)
+            }
+            .ignoresSafeArea()
+
+            AgentControlBar(state: agentRegionState)
 
             DrawingToolbar(
                 toolbarIcons: $toolbar.toolbarIcons,
