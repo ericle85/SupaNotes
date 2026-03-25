@@ -12,6 +12,8 @@ struct NoteEditorView: View {
     @State private var isWriting: Bool = false
     @State private var currentPageIndex: Int = 0
     @State private var agentRegionState = AgentRegionState()
+    @State private var captureToken = AgentCaptureToken()
+    @State private var visionSender = AgentVisionSender()
 
     private var note: Note? { notes.first }
 
@@ -46,7 +48,8 @@ struct NoteEditorView: View {
                 onWritingStateChanged: { isWriting = $0 },
                 onCurrentPageChanged: { currentPageIndex = $0 },
                 addPage: { pageManager.addPage(to: note) },
-                addPageAbove: { pageManager.addPageAbove(in: note) }
+                addPageAbove: { pageManager.addPageAbove(in: note) },
+                captureToken: captureToken
             )
             .ignoresSafeArea()
 
@@ -82,7 +85,7 @@ struct NoteEditorView: View {
             }
             .ignoresSafeArea()
 
-            AgentControlBar(state: agentRegionState)
+            AgentControlBar(state: agentRegionState, captureToken: captureToken, sender: visionSender)
 
             DrawingToolbar(
                 toolbarIcons: $toolbar.toolbarIcons,

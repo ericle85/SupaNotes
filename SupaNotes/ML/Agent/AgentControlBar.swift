@@ -2,16 +2,59 @@ import SwiftUI
 
 struct AgentControlBar: View {
     let state: AgentRegionState
+    var captureToken: AgentCaptureToken?
+    var sender: AgentVisionSender?
 
     var body: some View {
         VStack {
             Spacer()
             HStack {
+                // Debug: send current page to vision server
+                sendButton
+                    .padding(.leading, 20)
+                    .padding(.bottom, 100)
                 Spacer()
                 content
                     .padding(.trailing, 20)
                     .padding(.bottom, 100)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var sendButton: some View {
+        if let sender, let token = captureToken {
+            Button {
+                if let image = token.captureCurrentPage?() {
+                    sender.send(image)
+                }
+            } label: {
+                sendLabel(for: sender.status)
+            }
+            .disabled({
+                if case .sending = sender.status { return true }
+                return false
+            }())
+        }
+    }
+
+    @ViewBuilder
+    private func sendLabel(for status: AgentVisionSender.Status) -> some View {
+        switch status {
+        case .idle:
+            Label("Send View", systemImage: "eye.circle")
+                .capsuleButton()
+        case .sending:
+            Label("Sending…", systemImage: "arrow.up.circle")
+                .capsuleButton()
+        case .sent:
+            Label("Sent", systemImage: "checkmark.circle.fill")
+                .capsuleButton()
+                .foregroundStyle(.green)
+        case .failed(let msg):
+            Label(msg, systemImage: "xmark.circle.fill")
+                .capsuleButton()
+                .foregroundStyle(.red)
         }
     }
 

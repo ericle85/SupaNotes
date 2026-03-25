@@ -10,6 +10,7 @@ struct PagedCanvasContainer: UIViewRepresentable {
     var onCurrentPageChanged: ((Int) -> Void)?
     var addPage: () -> Void
     var addPageAbove: (() -> Void)?
+    var captureToken: AgentCaptureToken?
 
     func makeUIView(context: Context) -> UIScrollView {
         let scrollView = UIScrollView()
@@ -34,6 +35,11 @@ struct PagedCanvasContainer: UIViewRepresentable {
         scrollView.addInteraction(pencilInteraction)
 
         c.rebuildPages(pages: pages, tool: tool)
+
+        // Register page capture on the token
+        captureToken?.captureCurrentPage = { [weak c] in
+            c?.captureCurrentPageImage()
+        }
 
         DispatchQueue.main.async {
             scrollView.zoomScale = 1.0 / PageConstants.renderScale
@@ -94,6 +100,7 @@ struct PagedCanvasContainer: UIViewRepresentable {
         var onCurrentPageChanged: ((Int) -> Void)?
         var addPage: () -> Void
         var addPageAbove: (() -> Void)?
+        var currentVisiblePageIndex: Int = 0
 
         let layoutManager = PageLayoutManager()
         let pullController = PullToAddController()
@@ -135,8 +142,29 @@ struct PagedCanvasContainer: UIViewRepresentable {
         func viewForZooming(in scrollView: UIScrollView) -> UIView? { layoutManager.containerView }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
-            layoutManager.updateCurrentPage(pages: pages, onCurrentPageChanged: onCurrentPageChanged)
+            layoutManager.updateCurrentPage(pages: pages, onCurrentPageChanged: { [weak self] idx in
+                self?.currentVisiblePageIndex = idx
+                self?.onCurrentPageChanged?(idx)
+            } )
             pullController.update(for: scrollView)
+        }
+
+        func captureCurrentPageImage() -> UIImage? {
+            let canvasViews = layoutManager.canvasViews
+            guard currentVisiblePageIndex < canvasViews.count else { return nil }
+            let canvasView = canvasViews[currentVisiblePageIndex]
+            // Render the view hierarchy at display scale (1/renderScale) so output = pageWidth × pageHeight
+            let pageSize = CGSize(width: PageConstants.pageWidth, height: PageConstants.pageHeight)
+            let renderer = UIGraphicsImageRenderer(size: pageSize)
+            return renderer.image { ctx in
+                // White background
+                UIColor.white.setFill()
+                UIRectFill(CGRect(origin: .zero, size: pageSize))
+                // Scale canvas (internalWidth × internalHeight) down to page display size
+                let scale = 1.0 / PageConstants.renderScale
+                ctx.cgContext.scaleBy(x: scale, y: scale)
+                canvasView.drawHierarchy(in: canvasView.bounds, afterScreenUpdates: true)
+            }
         }
 
         func scrollViewDidZoom(_ scrollView: UIScrollView) { layoutManager.centerContainerIfNeeded() }
