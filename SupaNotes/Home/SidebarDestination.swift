@@ -5,6 +5,7 @@ enum SidebarDestination: Equatable {
     case folder(Folder)
     case trash
     case settings
+    case hwrDemo
 
     var isAllNotes: Bool { self == .allNotes }
     var isTrash: Bool { self == .trash }
@@ -15,9 +16,11 @@ enum SidebarDestination: Equatable {
         return nil
     }
 
+    var isHWRDemo: Bool { self == .hwrDemo }
+
     var showsNoteActions: Bool {
         switch self {
-        case .trash, .settings: return false
+        case .trash, .settings, .hwrDemo: return false
         default: return true
         }
     }

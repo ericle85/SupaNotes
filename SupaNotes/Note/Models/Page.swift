@@ -7,6 +7,8 @@ final class Page {
     var orderIndex: Int
     @Attribute(.externalStorage) var drawingData: Data
     var note: Note?
+    var recognizedText: String?
+    var lastScannedAt: Date?
 
     init(orderIndex: Int = 0, drawingData: Data = Data()) {
         self.id = UUID()

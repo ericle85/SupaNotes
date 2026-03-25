@@ -58,6 +58,14 @@ struct FolderSidebarView: View {
             ) {
                 destination = .settings
             }
+
+            sidebarButton(
+                icon: "pencil.and.scribble",
+                label: "HWR Demo",
+                isSelected: destination.isHWRDemo
+            ) {
+                destination = .hwrDemo
+            }
         }
         .padding(.vertical, 8)
         .background(Color("SidebarBackground"))
