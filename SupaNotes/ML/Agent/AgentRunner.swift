@@ -1,4 +1,5 @@
 import UIKit
+import PencilKit
 
 @Observable
 final class AgentRunner {
@@ -21,43 +22,43 @@ final class AgentRunner {
     ) {
         Task { @MainActor in
             do {
-                // 1. Capture birds-eye page image
+                // 1. Capture page image + strokes
                 status = .capturing
                 guard let pageImage = captureToken.captureCurrentPage?(nil) else {
                     status = .failed("Capture failed")
                     return
                 }
+                guard let drawing = captureToken.currentPageDrawing?(),
+                      !drawing.strokes.isEmpty else {
+                    status = .failed("No strokes on page")
+                    try? await Task.sleep(for: .seconds(2))
+                    if case .failed = status { status = .idle }
+                    return
+                }
 
-                // 2. Send raw page image to debug server for preview
+                guard let strokesJSON = AgentStrokeSerializer.jsonString(drawing: drawing) else {
+                    status = .failed("Stroke serialization failed")
+                    try? await Task.sleep(for: .seconds(2))
+                    if case .failed = status { status = .idle }
+                    return
+                }
+
                 sender.send(pageImage)
+                print("[AgentRunner] strokes JSON: \(strokesJSON.prefix(500))")
 
-                // 3. Ask model for a normalized tap point (0–1 in each axis)
+                // 2. Ask model to select a region using image + stroke coordinates
                 status = .thinking
-                let normalizedPoint = try await client.selectTapPoint(image: pageImage)
+                let imageRect = try await client.selectRegion(image: pageImage, strokesJSON: strokesJSON)
 
-                // 4. Convert normalized → image space (612×792), then → screen-space crop box
-                let imagePoint = CGPoint(
-                    x: normalizedPoint.x * 612,
-                    y: normalizedPoint.y * 792
-                )
-                let boxW: CGFloat = 120
-                let boxH: CGFloat = 40
-                let imageRect = CGRect(
-                    x: imagePoint.x - boxW / 2,
-                    y: imagePoint.y - boxH / 2,
-                    width: boxW,
-                    height: boxH
-                )
+                // 3. Convert to screen space and show
                 let screenRect = captureToken.imageRectToScreenRect?(imageRect) ?? imageRect
                 regionState.phase = .regionSelected(screenRect)
 
-                // 5. Re-capture with annotation and send to debug server
                 if let annotated = captureToken.captureCurrentPage?(screenRect) {
                     sender.send(annotated)
                 }
 
                 status = .done
-                // Auto-reset
                 try? await Task.sleep(for: .seconds(2))
                 if case .done = status { status = .idle }
 

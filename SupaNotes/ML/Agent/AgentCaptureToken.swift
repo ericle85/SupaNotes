@@ -1,4 +1,5 @@
 import UIKit
+import PencilKit
 
 /// Shared token that PagedCanvasContainer registers a capture closure on.
 /// NoteEditorView holds this and passes it down so it can trigger capture at any time.
@@ -9,4 +10,6 @@ final class AgentCaptureToken {
     var imageRectToScreenRect: ((CGRect) -> CGRect)?
     /// Simulate a tap at a point in page image space (0–612 × 0–792).
     var tapAtImagePoint: ((CGPoint) -> Void)?
+    /// Get the PKDrawing for the current page.
+    var currentPageDrawing: (() -> PKDrawing?)?
 }

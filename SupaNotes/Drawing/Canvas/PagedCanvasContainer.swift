@@ -44,6 +44,10 @@ struct PagedCanvasContainer: UIViewRepresentable {
         captureToken?.imageRectToScreenRect = { [weak c] (imageRect: CGRect) in
             c?.imageRectToScreenRect(imageRect) ?? .zero
         }
+        captureToken?.currentPageDrawing = { [weak c] in
+            guard let c, c.currentVisiblePageIndex < c.layoutManager.canvasViews.count else { return nil }
+            return c.layoutManager.canvasViews[c.currentVisiblePageIndex].drawing
+        }
         captureToken?.tapAtImagePoint = { [weak c] (imagePoint: CGPoint) in
             // Caller converts normalized point → image space before calling this.
             // Build a fixed-size crop box and return screen rect via imageRectToScreenRect.

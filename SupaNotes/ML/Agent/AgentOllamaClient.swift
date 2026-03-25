@@ -6,8 +6,9 @@ final class AgentOllamaClient {
     private let port = 11434
     private let model = "qwen3.5:4b"
 
-    /// Send birds-eye page image to Ollama. Returns a normalized tap point (0–1 in both axes).
-    func selectTapPoint(image: UIImage) async throws -> CGPoint {
+    /// Send page image + stroke bounding boxes to Ollama.
+    /// Returns a CGRect in image space (612×792) around selected content.
+    func selectRegion(image: UIImage, strokesJSON: String) async throws -> CGRect {
         guard let png = image.pngData(), !png.isEmpty else {
             throw AgentError.imageEncodingFailed
         }
@@ -15,22 +16,35 @@ final class AgentOllamaClient {
 
         let prompt = """
         You are looking at a handwritten notes page. \
-        Identify a piece of content — a specific word, line, or equation that is clearly visible. No need to read what is is, just point to the location \
-        Respond ONLY with a JSON object and nothing else: {"x":N,"y":N} \
-        where x and y are normalized coordinates from 0.0 to 1.0 representing the center of that content \
-        (0,0 = top-left corner, 1,1 = bottom-right corner). \
-        Do not include explanation, markdown, or any other text. If nothing is found, repond with NONE
+        Here are the bounding boxes of all strokes on the page: \
+        \(strokesJSON)
+        Each stroke has: id, x1, y1 (top-left), x2, y2 (bottom-right). \
+        Pick a meaningful piece of content (a word, line, or equation). \
+        Your rectangle MUST use the min x1,y1 and max x2,y2 of the strokes you select. \
+        Respond ONLY with: {"x1":N,"y1":N,"x2":N,"y2":N} \
+        If nothing is found: {}
         """
 
+        let responseText = try await chat(prompt: prompt, imageBase64: base64)
+        print("[AgentOllama] raw response:\n\(responseText)\n---")
+        let rect = try parseRect(from: responseText)
+        print("[AgentOllama] parsed rect: \(rect)")
+        return rect
+    }
+
+    // MARK: - Shared request
+
+    private func chat(prompt: String, imageBase64: String) async throws -> String {
         let body: [String: Any] = [
             "model": model,
             "messages": [[
                 "role": "user",
                 "content": prompt,
-                "images": [base64]
+                "images": [imageBase64]
             ]],
             "stream": false,
-            "options": ["temperature": 0]
+            "think": false,
+            "options": ["temperature": 0, "top_p": 0.9, "top_k": 20]
         ]
 
         var request = URLRequest(url: URL(string: "http://\(host):\(port)/api/chat")!)
@@ -48,28 +62,34 @@ final class AgentOllamaClient {
             print("[AgentOllama] unexpected response: \(raw.prefix(300))")
             throw AgentError.invalidResponse
         }
-
-        print("[AgentOllama] raw response:\n\(responseText)\n---")
-        let point = try parseTapPoint(from: responseText)
-        print("[AgentOllama] parsed tap point: \(point)")
-        return point
+        return responseText
     }
 
-    private func parseTapPoint(from text: String) throws -> CGPoint {
-        // Strip <think>...</think> blocks (qwen3 thinking output)
+    // MARK: - Parsing
+
+    private func parseRect(from text: String) throws -> CGRect {
         let stripped = text.replacingOccurrences(of: #"<think>[\s\S]*?</think>"#,
                                                   with: "", options: .regularExpression)
         let cleaned = stripped.trimmingCharacters(in: .whitespacesAndNewlines)
-        let pattern = #"\{[^{}]*"x"[^{}]*\}"#
+
+        let pattern = #"\{[^{}]*"x1"[^{}]*\}"#
         guard let range = cleaned.range(of: pattern, options: .regularExpression),
               let jsonData = String(cleaned[range]).data(using: .utf8),
-              let dict = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-              let x = (dict["x"] as? CGFloat) ?? (dict["x"] as? NSNumber).map(\.cgFloatValue),
-              let y = (dict["y"] as? CGFloat) ?? (dict["y"] as? NSNumber).map(\.cgFloatValue)
-        else {
+              let dict = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
+            if cleaned.contains("{}") { throw AgentError.parseError("empty") }
             throw AgentError.parseError(cleaned)
         }
-        return CGPoint(x: x.clamped(to: 0...1), y: y.clamped(to: 0...1))
+
+        func num(_ key: String) -> CGFloat? {
+            (dict[key] as? CGFloat) ?? (dict[key] as? NSNumber).map { CGFloat($0.doubleValue) }
+        }
+
+        guard let x1 = num("x1"), let y1 = num("y1"),
+              let x2 = num("x2"), let y2 = num("y2") else {
+            throw AgentError.parseError(cleaned)
+        }
+
+        return CGRect(x: x1, y: y1, width: x2 - x1, height: y2 - y1)
     }
 }
 
@@ -87,12 +107,3 @@ enum AgentError: LocalizedError {
     }
 }
 
-private extension NSNumber {
-    var cgFloatValue: CGFloat { CGFloat(doubleValue) }
-}
-
-private extension CGFloat {
-    func clamped(to range: ClosedRange<CGFloat>) -> CGFloat {
-        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
-    }
-}
