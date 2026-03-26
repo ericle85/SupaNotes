@@ -49,8 +49,13 @@ nonisolated class CTCModel: @unchecked Sendable {
 
         let outLen = outLenArray[0].intValue
         let totalElements = outLen * vocabSize
+        let available = logProbsArray.count
+        guard totalElements > 0, totalElements <= available else {
+            throw NSError(domain: "CTCModel", code: 3,
+                          userInfo: [NSLocalizedDescriptionKey: "logProbs size mismatch: need \(totalElements), have \(available)"])
+        }
         var logProbs = [Float](repeating: 0, count: totalElements)
-        let outPtr = logProbsArray.dataPointer.bindMemory(to: Float16.self, capacity: logProbsArray.count)
+        let outPtr = logProbsArray.dataPointer.bindMemory(to: Float16.self, capacity: available)
         for i in 0..<totalElements {
             logProbs[i] = Float(outPtr[i])
         }

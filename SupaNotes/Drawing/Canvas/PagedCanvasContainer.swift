@@ -44,6 +44,10 @@ struct PagedCanvasContainer: UIViewRepresentable {
         captureToken?.imageRectToScreenRect = { [weak c] (imageRect: CGRect) in
             c?.imageRectToScreenRect(imageRect) ?? .zero
         }
+        captureToken?.screenRectToImageRect = { [weak c] (screenRect: CGRect) in
+            guard let c, let sv = c.scrollViewRef else { return .zero }
+            return c.screenRectToImageRect(screenRect, scrollView: sv)
+        }
         captureToken?.currentPageDrawing = { [weak c] in
             guard let c, c.currentVisiblePageIndex < c.layoutManager.canvasViews.count else { return nil }
             return c.layoutManager.canvasViews[c.currentVisiblePageIndex].drawing
@@ -178,27 +182,35 @@ struct PagedCanvasContainer: UIViewRepresentable {
             let pageSize = CGSize(width: PageConstants.pageWidth, height: PageConstants.pageHeight)
             let canvasScale = 1.0 / PageConstants.renderScale
 
-            let renderer = UIGraphicsImageRenderer(size: pageSize)
-            return renderer.image { ctx in
+            // Render full page first
+            let fullRenderer = UIGraphicsImageRenderer(size: pageSize)
+            let fullImage = fullRenderer.image { ctx in
                 UIColor.white.setFill()
                 UIRectFill(CGRect(origin: .zero, size: pageSize))
-                // Draw canvas scaled down to page size
                 ctx.cgContext.scaleBy(x: canvasScale, y: canvasScale)
                 canvasView.drawHierarchy(in: canvasView.bounds, afterScreenUpdates: true)
-                ctx.cgContext.scaleBy(x: 1.0 / canvasScale, y: 1.0 / canvasScale)
-                // Draw selected region annotation
-                if let screenRect = highlightScreenRect, let sv = scrollViewRef {
-                    let imageRect = screenRectToImageRect(screenRect, scrollView: sv)
-                    ctx.cgContext.setFillColor(UIColor.systemBlue.withAlphaComponent(0.15).cgColor)
-                    ctx.cgContext.setStrokeColor(UIColor.systemBlue.cgColor)
-                    ctx.cgContext.setLineWidth(2)
-                    ctx.cgContext.fill(imageRect)
-                    ctx.cgContext.stroke(imageRect)
-                }
             }
+
+            // If a region is selected, crop to it
+            if let screenRect = highlightScreenRect, let sv = scrollViewRef {
+                let imageRect = screenRectToImageRect(screenRect, scrollView: sv)
+                // Clamp to page bounds
+                let clampedRect = imageRect.intersection(CGRect(origin: .zero, size: pageSize))
+                guard !clampedRect.isEmpty,
+                      let cgImage = fullImage.cgImage,
+                      let cropped = cgImage.cropping(to: CGRect(
+                          x: clampedRect.origin.x * fullImage.scale,
+                          y: clampedRect.origin.y * fullImage.scale,
+                          width: clampedRect.width * fullImage.scale,
+                          height: clampedRect.height * fullImage.scale
+                      )) else { return fullImage }
+                return UIImage(cgImage: cropped, scale: fullImage.scale, orientation: fullImage.imageOrientation)
+            }
+
+            return fullImage
         }
 
-        private func screenRectToImageRect(_ screenRect: CGRect, scrollView: UIScrollView) -> CGRect {
+        func screenRectToImageRect(_ screenRect: CGRect, scrollView: UIScrollView) -> CGRect {
             guard let containerView = layoutManager.containerView else { return .zero }
             let canvasViews = layoutManager.canvasViews
             guard currentVisiblePageIndex < canvasViews.count else { return .zero }

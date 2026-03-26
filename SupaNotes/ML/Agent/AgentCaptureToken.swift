@@ -10,6 +10,8 @@ final class AgentCaptureToken {
     var imageRectToScreenRect: ((CGRect) -> CGRect)?
     /// Simulate a tap at a point in page image space (0–612 × 0–792).
     var tapAtImagePoint: ((CGPoint) -> Void)?
+    /// Convert a screen-space rect to image space (0–612 × 0–792).
+    var screenRectToImageRect: ((CGRect) -> CGRect)?
     /// Get the PKDrawing for the current page.
     var currentPageDrawing: (() -> PKDrawing?)?
 }

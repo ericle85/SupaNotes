@@ -6,8 +6,36 @@ final class AgentOllamaClient {
     private let port = 11434
     private let model = "qwen3.5:4b"
 
+    enum ContentType: String {
+        case text
+        case math
+    }
+
+    /// Classify a cropped region as regular text or math/equations.
+    func classifyContent(image: UIImage) async throws -> ContentType {
+        guard let png = image.pngData(), !png.isEmpty else {
+            throw AgentError.imageEncodingFailed
+        }
+        let base64 = png.base64EncodedString()
+
+        let prompt = """
+        Look at this cropped handwritten content. \
+        Is it regular text, or does it contain math/equations? \
+        Respond with ONLY one word: "text" or "math".
+        """
+
+        let response = try await chat(prompt: prompt, imageBase64: base64)
+        let cleaned = response.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        print("[AgentOllama] classify response: \(cleaned)")
+
+        if cleaned.contains("math") { return .math }
+        return .text
+    }
+
     /// Send page image + stroke bounding boxes to Ollama.
     /// Returns a CGRect in image space (612×792) around selected content.
+    /// NOT BEING USED CURRENTLY - SEE `classifyContent` INSTEAD
+    /// HAVE MADE BOUNDING BOX SLECTION BE MANUAL
     func selectRegion(image: UIImage, strokesJSON: String) async throws -> CGRect {
         guard let png = image.pngData(), !png.isEmpty else {
             throw AgentError.imageEncodingFailed

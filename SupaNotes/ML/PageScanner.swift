@@ -14,61 +14,44 @@ struct PageScanResult {
     let fullText: String
 }
 
-/// Scan strokes through the full pipeline: orient → segment lines → reorder → split → predict.
+/// Scan strokes: normalize all together → extract features → predict.
 func scanStrokes(
     _ rawStrokes: [[StrokePoint]],
     model: CTCModel,
-    threshold: Float = 0.7
+    threshold: Float = 0.53
 ) throws -> PageScanResult {
     guard !rawStrokes.isEmpty else {
         return PageScanResult(lines: [], fullText: "")
     }
 
-    // 1. Orientation correction
-    let correction = detectOrientation(rawStrokes)
-    let oriented = applyOrientationCorrection(rawStrokes, correction: correction)
-
-    // 2. Segment into lines
-    let lines = segmentIntoLines(oriented)
-
-    // 3. Process each line
-    var recognizedLines = [RecognizedLine]()
-
-    for (idx, line) in lines.enumerated() {
-        // Reorder left-to-right
-        let reordered = reorderStrokesLeftToRight(line.strokes)
-
-        // Split if too long
-        let segments = splitLineIntoSegments(reordered)
-
-        // Predict each segment and concatenate
-        var lineTokens = [TokenDetail]()
-        for segment in segments {
-            // Zero out timestamps — model doesn't depend on time
-            let zeroed = segment.strokes.map { stroke in
-                stroke.map { StrokePoint(x: $0.x, y: $0.y, t: 0) }
-            }
-            let normalized = normalizeStrokes(zeroed)
-            let features = extractPointFeatures(normalized)
-            let nPoints = features.count / FEATURE_DIM
-            guard nPoints > 0 else { continue }
-
-            let result = try model.predict(features: features, seqLen: nPoints, threshold: threshold)
-            lineTokens.append(contentsOf: result.tokens)
-        }
-
-        let text = lineTokens.map(\.token).joined()
-        let avgConf = lineTokens.isEmpty ? 0 : lineTokens.map(\.confidence).reduce(0, +) / Float(lineTokens.count)
-
-        recognizedLines.append(RecognizedLine(
-            lineIndex: idx,
-            text: text,
-            tokens: lineTokens,
-            boundingBox: line.boundingBox,
-            confidence: avgConf
-        ))
+    let normalized = normalizeStrokes(rawStrokes)
+    let features = extractPointFeatures(normalized)
+    let nPoints = features.count / FEATURE_DIM
+    guard nPoints >= 2 else {
+        return PageScanResult(lines: [], fullText: "")
     }
 
-    let fullText = recognizedLines.map(\.text).joined(separator: "\n")
-    return PageScanResult(lines: recognizedLines, fullText: fullText)
+    let result = try model.predict(features: features, seqLen: nPoints, threshold: threshold)
+    let text = result.tokens.map(\.token).joined()
+    let avgConf = result.tokens.isEmpty ? 0 : result.tokens.map(\.confidence).reduce(0, +) / Float(result.tokens.count)
+
+    // Compute bounding box from all strokes
+    var minX: Float = .greatestFiniteMagnitude
+    var minY: Float = .greatestFiniteMagnitude
+    var maxX: Float = -.greatestFiniteMagnitude
+    var maxY: Float = -.greatestFiniteMagnitude
+    for stroke in rawStrokes {
+        for p in stroke {
+            minX = min(minX, p.x); maxX = max(maxX, p.x)
+            minY = min(minY, p.y); maxY = max(maxY, p.y)
+        }
+    }
+    let bbox = CGRect(x: CGFloat(minX), y: CGFloat(minY),
+                      width: CGFloat(maxX - minX), height: CGFloat(maxY - minY))
+
+    let line = RecognizedLine(
+        lineIndex: 0, text: text, tokens: result.tokens,
+        boundingBox: bbox, confidence: avgConf
+    )
+    return PageScanResult(lines: [line], fullText: text)
 }

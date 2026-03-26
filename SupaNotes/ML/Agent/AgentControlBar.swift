@@ -26,13 +26,14 @@ struct AgentControlBar: View {
 
     @ViewBuilder
     private var runAgentButton: some View {
-        if let runner, let token = captureToken, let sender {
+        if let runner, let token = captureToken {
             Button {
-                runner.run(captureToken: token, regionState: state, sender: sender)
+                runner.run(captureToken: token, regionState: state)
             } label: {
                 runAgentLabel(for: runner.status)
             }
             .disabled({
+                if state.selectedRect == nil { return true }
                 switch runner.status {
                 case .capturing, .thinking: return true
                 default: return false
