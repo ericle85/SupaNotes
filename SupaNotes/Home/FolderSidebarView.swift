@@ -66,6 +66,14 @@ struct FolderSidebarView: View {
             ) {
                 destination = .hwrDemo
             }
+
+            sidebarButton(
+                icon: "timer",
+                label: "Vision Benchmark",
+                isSelected: destination == .visionBenchmark
+            ) {
+                destination = .visionBenchmark
+            }
         }
         .padding(.vertical, 8)
         .background(Color("SidebarBackground"))
