@@ -15,6 +15,7 @@ struct NoteEditorView: View {
     @State private var captureToken = AgentCaptureToken()
     @State private var visionSender = AgentVisionSender()
     @State private var agentRunner = AgentRunner()
+    @State private var suggestionRunner = SuggestionRunner()
 
     private var note: Note? { notes.first }
 
@@ -86,7 +87,28 @@ struct NoteEditorView: View {
             }
             .ignoresSafeArea()
 
-            AgentControlBar(state: agentRegionState, captureToken: captureToken, sender: visionSender, runner: agentRunner)
+            AgentControlBar(state: agentRegionState, captureToken: captureToken, sender: visionSender, runner: agentRunner, suggestionRunner: suggestionRunner)
+
+            GhostOverlayView(tokens: suggestionRunner.tokens, renderedImage: suggestionRunner.renderedImage)
+                .animation(.easeInOut(duration: 0.3), value: suggestionRunner.tokens.count)
+
+            // Debug: show captured image sent to model
+            if let debugImage = suggestionRunner.debugImage {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Image(uiImage: debugImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 200)
+                            .border(Color.red, width: 3)
+                            .shadow(radius: 4)
+                            .padding(8)
+                    }
+                    Spacer()
+                }
+                .allowsHitTesting(false)
+            }
 
             DrawingToolbar(
                 toolbarIcons: $toolbar.toolbarIcons,

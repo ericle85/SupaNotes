@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		2E0F478DADEFB0AFF1E4464F /* katex in Resources */ = {isa = PBXBuildFile; fileRef = F7234F0E85DAF70E475CD486 /* katex */; };
+		4E8F4A7EB3F3C9D0B8007685 /* KaTeXRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55FA4DAABF7460027A845631 /* KaTeXRenderer.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		BFAF52182F41429F0038730F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -17,19 +22,21 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		55FA4DAABF7460027A845631 /* KaTeXRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = KaTeXRenderer.swift; path = SupaNotes/ML/Overlay/KaTeXRenderer.swift; sourceTree = SOURCE_ROOT; };
 		BFAF52142F41429F0038730F /* Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BFE730DE2F3CCEC200F5DD1D /* SupaNotes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SupaNotes.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F7234F0E85DAF70E475CD486 /* katex */ = {isa = PBXFileReference; lastKnownFileType = text; name = katex; path = SupaNotes/ML/Overlay/katex; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		BF2FA6E72F73B1950033927D /* Exceptions for "Tests" folder in "Tests" target */ = {
+		BF2FA6E72F73B1950033927D = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
 			target = BFAF52132F41429F0038730F /* Tests */;
 		};
-		BFE730F12F3CCEC200F5DD1D /* Exceptions for "SupaNotes" folder in "SupaNotes" target */ = {
+		BFE730F12F3CCEC200F5DD1D = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -39,22 +46,8 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		BFAF52152F41429F0038730F /* Tests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				BF2FA6E72F73B1950033927D /* Exceptions for "Tests" folder in "Tests" target */,
-			);
-			path = Tests;
-			sourceTree = "<group>";
-		};
-		BFE730E02F3CCEC200F5DD1D /* SupaNotes */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				BFE730F12F3CCEC200F5DD1D /* Exceptions for "SupaNotes" folder in "SupaNotes" target */,
-			);
-			path = SupaNotes;
-			sourceTree = "<group>";
-		};
+		BFAF52152F41429F0038730F /* Tests */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (BF2FA6E72F73B1950033927D, ); path = Tests; sourceTree = "<group>"; };
+		BFE730E02F3CCEC200F5DD1D /* SupaNotes */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (BFE730F12F3CCEC200F5DD1D, ); path = SupaNotes; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -81,6 +74,8 @@
 				BFE730E02F3CCEC200F5DD1D /* SupaNotes */,
 				BFAF52152F41429F0038730F /* Tests */,
 				BFE730DF2F3CCEC200F5DD1D /* Products */,
+				55FA4DAABF7460027A845631 /* KaTeXRenderer.swift */,
+				F7234F0E85DAF70E475CD486 /* katex */,
 			);
 			sourceTree = "<group>";
 		};
@@ -192,6 +187,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2E0F478DADEFB0AFF1E4464F /* katex in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -209,6 +205,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4E8F4A7EB3F3C9D0B8007685 /* KaTeXRenderer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -230,8 +227,13 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7ARN6P5ZCL;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(SRCROOT)/SupaNotes/ML/Overlay",
+					"$(inherited)",
+				);
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Tests/Info.plist;
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/SupaNotes/ML/Overlay";
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ericle.Tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -252,8 +254,13 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7ARN6P5ZCL;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(SRCROOT)/SupaNotes/ML/Overlay",
+					"$(inherited)",
+				);
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Tests/Info.plist;
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/SupaNotes/ML/Overlay";
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ericle.Tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -395,12 +402,17 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7ARN6P5ZCL;
 				ENABLE_PREVIEWS = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(SRCROOT)/SupaNotes/ML/Overlay",
+					"$(inherited)",
+				);
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SupaNotes/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/SupaNotes/ML/Overlay";
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ericle.SupaNotes;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -427,12 +439,17 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7ARN6P5ZCL;
 				ENABLE_PREVIEWS = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(SRCROOT)/SupaNotes/ML/Overlay",
+					"$(inherited)",
+				);
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SupaNotes/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/SupaNotes/ML/Overlay";
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ericle.SupaNotes;
 				PRODUCT_NAME = "$(TARGET_NAME)";

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="katex.min.css">
+<script src="katex.min.js"></script>
+<style>
+  body { margin: 0; padding: 0; background: transparent; }
+  #container {
+    display: inline-block;
+    padding: 4px 8px;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<div id="container"></div>
+<script>
+function renderLatex(latex, fontSize) {
+  var el = document.getElementById('container');
+  el.style.fontSize = fontSize + 'px';
+  try {
+    katex.render(latex, el, {
+      throwOnError: false,
+      trust: true,
+      output: 'html',
+      displayMode: false
+    });
+  } catch(e) {
+    el.textContent = latex;
+  }
+  var r = el.getBoundingClientRect();
+  return JSON.stringify({width: Math.ceil(r.width), height: Math.ceil(r.height)});
+}
+</script>
+</body>
+</html>
