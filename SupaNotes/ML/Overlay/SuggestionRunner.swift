@@ -7,25 +7,22 @@ final class SuggestionRunner {
         case capturing
         case thinking
         case rendering
-        case done(String) // raw LLM response
+        case done(String)
         case failed(String)
     }
 
     var status: Status = .idle
     var tokens: [OverlayToken] = []
+    var characters: [OverlayCharacter] = []
     var renderedImage: UIImage?
+    var renderSize: CGSize = .zero
     var debugImage: UIImage?
 
     private let client = AgentOllamaClient()
     private let tokenizer = OverlayTokenizer()
-    private let renderer = KaTeXRenderer()
+    private let parser = MathParser()
+    private let layoutEngine = MathLayoutEngine()
 
-    /// Pre-load KaTeX webview.
-    func warmUp() async {
-        await renderer.warmUp()
-    }
-
-    /// Capture viewport, send to Ollama, parse response into tokens, render LaTeX.
     func suggest(captureToken: AgentCaptureToken) async {
         status = .capturing
 
@@ -43,12 +40,27 @@ final class SuggestionRunner {
             tokens = parsed
             print("[SuggestionRunner] tokens: \(parsed.map { "[\($0.type.rawValue)]\($0.value)" })")
 
-            // Build full LaTeX string from tokens
-            let fullLatex = parsed.map(\.displayLatex).joined(separator: "\\;")
+            // Parse tokens into MathNode tree
+            var allNodes: [MathNode] = []
+            for token in parsed {
+                switch token.type {
+                case .latex:
+                    allNodes.append(contentsOf: parser.parse(token.value))
+                case .word:
+                    allNodes.append(.text(token.value))
+                    allNodes.append(.space)
+                }
+            }
 
+            // Layout and render
             status = .rendering
-            let rendered = try await renderer.render(latex: fullLatex, fontSize: 20)
-            renderedImage = rendered
+            let fontSize: CGFloat = 48 // TODO: adapt to user's stroke height
+            let result = layoutEngine.layout(nodes: allNodes, fontSize: fontSize)
+            renderedImage = result.image
+            renderSize = result.size
+            characters = result.characters
+
+            print("[SuggestionRunner] \(result.characters.count) characters, size: \(result.size)")
             status = .done(response)
         } catch {
             status = .failed(error.localizedDescription)

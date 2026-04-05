@@ -1,13 +1,17 @@
 import UIKit
 import WebKit
 
-/// Renders LaTeX strings to UIImage using a hidden WKWebView with bundled KaTeX.
+struct KaTeXRenderResult {
+    let image: UIImage
+    let size: CGSize
+    let characters: [OverlayCharacter]
+}
+
 final class KaTeXRenderer: NSObject, WKNavigationDelegate {
     private var webView: WKWebView?
     private var isReady = false
     private var readyContinuation: CheckedContinuation<Void, Never>?
 
-    /// Initialize and load the KaTeX HTML page.
     func warmUp() async {
         guard webView == nil else { return }
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
@@ -41,37 +45,48 @@ final class KaTeXRenderer: NSObject, WKNavigationDelegate {
         readyContinuation = nil
     }
 
-    /// Render a LaTeX string to a UIImage.
-    /// - Parameters:
-    ///   - latex: Full LaTeX expression (e.g. `\sum_{n=0}^{\infty} a_n`)
-    ///   - fontSize: Target font size in points
-    /// - Returns: Rendered UIImage with transparent background
-    func render(latex: String, fontSize: CGFloat = 20) async throws -> UIImage {
+    func render(latex: String, fontSize: CGFloat = 20) async throws -> KaTeXRenderResult {
         if !isReady { await warmUp() }
-        guard let wv = webView, isReady else {
-            throw RenderError.notReady
-        }
+        guard let wv = webView, isReady else { throw RenderError.notReady }
 
         let escaped = latex
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "'", with: "\\'")
             .replacingOccurrences(of: "\n", with: " ")
 
-        let js = "renderLatex('\(escaped)', \(fontSize))"
+        let js = "renderLatex('\(escaped)', \(fontSize), true)"
         let result = try await wv.evaluateJavaScript(js)
 
         guard let jsonString = result as? String,
-              let data = jsonString.data(using: .utf8),
-              let size = try? JSONDecoder().decode(RenderSize.self, from: data) else {
+              let data = jsonString.data(using: .utf8) else {
+            throw RenderError.badResponse
+        }
+
+        print("[KaTeXRenderer] raw response: \(jsonString.prefix(500))")
+
+        guard let response = try? JSONDecoder().decode(RenderResponse.self, from: data) else {
             throw RenderError.badResponse
         }
 
         let snapshotConfig = WKSnapshotConfiguration()
-        snapshotConfig.rect = CGRect(x: 0, y: 0, width: size.width, height: size.height)
-        snapshotConfig.snapshotWidth = NSNumber(value: Double(size.width))
-
+        snapshotConfig.rect = CGRect(x: 0, y: 0, width: response.width, height: response.height)
+        snapshotConfig.snapshotWidth = NSNumber(value: Double(response.width))
         let image = try await wv.takeSnapshot(configuration: snapshotConfig)
-        return image
+
+        // Convert leaf rects directly into OverlayCharacters
+        let characters = response.leafRects.enumerated().map { i, leaf in
+            OverlayCharacter(
+                id: "c-\(i)",
+                index: i,
+                displayLatex: leaf.text,
+                sourceToken: .latex,
+                rect: CGRect(x: leaf.x, y: leaf.y, width: leaf.width, height: leaf.height)
+            )
+        }
+
+        print("[KaTeXRenderer] \(characters.count) leaf glyphs found")
+
+        return KaTeXRenderResult(image: image, size: CGSize(width: response.width, height: response.height), characters: characters)
     }
 
     enum RenderError: Error {
@@ -79,7 +94,16 @@ final class KaTeXRenderer: NSObject, WKNavigationDelegate {
         case badResponse
     }
 
-    private struct RenderSize: Decodable {
+    private struct RenderResponse: Decodable {
+        let width: CGFloat
+        let height: CGFloat
+        let leafRects: [LeafRect]
+    }
+
+    private struct LeafRect: Decodable {
+        let text: String
+        let x: CGFloat
+        let y: CGFloat
         let width: CGFloat
         let height: CGFloat
     }

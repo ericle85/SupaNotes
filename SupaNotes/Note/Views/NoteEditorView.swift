@@ -89,7 +89,7 @@ struct NoteEditorView: View {
 
             AgentControlBar(state: agentRegionState, captureToken: captureToken, sender: visionSender, runner: agentRunner, suggestionRunner: suggestionRunner)
 
-            GhostOverlayView(tokens: suggestionRunner.tokens, renderedImage: suggestionRunner.renderedImage)
+            GhostOverlayView(tokens: suggestionRunner.tokens, characters: suggestionRunner.characters, renderedImage: suggestionRunner.renderedImage, renderSize: suggestionRunner.renderSize)
                 .animation(.easeInOut(duration: 0.3), value: suggestionRunner.tokens.count)
 
             // Debug: show captured image sent to model

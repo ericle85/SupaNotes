@@ -1,11 +1,11 @@
 import SwiftUI
 import UIKit
 
-/// Renders suggestion as a faded overlay at the bottom of the screen.
-/// Uses KaTeX-rendered image for LaTeX, falls back to text if no image.
 struct GhostOverlayView: View {
     let tokens: [OverlayToken]
+    let characters: [OverlayCharacter]
     let renderedImage: UIImage?
+    let renderSize: CGSize
 
     var body: some View {
         if !tokens.isEmpty {
@@ -15,9 +15,9 @@ struct GhostOverlayView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                     .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .cornerRadius(12)
                     .opacity(0.7)
-                    .padding(.bottom, 160)
+                    .padding(.bottom, 100)
             }
             .allowsHitTesting(false)
             .transition(.opacity.combined(with: .move(edge: .bottom)))
@@ -27,12 +27,12 @@ struct GhostOverlayView: View {
     @ViewBuilder
     private var overlayContent: some View {
         if let renderedImage {
+            // Debug boxes are baked into the image by JS
             Image(uiImage: renderedImage)
                 .resizable()
                 .scaledToFit()
-                .frame(maxHeight: 60)
+                .frame(maxWidth: 500, maxHeight: 300)
         } else {
-            // Fallback: plain text while rendering or on failure
             HStack(spacing: 4) {
                 ForEach(tokens) { token in
                     Text(token.value)
