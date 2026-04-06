@@ -149,24 +149,26 @@ final class MathLayoutEngine {
         }
     }
 
-    /// Compute baseline Y for a glyph view (tight bbox container)
+    /// Compute baseline Y for a glyph view
     private func glyphBaselineY(_ text: String, view: UIView, fontSize: CGFloat) -> CGFloat {
         if tallGlyphs.contains(text) {
             // Integral: bbox is the stem portion, baseline at center + math axis shift
             return view.frame.height / 2 + fontSize * 0.32
         }
-        // With tight bbox: baseline position depends on character type
+        // Check if this is a tight-bbox letter/digit
+        let isSingleLetter = text.count == 1 && (text.first!.isLetter || text.first!.isNumber)
+        guard isSingleLetter else {
+            // Symbols/operators: full label frame, baseline at ~78%
+            return view.frame.height * 0.78
+        }
         if descenderChars.contains(text) {
-            // Baseline is above the descender portion
-            // bbox spans from (baseline - xHeight) to (baseline + |descender|)
-            // so baseline is at xHeight / (xHeight + |descender|) from top
             let font = mathFontItalic(size: fontSize)
             let xH = font.xHeight
             let desc = abs(font.descender)
             return xH / (xH + desc) * view.frame.height
         }
-        // For non-descender chars, baseline is at the bottom of the tight bbox
-        return view.frame.height - fontSize * 0.03  // minus the padding
+        // Non-descender letter/digit: baseline at bottom minus padding
+        return view.frame.height - fontSize * 0.03
     }
 
     // MARK: - Glyph
@@ -217,27 +219,35 @@ final class MathLayoutEngine {
             return container
         }
 
-        // Tight bounding box using font metrics
-        // Label layout: baseline is at (label.height - font.descender) from top
-        // (descender is negative, so baseline = height + descender)
+        // Only apply tight bboxes to actual letters and digits — not symbols/operators
+        let isSingleLetter = text.count == 1 && (text.first!.isLetter || text.first!.isNumber)
+        guard isSingleLetter else {
+            // Symbols, operators, brackets: keep full label frame
+            label.tag = 9000 + charIndex
+            charIndex += 1
+            return label
+        }
+
+        // Tighter bounding box using font metrics — but with generous padding
+        // to account for italic slant and glyph overshoot
         let labelBaseline = label.frame.height + font.descender
         let tightTop: CGFloat
         let tightBottom: CGFloat
 
         if capitalChars.contains(text) || text.first?.isUppercase == true {
             tightTop = labelBaseline - font.capHeight
-            tightBottom = labelBaseline  // no descender
+            tightBottom = labelBaseline
         } else if descenderChars.contains(text) {
             tightTop = labelBaseline - font.xHeight
-            tightBottom = labelBaseline - font.descender  // descender is negative
+            tightBottom = labelBaseline - font.descender
         } else {
-            // Lowercase without descender (x, a, n, etc.) or symbols
             tightTop = labelBaseline - font.xHeight
             tightBottom = labelBaseline
         }
 
-        // Add small padding so strokes aren't clipped
-        let pad: CGFloat = fontSize * 0.03
+        // Generous padding for italic overshoot, glyph variations, and dotted chars (i, j)
+        let hasDot = (text == "i" || text == "j")
+        let pad: CGFloat = hasDot ? fontSize * 0.15 : fontSize * 0.1
         let bboxTop = max(0, tightTop - pad)
         let bboxBottom = min(label.frame.height, tightBottom + pad)
         let bboxH = bboxBottom - bboxTop
@@ -699,7 +709,7 @@ private final class AccentShapeView: UIView {
         self.symbol = symbol
         self.contentWidth = width
         self.accentFontSize = fontSize
-        let height = fontSize * 0.12
+        let height = fontSize * 0.16
         super.init(frame: CGRect(x: 0, y: 0, width: width, height: height))
         backgroundColor = .clear
         isOpaque = false
