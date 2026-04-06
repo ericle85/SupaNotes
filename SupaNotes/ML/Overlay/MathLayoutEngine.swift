@@ -527,8 +527,9 @@ final class MathLayoutEngine {
         container.addSubview(baseView)
 
         let scriptGap = fontSize * 0.02
-        // For integrals, place limits just past the stem bbox (tight to the curl)
-        let scriptX = isIntegral(base) ? baseView.frame.width + scriptGap : baseView.frame.width + scriptGap
+        let isInt = isIntegral(base)
+        // For integrals, limits overlap the curls like LaTeX; for others, past the base
+        let scriptX = isInt ? baseView.frame.width * 0.45 : baseView.frame.width + scriptGap
 
         var totalWidth = baseView.frame.width
         var totalHeight = baseView.frame.height
@@ -537,13 +538,13 @@ final class MathLayoutEngine {
 
         if let sup = sup {
             let supView = layoutRow(sup, fontSize: scriptFontSize)
-            if isIntegral(base) {
-                // Upper limit: bottom of sup aligns near top of stem bbox
-                let supY = -supView.frame.height * 0.3
+            if isInt {
+                // Upper limit: nearly touching the top of the stem
+                let supY = supView.frame.height * 0.05
                 supView.frame.origin = CGPoint(x: scriptX, y: supY)
             } else {
                 let supY = -supView.frame.height * 0.5
-                supView.frame.origin = CGPoint(x: scriptX, y: supY)
+                supView.frame.origin = CGPoint(x: baseView.frame.width + scriptGap, y: supY)
             }
             container.addSubview(supView)
             totalWidth = max(totalWidth, supView.frame.maxX)
@@ -552,13 +553,13 @@ final class MathLayoutEngine {
 
         if let sub = sub {
             let subView = layoutRow(sub, fontSize: scriptFontSize)
-            if isIntegral(base) {
-                // Lower limit: top of sub near bottom of stem bbox
-                let subY = baseView.frame.height * 0.85
+            if isInt {
+                // Lower limit: tucked near bottom of stem
+                let subY = baseView.frame.height * 0.8
                 subView.frame.origin = CGPoint(x: scriptX, y: subY)
             } else {
                 let subY = baseView.frame.height * 0.6
-                subView.frame.origin = CGPoint(x: scriptX, y: subY)
+                subView.frame.origin = CGPoint(x: baseView.frame.width + scriptGap, y: subY)
             }
             container.addSubview(subView)
             totalWidth = max(totalWidth, subView.frame.maxX)
