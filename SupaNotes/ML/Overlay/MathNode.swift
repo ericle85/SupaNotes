@@ -8,6 +8,8 @@ indirect enum MathNode {
     case delimited(open: String, close: String, content: [MathNode])
     case matrix(rows: [[[MathNode]]], open: String, close: String)
     case row([MathNode])
+    case sqrt(content: [MathNode])
+    case accent(symbol: String, content: [MathNode]) // \vec, \hat, \bar, \dot, \tilde, \overline
     case space
     case text(String)
     case fracLine
@@ -40,6 +42,14 @@ let latexSymbolMap: [String: String] = [
     "\\lim": "lim", "\\max": "max", "\\min": "min",
     "\\sin": "sin", "\\cos": "cos", "\\tan": "tan",
     "\\log": "log", "\\ln": "ln", "\\exp": "exp",
+    "\\det": "det", "\\dim": "dim", "\\ker": "ker",
+]
+
+let mathbbMap: [Character: String] = [
+    "A": "𝔸", "B": "𝔹", "C": "ℂ", "D": "𝔻", "E": "𝔼", "F": "𝔽", "G": "𝔾",
+    "H": "ℍ", "I": "𝕀", "J": "𝕁", "K": "𝕂", "L": "𝕃", "M": "𝕄", "N": "ℕ",
+    "O": "𝕆", "P": "ℙ", "Q": "ℚ", "R": "ℝ", "S": "𝕊", "T": "𝕋", "U": "𝕌",
+    "V": "𝕍", "W": "𝕎", "X": "𝕏", "Y": "𝕐", "Z": "ℤ",
 ]
 
 // MARK: - Parser
@@ -115,9 +125,17 @@ struct MathParser {
         case "\\left":
             return handleDelimited(s, from: &i)
 
-        case "\\text", "\\mathrm", "\\mathbf":
+        case "\\text", "\\mathrm", "\\mathbf", "\\operatorname":
             let content = readBraceGroupRaw(s, from: &i)
             return .text(content)
+
+        case "\\mathbb":
+            let content = readBraceGroupRaw(s, from: &i)
+            let mapped = content.map { ch -> String in
+                if let bb = mathbbMap[ch] { return bb }
+                return String(ch)
+            }.joined()
+            return .text(mapped)
 
         case "\\;", "\\,", "\\!", "\\ ", "\\quad", "\\qquad":
             return .space
@@ -127,7 +145,29 @@ struct MathParser {
 
         case "\\sqrt":
             let content = readBraceGroup(s, from: &i)
-            return .row([.glyph("√")] + content)
+            return .sqrt(content: content)
+
+        case "\\vec":
+            let content = readBraceGroup(s, from: &i)
+            return .accent(symbol: "→", content: content)
+        case "\\hat":
+            let content = readBraceGroup(s, from: &i)
+            return .accent(symbol: "^", content: content)
+        case "\\bar", "\\overline":
+            let content = readBraceGroup(s, from: &i)
+            return .accent(symbol: "—", content: content)
+        case "\\dot":
+            let content = readBraceGroup(s, from: &i)
+            return .accent(symbol: "·", content: content)
+        case "\\ddot":
+            let content = readBraceGroup(s, from: &i)
+            return .accent(symbol: "··", content: content)
+        case "\\tilde":
+            let content = readBraceGroup(s, from: &i)
+            return .accent(symbol: "~", content: content)
+        case "\\underline":
+            let content = readBraceGroup(s, from: &i)
+            return .accent(symbol: "_", content: content)
 
         default:
             if let symbol = latexSymbolMap[cmd] {
@@ -164,6 +204,7 @@ struct MathParser {
             "vmatrix": ("|", "|"),
             "Vmatrix": ("‖", "‖"),
             "matrix": ("", ""),
+            "cases": ("{", ""),
         ]
 
         if let delims = matrixDelims[envName] {
@@ -185,10 +226,34 @@ struct MathParser {
         }
     }
 
+    private func readDelimiter(_ s: String, from i: inout String.Index) -> String {
+        guard i < s.endIndex else { return "(" }
+        if s[i] == "\\" {
+            // \{ \} \| etc.
+            i = s.index(after: i)
+            guard i < s.endIndex else { return "\\" }
+            let ch = s[i]
+            i = s.index(after: i)
+            switch ch {
+            case "{": return "{"
+            case "}": return "}"
+            case "|": return "‖"
+            default: return String(ch)
+            }
+        }
+        if s[i] == "." {
+            // \left. = invisible delimiter
+            i = s.index(after: i)
+            return ""
+        }
+        let ch = String(s[i])
+        i = s.index(after: i)
+        return ch
+    }
+
     private func handleDelimited(_ s: String, from i: inout String.Index) -> MathNode? {
         guard i < s.endIndex else { return nil }
-        let openDelim = String(s[i])
-        i = s.index(after: i)
+        let openDelim = readDelimiter(s, from: &i)
 
         // Parse until \right
         var content: [MathNode] = []
@@ -197,8 +262,7 @@ struct MathParser {
                 let saved = i
                 let cmd = readCommand(s, from: &i)
                 if cmd == "\\right" {
-                    let closeDelim = i < s.endIndex ? String(s[i]) : ")"
-                    if i < s.endIndex { i = s.index(after: i) }
+                    let closeDelim = readDelimiter(s, from: &i)
                     return .delimited(open: openDelim, close: closeDelim, content: content)
                 }
                 // Not \right, handle normally
