@@ -30,7 +30,7 @@ final class MathLayoutEngine {
 
     // Characters with uniform handwriting → tighter box
     private let narrowChars: Set<String> = ["i", "l", "1", "!", ".", ",", ";", ":", "'", "|"]
-    private let wideChars: Set<String> = ["m", "w", "M", "W"]
+    private let wideChars: Set<String> = ["m", "w", "M", "W", "π"]
     // Greek uppercase should be roman (not italic) per LaTeX convention
     private let romanChars: Set<String> = [
         "Γ", "Δ", "Θ", "Λ", "Ξ", "Π", "Σ", "Φ", "Ψ", "Ω",
@@ -185,7 +185,7 @@ final class MathLayoutEngine {
     private let tallGlyphs: Set<String> = ["∫", "∮"]
 
     private let mathOperators: Set<String> = ["+", "−", "-", "=", "×", "÷", "·", "±", "∓", "<", ">", "≤", "≥", "≠", "≈", "≡"]
-    private let descenderChars: Set<String> = ["g", "j", "p", "q", "y", "Q", "β", "γ", "η", "μ", "ρ", "φ", "χ", "ψ"]
+    private let descenderChars: Set<String> = ["f", "g", "j", "p", "q", "y", "Q", "β", "γ", "η", "μ", "ρ", "φ", "χ", "ψ"]
     private let capitalChars: Set<String> = [
         "A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z",
         "Γ","Δ","Θ","Λ","Ξ","Π","Σ","Φ","Ψ","Ω",
@@ -197,7 +197,12 @@ final class MathLayoutEngine {
         label.text = text
         let isRoman = romanChars.contains(text) || text.count > 1
         let effectiveSize = tallGlyphs.contains(text) ? fontSize * 1.6 : fontSize
-        let font = isRoman ? mathFont(size: effectiveSize) : mathFontItalic(size: effectiveSize)
+        let font: UIFont
+        if tallGlyphs.contains(text) {
+            font = mathFont(size: effectiveSize)
+        } else {
+            font = isRoman ? mathFont(size: effectiveSize) : mathFontItalic(size: effectiveSize)
+        }
         label.font = font
         label.textColor = .black
         label.sizeToFit()
@@ -211,20 +216,27 @@ final class MathLayoutEngine {
         } else {
             width = max(baseWidth, fontSize * 0.55)
         }
-        label.frame.size.width = width
+        // Italic f, j extend rightward — add extra width
+        let italicExtenders: Set<String> = ["f", "j"]
+        let extraWidth = (!isRoman && italicExtenders.contains(text)) ? fontSize * 0.25 : 0
+        label.frame.size.width = width + extraWidth
         label.frame.size.height = max(label.frame.height, fontSize * 0.9)
         label.textAlignment = .center
 
         if tallGlyphs.contains(text) {
-            // Integral: render full size but bounding box covers only the vertical stem
+            // Integral: narrow bbox around stem, expand label so curls aren't clipped at image edge
             let container = UIView()
             container.clipsToBounds = false
             container.tag = 9000 + charIndex
             charIndex += 1
-            let bboxH = label.frame.height * 0.55
-            let bboxY = (label.frame.height - bboxH) / 2
-            container.frame = CGRect(x: 0, y: 0, width: width, height: bboxH)
-            label.frame.origin = CGPoint(x: 0, y: -bboxY)
+            // Expand label to account for glyph overflow beyond font metrics
+            let curlPad = label.frame.height * 0.15
+            label.frame.size.height += curlPad * 2
+            label.frame.size.width += curlPad * 2
+            let stemWidth = width * 0.55
+            let stemX = (width - stemWidth) / 2
+            container.frame = CGRect(x: 0, y: 0, width: stemWidth, height: label.frame.height - curlPad * 2)
+            label.frame.origin = CGPoint(x: -stemX - curlPad, y: -curlPad)
             container.addSubview(label)
             return container
         }
@@ -271,7 +283,8 @@ final class MathLayoutEngine {
         }
 
         // Generous padding — better to have more space for CTC model readability
-        let pad: CGFloat = fontSize * 0.12
+        let isItalicExtender = !isRoman && (text == "f" || text == "j")
+        let pad: CGFloat = isItalicExtender ? fontSize * 0.18 : fontSize * 0.12
         let bboxTop = max(0, tightTop - pad)
         let bboxBottom = min(label.frame.height, tightBottom + pad)
         let bboxH = bboxBottom - bboxTop
@@ -514,8 +527,8 @@ final class MathLayoutEngine {
         container.addSubview(baseView)
 
         let scriptGap = fontSize * 0.02
-        // For integrals, place limits to the right of the symbol (past the curls)
-        let scriptX = isIntegral(base) ? baseView.frame.width + scriptGap : baseView.frame.width + scriptGap
+        // For integrals, place limits past the curls (wider than the narrow stem bbox)
+        let scriptX = isIntegral(base) ? baseView.frame.width * 1.8 + scriptGap : baseView.frame.width + scriptGap
 
         var totalWidth = baseView.frame.width
         var totalHeight = baseView.frame.height
@@ -603,7 +616,7 @@ final class MathLayoutEngine {
         label.text = text
         // Scale font so delimiter matches content height
         let delimFontSize = max(fontSize, height * 0.85)
-        label.font = mathFont(size: delimFontSize)
+        label.font = UIFont.systemFont(ofSize: delimFontSize, weight: .ultraLight)
         label.textColor = .black
         label.tag = 9000 + charIndex
         charIndex += 1
