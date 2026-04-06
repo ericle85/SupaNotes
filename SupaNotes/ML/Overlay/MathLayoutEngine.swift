@@ -113,7 +113,7 @@ final class MathLayoutEngine {
             let y = maxAbove - baselineY
             view.frame.origin = CGPoint(x: x, y: y)
             container.addSubview(view)
-            x += view.frame.width + fontSize * 0.08
+            x += view.frame.width + fontSize * 0.03
         }
 
         container.frame = CGRect(x: 0, y: 0, width: x, height: totalHeight)
@@ -156,8 +156,8 @@ final class MathLayoutEngine {
     /// Compute baseline Y for a glyph view
     private func glyphBaselineY(_ text: String, view: UIView, fontSize: CGFloat) -> CGFloat {
         if tallGlyphs.contains(text) {
-            // Integral: bbox is the stem portion, baseline at center + math axis shift
-            return view.frame.height / 2 + fontSize * 0.32
+            // Integral: text baseline near bottom third, integral extends mostly above
+            return view.frame.height * 0.85
         }
         if mathOperators.contains(text) {
             // Operators: baseline at center of bbox + math axis shift
@@ -527,8 +527,8 @@ final class MathLayoutEngine {
         container.addSubview(baseView)
 
         let scriptGap = fontSize * 0.02
-        // For integrals, place limits past the curls (wider than the narrow stem bbox)
-        let scriptX = isIntegral(base) ? baseView.frame.width * 1.8 + scriptGap : baseView.frame.width + scriptGap
+        // For integrals, place limits just past the stem bbox (tight to the curl)
+        let scriptX = isIntegral(base) ? baseView.frame.width + scriptGap : baseView.frame.width + scriptGap
 
         var totalWidth = baseView.frame.width
         var totalHeight = baseView.frame.height
@@ -538,10 +538,8 @@ final class MathLayoutEngine {
         if let sup = sup {
             let supView = layoutRow(sup, fontSize: scriptFontSize)
             if isIntegral(base) {
-                // Upper limit: align top of sup with top of integral's visible area
-                // The integral container's top is the bbox top, but the glyph extends above
-                // Place sup so its bottom aligns near the top of the bbox
-                let supY = -supView.frame.height * 0.8
+                // Upper limit: bottom of sup aligns near top of stem bbox
+                let supY = -supView.frame.height * 0.3
                 supView.frame.origin = CGPoint(x: scriptX, y: supY)
             } else {
                 let supY = -supView.frame.height * 0.5
@@ -555,8 +553,8 @@ final class MathLayoutEngine {
         if let sub = sub {
             let subView = layoutRow(sub, fontSize: scriptFontSize)
             if isIntegral(base) {
-                // Lower limit: align top of sub near bottom of bbox
-                let subY = baseView.frame.height * 0.75
+                // Lower limit: top of sub near bottom of stem bbox
+                let subY = baseView.frame.height * 0.85
                 subView.frame.origin = CGPoint(x: scriptX, y: subY)
             } else {
                 let subY = baseView.frame.height * 0.6
