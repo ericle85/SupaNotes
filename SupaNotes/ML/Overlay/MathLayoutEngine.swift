@@ -155,10 +155,15 @@ final class MathLayoutEngine {
             // Integral: bbox is the stem portion, baseline at center + math axis shift
             return view.frame.height / 2 + fontSize * 0.32
         }
+        if mathOperators.contains(text) {
+            // Operators: baseline at center of bbox + math axis shift
+            // so they align with the math axis of adjacent letters
+            return view.frame.height / 2 + fontSize * 0.32
+        }
         // Check if this is a tight-bbox letter/digit
         let isSingleLetter = text.count == 1 && (text.first!.isLetter || text.first!.isNumber)
         guard isSingleLetter else {
-            // Symbols/operators: full label frame, baseline at ~78%
+            // Brackets, delimiters: full label frame, baseline at ~78%
             return view.frame.height * 0.78
         }
         if descenderChars.contains(text) {
@@ -175,6 +180,7 @@ final class MathLayoutEngine {
 
     private let tallGlyphs: Set<String> = ["∫", "∮"]
 
+    private let mathOperators: Set<String> = ["+", "−", "-", "=", "×", "÷", "·", "±", "∓", "<", ">", "≤", "≥", "≠", "≈", "≡"]
     private let descenderChars: Set<String> = ["g", "j", "p", "q", "y", "Q", "β", "γ", "η", "μ", "ρ", "φ", "χ", "ψ"]
     private let capitalChars: Set<String> = [
         "A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z",
@@ -219,35 +225,49 @@ final class MathLayoutEngine {
             return container
         }
 
-        // Only apply tight bboxes to actual letters and digits — not symbols/operators
-        let isSingleLetter = text.count == 1 && (text.first!.isLetter || text.first!.isNumber)
-        guard isSingleLetter else {
-            // Symbols, operators, brackets: keep full label frame
+        // Only apply tight bboxes to letters, digits, and math operators
+        let isLetterOrDigit = text.count == 1 && (text.first!.isLetter || text.first!.isNumber)
+        let isMathOperator = mathOperators.contains(text)
+        guard isLetterOrDigit || isMathOperator else {
+            // Brackets, delimiters, etc.: keep full label frame
             label.tag = 9000 + charIndex
             charIndex += 1
             return label
         }
 
-        // Tighter bounding box using font metrics — but with generous padding
-        // to account for italic slant and glyph overshoot
+        // Tighter bounding box using font metrics
         let labelBaseline = label.frame.height + font.descender
+        let ascenderChars: Set<String> = ["b","d","f","h","i","j","k","l","t","β","δ","ζ","θ","λ","ξ","φ","ψ"]
         let tightTop: CGFloat
         let tightBottom: CGFloat
 
-        if capitalChars.contains(text) || text.first?.isUppercase == true {
-            tightTop = labelBaseline - font.capHeight
+        if isMathOperator {
+            // Operators: tight box centered on math axis (xHeight / 2 above baseline)
+            let mathAxis = labelBaseline - font.xHeight / 2
+            let opHalfH = font.xHeight * 0.4  // half-height of operator bbox
+            tightTop = mathAxis - opHalfH
+            tightBottom = mathAxis + opHalfH
+        } else if capitalChars.contains(text) || text.first?.isUppercase == true || text.first?.isNumber == true {
+            // Capitals and digits: use ascender (taller than capHeight for safety)
+            tightTop = labelBaseline - font.ascender
             tightBottom = labelBaseline
         } else if descenderChars.contains(text) {
-            tightTop = labelBaseline - font.xHeight
+            // Descender chars: extend below baseline
+            let topMetric = ascenderChars.contains(text) ? font.ascender : font.xHeight
+            tightTop = labelBaseline - topMetric
             tightBottom = labelBaseline - font.descender
+        } else if ascenderChars.contains(text) {
+            // Ascender chars (b, d, f, h, k, l, t): use ascender height
+            tightTop = labelBaseline - font.ascender
+            tightBottom = labelBaseline
         } else {
+            // Lowercase without ascender/descender (x, a, n, etc.)
             tightTop = labelBaseline - font.xHeight
             tightBottom = labelBaseline
         }
 
-        // Generous padding for italic overshoot, glyph variations, and dotted chars (i, j)
-        let hasDot = (text == "i" || text == "j")
-        let pad: CGFloat = hasDot ? fontSize * 0.15 : fontSize * 0.1
+        // Generous padding — better to have more space for CTC model readability
+        let pad: CGFloat = fontSize * 0.12
         let bboxTop = max(0, tightTop - pad)
         let bboxBottom = min(label.frame.height, tightBottom + pad)
         let bboxH = bboxBottom - bboxTop
