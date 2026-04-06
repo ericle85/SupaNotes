@@ -13,13 +13,17 @@ final class MathLayoutEngine {
     // MARK: - Font
 
     private func mathFont(size: CGFloat) -> UIFont {
-        UIFont(name: "CMU Serif", size: size)
+        UIFont(name: "Latin Modern Math", size: size)
+            ?? UIFont(name: "CMU Serif", size: size)
             ?? UIFont(name: "TimesNewRomanPSMT", size: size)
             ?? UIFont.systemFont(ofSize: size)
     }
 
     private func mathFontItalic(size: CGFloat) -> UIFont {
+        // Latin Modern Math contains italic glyphs via OpenType features,
+        // but UIFont doesn't auto-apply them. Fall back to CMU Serif Italic for variables.
         UIFont(name: "CMU Serif Italic", size: size)
+            ?? UIFont(name: "Latin Modern Math", size: size)
             ?? UIFont(name: "TimesNewRomanPS-ItalicMT", size: size)
             ?? UIFont.italicSystemFont(ofSize: size)
     }

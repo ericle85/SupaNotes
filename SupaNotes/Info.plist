@@ -40,6 +40,13 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>UIAppFonts</key>
+	<array>
+		<string>fonts/cmunrm.otf</string>
+		<string>fonts/cmunti.otf</string>
+		<string>fonts/cmunbx.otf</string>
+		<string>fonts/latinmodern-math.otf</string>
+	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
