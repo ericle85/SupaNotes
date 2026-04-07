@@ -60,6 +60,32 @@ final class AgentOllamaClient {
         return rect
     }
 
+    /// Suggest what comes next in the user's handwritten notes.
+    func suggest(image: UIImage) async throws -> String {
+        guard let png = image.pngData(), !png.isEmpty else {
+            throw AgentError.imageEncodingFailed
+        }
+        let base64 = png.base64EncodedString()
+
+        let prompt = """
+        You autocomplete handwritten notes. Rules:
+        1. Max 8 words or one short expression
+        2. Wrap ALL math/symbols/numbers in [latex]...[/latex] tags
+        3. NEVER use $ signs for math
+        4. Output ONLY the suggestion, nothing else
+
+        Examples:
+        - "The area of a circle is" → [latex]A = \\pi r^2[/latex]
+        - "Let x be a" → positive integer
+        - "If f(x) = 3x + 1, then" → [latex]f(2) = 7[/latex]
+        - "The Schrödinger equation describes" → the time evolution of [latex]\\psi[/latex]
+
+        What comes next in these notes?
+        """
+
+        return try await chat(prompt: prompt, imageBase64: base64)
+    }
+
     // MARK: - Shared request
 
     private func chat(prompt: String, imageBase64: String) async throws -> String {

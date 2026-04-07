@@ -14,4 +14,6 @@ final class AgentCaptureToken {
     var screenRectToImageRect: ((CGRect) -> CGRect)?
     /// Get the PKDrawing for the current page.
     var currentPageDrawing: (() -> PKDrawing?)?
+    /// Capture the visible viewport as a UIImage.
+    var captureViewport: (() -> UIImage?)?
 }
