@@ -18,49 +18,54 @@ struct SwiftMathRenderer {
         label.textColor = MTColor(cgColor: textColor.cgColor)
         label.labelMode = .display
 
-        // Force layout to populate displayList
-        let fitSize = label.sizeThatFits(CGSize(width: CGFloat.greatestFiniteMagnitude,
-                                                 height: CGFloat.greatestFiniteMagnitude))
+        // Compute intrinsic size — use a large frame so layout has room
+        label.frame = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        label.setNeedsLayout()
+        label.layoutIfNeeded()
 
-        guard fitSize.width > 0, fitSize.height > 0 else { return nil }
         guard let displayList = label.displayList else { return nil }
 
-        // Add padding to avoid clipping
-        let padding: CGFloat = 4
-        let totalWidth = fitSize.width + padding * 2
-        let totalHeight = fitSize.height + padding * 2
+        // Use the display tree's actual metrics for sizing
+        let contentWidth = displayList.width
+        let contentAscent = displayList.ascent
+        let contentDescent = displayList.descent
+        guard contentWidth > 0, (contentAscent + contentDescent) > 0 else { return nil }
 
-        label.frame = CGRect(x: 0, y: 0, width: totalWidth, height: totalHeight)
+        let padding: CGFloat = 8
+        let totalWidth = contentWidth + padding * 2
+        let totalHeight = contentAscent + contentDescent + padding * 2
 
-        // Extract glyph rects in CoreText coordinates (y-up, origin at baseline)
+        // Reset displayList position to origin so we control placement
+        displayList.position = CGPoint.zero
+
+        let baselineY = padding + contentAscent
+
+        // Extract glyph rects in CoreText coordinates (y-up from origin)
         let ctGlyphRects = extractGlyphRects(from: displayList)
 
         // Render to UIImage
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: totalWidth, height: totalHeight))
         let image = renderer.image { ctx in
-            // White background for debugging visibility
             UIColor.white.setFill()
             ctx.fill(CGRect(x: 0, y: 0, width: totalWidth, height: totalHeight))
 
             let cgContext = ctx.cgContext
 
-            // Flip to CoreText coordinates
-            cgContext.translateBy(x: padding, y: totalHeight - padding)
+            // CoreText draws with y-up. We want baseline at baselineY from top.
+            // Flip y, then translate so origin (baseline) maps to (padding, baselineY)
+            cgContext.translateBy(x: padding, y: baselineY)
             cgContext.scaleBy(x: 1, y: -1)
-
-            // Offset to account for displayList position
-            cgContext.translateBy(x: displayList.position.x, y: displayList.position.y)
 
             displayList.draw(cgContext)
         }
 
-        // Convert glyph rects from CoreText coords to UIKit coords
+        // Convert glyph rects from CoreText coords (y-up from baseline) to UIKit coords (y-down from top)
         let uikitRects = ctGlyphRects.map { glyph -> GlyphRect in
             let ctRect = glyph.rect
-            // In CoreText: y is up from baseline. In UIKit image: y is down from top.
-            // displayList.position is the baseline offset set by MTMathUILabel
-            let x = ctRect.origin.x + displayList.position.x + padding
-            let y = totalHeight - padding - (ctRect.origin.y + ctRect.height + displayList.position.y)
+            // ctRect.origin.y is in CoreText coords (positive = above baseline)
+            // In UIKit: y = baselineY - (ctRect.origin.y + ctRect.height)
+            let x = ctRect.origin.x + padding
+            let y = baselineY - (ctRect.origin.y + ctRect.height)
             let uiRect = CGRect(x: x, y: y, width: ctRect.width, height: ctRect.height)
             return GlyphRect(character: glyph.character, rect: uiRect)
         }
