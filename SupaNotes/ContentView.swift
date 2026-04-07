@@ -13,7 +13,7 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showOverlayPrototype) {
                 NavigationStack {
-                    OverlayAccuracyView()
+                    SwiftMathGalleryView()
                         .toolbar {
                             ToolbarItem(placement: .cancellationAction) {
                                 Button("Close") { showOverlayPrototype = false }

@@ -57,11 +57,16 @@ public func extractGlyphRects(from display: MTDisplay, offset: CGPoint = .zero) 
 
     case let fraction as MTFractionDisplay:
         var rects = [GlyphRect]()
+        // Fraction children have positions set relative to the fraction's parent
+        // (they include fraction.position but not the accumulated parent offset).
+        // parentOffset = pos - fraction.position = the offset of the fraction's parent.
+        let parentOffset = CGPoint(x: pos.x - display.position.x,
+                                    y: pos.y - display.position.y)
         if let num = fraction.numerator {
-            rects.append(contentsOf: extractGlyphRects(from: num, offset: .zero))
+            rects.append(contentsOf: extractGlyphRects(from: num, offset: parentOffset))
         }
         if let den = fraction.denominator {
-            rects.append(contentsOf: extractGlyphRects(from: den, offset: .zero))
+            rects.append(contentsOf: extractGlyphRects(from: den, offset: parentOffset))
         }
         // Add the fraction line itself as a rect
         let lineY = pos.y + fraction.linePosition
@@ -74,39 +79,43 @@ public func extractGlyphRects(from display: MTDisplay, offset: CGPoint = .zero) 
 
     case let radical as MTRadicalDisplay:
         var rects = [GlyphRect]()
-        // The radical's full bounding box (√ sign + vinculum + radicand area)
-        // acts as a background layer — inner glyphs sit on top
         let fullRect = CGRect(x: pos.x, y: pos.y - radical.descent,
                               width: radical.width, height: radical.ascent + radical.descent)
         if fullRect.width > 0.1 && fullRect.height > 0.1 {
             rects.append(GlyphRect(character: "√", rect: fullRect))
         }
-        // Inner glyphs on top
+        // Radical children have positions relative to the radical's parent
+        let parentOffset = CGPoint(x: pos.x - display.position.x,
+                                    y: pos.y - display.position.y)
         if let radicand = radical.radicand {
-            rects.append(contentsOf: extractGlyphRects(from: radicand, offset: .zero))
+            rects.append(contentsOf: extractGlyphRects(from: radicand, offset: parentOffset))
         }
         if let degree = radical.degree {
-            rects.append(contentsOf: extractGlyphRects(from: degree, offset: .zero))
+            rects.append(contentsOf: extractGlyphRects(from: degree, offset: parentOffset))
         }
         return rects
 
     case let limits as MTLargeOpLimitsDisplay:
         var rects = [GlyphRect]()
+        let parentOffset = CGPoint(x: pos.x - display.position.x,
+                                    y: pos.y - display.position.y)
         if let nucleus = limits.nucleus {
-            rects.append(contentsOf: extractGlyphRects(from: nucleus, offset: pos))
+            rects.append(contentsOf: extractGlyphRects(from: nucleus, offset: parentOffset))
         }
         if let upper = limits.upperLimit {
-            rects.append(contentsOf: extractGlyphRects(from: upper, offset: .zero))
+            rects.append(contentsOf: extractGlyphRects(from: upper, offset: parentOffset))
         }
         if let lower = limits.lowerLimit {
-            rects.append(contentsOf: extractGlyphRects(from: lower, offset: .zero))
+            rects.append(contentsOf: extractGlyphRects(from: lower, offset: parentOffset))
         }
         return rects
 
     case let accent as MTAccentDisplay:
         var rects = [GlyphRect]()
+        let parentOffset = CGPoint(x: pos.x - display.position.x,
+                                    y: pos.y - display.position.y)
         if let accentee = accent.accentee {
-            rects.append(contentsOf: extractGlyphRects(from: accentee, offset: .zero))
+            rects.append(contentsOf: extractGlyphRects(from: accentee, offset: parentOffset))
         }
         if let accentGlyph = accent.accent {
             rects.append(contentsOf: extractGlyphRects(from: accentGlyph, offset: pos))
@@ -115,8 +124,10 @@ public func extractGlyphRects(from display: MTDisplay, offset: CGPoint = .zero) 
 
     case let lineDisplay as MTLineDisplay:
         var rects = [GlyphRect]()
+        let parentOffset = CGPoint(x: pos.x - display.position.x,
+                                    y: pos.y - display.position.y)
         if let inner = lineDisplay.inner {
-            rects.append(contentsOf: extractGlyphRects(from: inner, offset: .zero))
+            rects.append(contentsOf: extractGlyphRects(from: inner, offset: parentOffset))
         }
         return rects
 
