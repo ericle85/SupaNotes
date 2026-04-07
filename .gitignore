@@ -116,3 +116,7 @@ iOSInjectionProject/
 # Debugging
 *.xclog
 xcdebugger/
+
+
+# Test files
+Tests/SuggestBenchmark/results

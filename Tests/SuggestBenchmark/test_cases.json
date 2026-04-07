@@ -1,0 +1,141 @@
+[
+  {
+    "id": "math_3plus3_equals",
+    "ocr_text": "3 + 3 =",
+    "image": "images/IMG_3CC31607825B-1.jpeg",
+    "category": "math",
+    "acceptable_suggestions": [
+      "[latex]6[/latex]"
+    ],
+    "notes": "= already written, just needs the answer"
+  },
+  {
+    "id": "math_3plus3_no_equals",
+    "ocr_text": "3 + 3",
+    "image": "images/IMG_EED93E2FC825-1.jpeg",
+    "category": "math",
+    "acceptable_suggestions": [
+      "[latex]= 6[/latex]"
+    ],
+    "notes": "No = sign yet, suggestion should include it"
+  },
+  {
+    "id": "text_hello",
+    "ocr_text": "Hello",
+    "image": "images/IMG_F3CCCA21CCFD-1.jpeg",
+    "category": "none",
+    "acceptable_suggestions": [
+      "(none)"
+    ],
+    "notes": "Nothing meaningful to suggest"
+  },
+  {
+    "id": "math_solve_linear",
+    "ocr_text": "5x + 2 = 18",
+    "image": "images/IMG_A4F896B76A8A-1.jpeg",
+    "category": "math",
+    "acceptable_suggestions": [
+      "[latex]5x = 16[/latex]",
+      "[latex]5x = 18 - 2[/latex]"
+    ],
+    "notes": "Next step: subtract 2 from both sides. Should NOT skip to final answer."
+  },
+  {
+    "id": "math_integration_by_parts",
+    "ocr_text": "Using integration by parts:",
+    "image": "images/IMG_1C6C94448D09-1.jpeg",
+    "category": "math",
+    "acceptable_suggestions": [
+      "[latex]\\int u \\, dv = uv - \\int v \\, du[/latex]"
+    ],
+    "notes": "Standard IBP formula"
+  },
+  {
+    "id": "math_f_of_x",
+    "ocr_text": "If f(x) = 3x + 1, then",
+    "image": "images/IMG_89613129D309-1.jpeg",
+    "category": "math",
+    "acceptable_suggestions": [
+      "[latex]f(2) = 7[/latex]",
+      "[latex]f'(x) = 3[/latex]"
+    ],
+    "notes": "Either evaluation or derivative is reasonable"
+  },
+  {
+    "id": "text_convergence",
+    "ocr_text": "Convergence and Continuity:",
+    "image": "images/IMG_8E00A0241C37-1.jpeg",
+    "category": "text",
+    "acceptable_suggestions": [
+      "[latex]\\lim_{x \\to c} f(x) = f(c)[/latex]",
+      "A function is continuous if"
+    ],
+    "notes": "Either a formula or text continuation"
+  },
+  {
+    "id": "math_derivative_sinx",
+    "ocr_text": "The derivative of sin(x) is",
+    "image": "images/IMG_BA29CCB384DA-1.jpeg",
+    "category": "math",
+    "acceptable_suggestions": [
+      "[latex]\\cos(x)[/latex]"
+    ],
+    "notes": "Standard calculus fact"
+  },
+  {
+    "id": "math_scalar_vector",
+    "ocr_text": "A = (2, 1)^T, 2A =",
+    "image": "images/IMG_7E78F921BFE9-1.jpeg",
+    "category": "math",
+    "acceptable_suggestions": [
+      "[latex]\\begin{pmatrix} 4 \\\\ 2 \\end{pmatrix}[/latex]"
+    ],
+    "notes": "Scalar multiplication of a column vector"
+  },
+  {
+    "id": "math_diffeq_system",
+    "ocr_text": "Ex. y' = Ay + f where A = [[1,2],[2,1]], f(t) = [[e^t],[0]]",
+    "image": "images/IMG_9049B4CC700A-1.jpeg",
+    "category": "math",
+    "acceptable_suggestions": [
+      "[latex]\\det(A - \\lambda I) = 0[/latex]",
+      "Find the eigenvalues of [latex]A[/latex]",
+      "[latex](1-\\lambda)^2 - 4 = 0[/latex]"
+    ],
+    "notes": "Next step is characteristic equation / eigenvalues. Don't skip to solution."
+  },
+  {
+    "id": "math_matrix_mult",
+    "ocr_text": "A = [[1,2,3],[4,5,6]] * [[2],[3]], A =",
+    "image": "images/IMG_C04A294E9073-1.jpeg",
+    "category": "math",
+    "acceptable_suggestions": [
+      "[latex]\\begin{pmatrix} 1 \\cdot 2 + 2 \\cdot 3 \\\\ 4 \\cdot 2 + 5 \\cdot 3 \\end{pmatrix}[/latex]",
+      "[latex]\\begin{pmatrix} 8 \\\\ 23 \\end{pmatrix}[/latex]"
+    ],
+    "notes": "Matrix is 2x3 times 2x1 — dimensions don't match (need 3x1 vector). Model should either show the work or give result. Interesting edge case."
+  },
+  {
+    "id": "math_matrix_mult_valid",
+    "ocr_text": "A = [[1,2,3],[4,5,6]] * [[2],[3],[4]], A =",
+    "image": "images/IMG_9DE230BCC4C8-1.jpeg",
+    "category": "math",
+    "acceptable_suggestions": [
+      "[latex]\\begin{pmatrix} 20 \\\\ 47 \\end{pmatrix}[/latex]",
+      "[latex]\\begin{pmatrix} 1\\cdot2 + 2\\cdot3 + 3\\cdot4 \\\\ 4\\cdot2 + 5\\cdot3 + 6\\cdot4 \\end{pmatrix}[/latex]"
+    ],
+    "notes": "2x3 times 3x1, valid dimensions. Result is [[20],[47]]."
+  },
+  {
+    "id": "text_let_x",
+    "ocr_text": "Let x be a",
+    "image": "images/IMG_CC0A749837AB-1.jpeg",
+    "category": "text",
+    "acceptable_suggestions": [
+      "positive integer",
+      "real number",
+      "variable such that"
+    ],
+    "notes": "Natural text completion, no latex needed"
+  }
+]
