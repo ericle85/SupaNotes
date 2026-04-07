@@ -137,6 +137,7 @@
 			);
 			name = SupaNotes;
 			packageProductDependencies = (
+				BF0000012F42000000000002 /* SwiftMath */,
 			);
 			productName = SupaNotes;
 			productReference = BFE730DE2F3CCEC200F5DD1D /* SupaNotes.app */;
@@ -170,6 +171,9 @@
 			);
 			mainGroup = BFE730D52F3CCEC200F5DD1D;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				BF0000012F42000000000001 /* XCRemoteSwiftPackageReference "SwiftMath" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BFE730DF2F3CCEC200F5DD1D /* Products */;
 			projectDirPath = "";
@@ -506,6 +510,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		BF0000012F42000000000001 /* XCRemoteSwiftPackageReference "SwiftMath" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ericle85/SwiftMath.git";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BF0000012F42000000000002 /* SwiftMath */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BF0000012F42000000000001 /* XCRemoteSwiftPackageReference "SwiftMath" */;
+			productName = SwiftMath;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = BFE730D62F3CCEC200F5DD1D /* Project object */;
 }

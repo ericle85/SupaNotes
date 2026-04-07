@@ -8,10 +8,12 @@ struct OverlayAccuracyView: View {
     enum Mode: String, CaseIterable {
         case type = "Type"
         case draw = "Draw"
+        case latex = "LaTeX"
     }
 
     @State private var mode: Mode = .type
     @State private var overlayText: String = "49"
+    @State private var latexText: String = "\\sum_{n=0}^{\\infty} a_n x^n"
     @State private var completeness: Double = 0
     @State private var accuracy: Double = 0
     @State private var distanceThreshold: Double = 7
@@ -31,15 +33,18 @@ struct OverlayAccuracyView: View {
             }
             .padding(.horizontal)
 
-            if mode == .type {
+            switch mode {
+            case .type:
                 TypeModeView(overlayText: $overlayText)
-            } else {
+            case .draw:
                 DrawModeView(
                     overlayText: overlayText,
                     completeness: $completeness,
                     accuracy: $accuracy,
                     distanceThreshold: $distanceThreshold
                 )
+            case .latex:
+                LaTeXModeView(latexText: $latexText)
             }
         }
         .navigationTitle("Overlay Accuracy")
@@ -544,6 +549,101 @@ extension DrawModeView {
             cachedTransform = nil
             cachedTargetMask = nil
         }
+    }
+}
+
+// MARK: - LaTeX Mode
+
+private struct LaTeXModeView: View {
+    @Binding var latexText: String
+    @State private var showDebugBoxes = true
+    @State private var fontSize: Double = 48
+    @State private var renderedImage: UIImage?
+    @State private var glyphCount: Int = 0
+
+    private let renderer = SwiftMathRenderer()
+
+    private let sampleExpressions = [
+        "\\sum_{n=0}^{\\infty} a_n x^n",
+        "\\frac{d}{dx} \\int_a^x f(t) dt = f(x)",
+        "\\sqrt{x^2 + y^2}",
+        "\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}",
+        "e^{i\\pi} + 1 = 0",
+        "\\lim_{x \\to 0} \\frac{\\sin x}{x} = 1",
+        "\\vec{F} = m\\vec{a}",
+        "\\alpha + \\beta = \\gamma",
+    ]
+
+    var body: some View {
+        VStack(spacing: 12) {
+            // LaTeX input
+            TextField("LaTeX expression", text: $latexText)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(.body, design: .monospaced))
+                .padding(.horizontal)
+
+            // Controls
+            HStack {
+                Text("Size: \(Int(fontSize))pt")
+                    .font(.caption.monospaced())
+                Slider(value: $fontSize, in: 20...80, step: 4)
+                Toggle("Boxes", isOn: $showDebugBoxes)
+                    .fixedSize()
+            }
+            .padding(.horizontal)
+
+            // Sample expressions
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(sampleExpressions, id: \.self) { expr in
+                        Button(expr.prefix(20) + (expr.count > 20 ? "…" : "")) {
+                            latexText = expr
+                        }
+                        .font(.caption.monospaced())
+                        .buttonStyle(.bordered)
+                    }
+                }
+                .padding(.horizontal)
+            }
+
+            // Rendered output
+            if let image = renderedImage {
+                ScrollView([.horizontal, .vertical]) {
+                    Image(uiImage: image)
+                        .interpolation(.high)
+                        .padding()
+                }
+                .frame(maxHeight: 300)
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+                .padding(.horizontal)
+
+                Text("\(glyphCount) glyphs extracted")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+            } else {
+                ContentUnavailableView("No render", systemImage: "function", description: Text("Enter a LaTeX expression above"))
+                    .frame(height: 200)
+            }
+
+            Spacer()
+        }
+        .padding(.top, 12)
+        .onChange(of: latexText) { renderLatex() }
+        .onChange(of: fontSize) { renderLatex() }
+        .onChange(of: showDebugBoxes) { renderLatex() }
+        .onAppear { renderLatex() }
+    }
+
+    private func renderLatex() {
+        let result: SwiftMathRenderResult?
+        if showDebugBoxes {
+            result = renderer.renderWithDebug(latex: latexText, fontSize: CGFloat(fontSize))
+        } else {
+            result = renderer.render(latex: latexText, fontSize: CGFloat(fontSize))
+        }
+        renderedImage = result?.image
+        glyphCount = result?.glyphRects.count ?? 0
     }
 }
 
