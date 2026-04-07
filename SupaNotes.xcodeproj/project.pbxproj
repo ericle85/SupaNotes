@@ -511,16 +511,12 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		BF0000012F42000000000001 /* XCRemoteSwiftPackageReference "SwiftMath" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ericle85/SwiftMath.git";
-			requirement = {
-				branch = main;
-				kind = branch;
-			};
+/* Begin XCLocalSwiftPackageReference section */
+		BF0000012F42000000000001 /* XCLocalSwiftPackageReference "SwiftMath" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = SwiftMath;
 		};
-/* End XCRemoteSwiftPackageReference section */
+/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		BF0000012F42000000000002 /* SwiftMath */ = {
