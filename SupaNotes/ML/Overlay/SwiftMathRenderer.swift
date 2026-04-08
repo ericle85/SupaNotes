@@ -43,13 +43,16 @@ struct SwiftMathRenderer {
         // Extract glyph rects in CoreText coordinates (y-up from origin)
         let ctGlyphRects = extractGlyphRects(from: displayList)
 
-        // Render to UIImage
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: totalWidth, height: totalHeight))
+        // Render to UIImage at 3x for crisp display
+        let renderScale: CGFloat = 3
+        let pixelSize = CGSize(width: totalWidth * renderScale, height: totalHeight * renderScale)
+        let renderer = UIGraphicsImageRenderer(size: pixelSize)
         let image = renderer.image { ctx in
             UIColor.white.setFill()
-            ctx.fill(CGRect(x: 0, y: 0, width: totalWidth, height: totalHeight))
+            ctx.fill(CGRect(origin: .zero, size: pixelSize))
 
             let cgContext = ctx.cgContext
+            cgContext.scaleBy(x: renderScale, y: renderScale)
 
             // CoreText draws with y-up. We want baseline at baselineY from top.
             // Flip y, then translate so origin (baseline) maps to (padding, baselineY)
@@ -58,6 +61,7 @@ struct SwiftMathRenderer {
 
             displayList.draw(cgContext)
         }
+        let hiResImage = UIImage(cgImage: image.cgImage!, scale: renderScale, orientation: .up)
 
         // Convert glyph rects from CoreText coords (y-up from baseline) to UIKit coords (y-down from top)
         let uikitRects = ctGlyphRects.map { glyph -> GlyphRect in
@@ -71,7 +75,7 @@ struct SwiftMathRenderer {
         }
 
         return SwiftMathRenderResult(
-            image: image,
+            image: hiResImage,
             size: CGSize(width: totalWidth, height: totalHeight),
             glyphRects: uikitRects
         )
@@ -84,18 +88,23 @@ struct SwiftMathRenderer {
         let colors: [UIColor] = [.systemRed, .systemBlue, .systemGreen, .systemOrange,
                                   .systemPurple, .systemTeal, .systemPink, .systemYellow]
 
-        let renderer = UIGraphicsImageRenderer(size: result.size)
-        let debugImage = renderer.image { ctx in
-            result.image.draw(at: .zero)
+        let scale = result.image.scale
+        let pixelSize = CGSize(width: result.size.width * scale, height: result.size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: pixelSize)
+        let debugRaw = renderer.image { ctx in
+            let cgCtx = ctx.cgContext
+            cgCtx.scaleBy(x: scale, y: scale)
+            result.image.draw(in: CGRect(origin: .zero, size: result.size))
 
             for (i, glyph) in result.glyphRects.enumerated() {
                 let color = colors[i % colors.count]
                 color.withAlphaComponent(0.3).setFill()
-                ctx.fill(glyph.rect)
+                cgCtx.fill(glyph.rect)
                 color.setStroke()
                 UIBezierPath(rect: glyph.rect).stroke()
             }
         }
+        let debugImage = UIImage(cgImage: debugRaw.cgImage!, scale: scale, orientation: .up)
 
         return SwiftMathRenderResult(
             image: debugImage,

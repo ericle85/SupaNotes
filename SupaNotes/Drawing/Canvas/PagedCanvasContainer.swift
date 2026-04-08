@@ -36,34 +36,45 @@ struct PagedCanvasContainer: UIViewRepresentable {
 
         c.rebuildPages(pages: pages, tool: tool)
 
-        // Register page capture on the token
+        // Register viewport capture on the token
         c.scrollViewRef = scrollView
-        captureToken?.captureCurrentPage = { [weak c] (screenRect: CGRect?) in
-            c?.captureCurrentPageImage(highlightScreenRect: screenRect)
-        }
-        captureToken?.imageRectToScreenRect = { [weak c] (imageRect: CGRect) in
-            c?.imageRectToScreenRect(imageRect) ?? .zero
-        }
-        captureToken?.screenRectToImageRect = { [weak c] (screenRect: CGRect) in
-            guard let c, let sv = c.scrollViewRef else { return .zero }
-            return c.screenRectToImageRect(screenRect, scrollView: sv)
-        }
-        captureToken?.currentPageDrawing = { [weak c] in
-            guard let c, c.currentVisiblePageIndex < c.layoutManager.canvasViews.count else { return nil }
-            return c.layoutManager.canvasViews[c.currentVisiblePageIndex].drawing
-        }
-        captureToken?.tapAtImagePoint = { [weak c] (imagePoint: CGPoint) in
-            // Caller converts normalized point → image space before calling this.
-            // Build a fixed-size crop box and return screen rect via imageRectToScreenRect.
-            let boxW: CGFloat = 120
-            let boxH: CGFloat = 40
+        captureToken?.captureViewport = { [weak c] in
+            guard let c, let sv = c.scrollViewRef else { return nil }
+            let canvasViews = c.layoutManager.canvasViews
+            guard c.currentVisiblePageIndex < canvasViews.count else { return nil }
+
+            // Visible rect in container coordinates
+            guard let containerView = c.layoutManager.containerView else { return nil }
+            let visibleRect = sv.convert(sv.bounds, to: containerView)
+            let pageFrame = canvasViews[c.currentVisiblePageIndex].frame
+
+            // Intersect visible area with page frame (exclude grey background)
+            let pageVisible = visibleRect.intersection(pageFrame)
+            guard !pageVisible.isEmpty else { return c.captureCurrentPageImage() }
+
+            // Convert to image space (0–612 × 0–792)
+            let scale = 1.0 / PageConstants.renderScale
             let imageRect = CGRect(
-                x: imagePoint.x - boxW / 2,
-                y: imagePoint.y - boxH / 2,
-                width: boxW,
-                height: boxH
+                x: (pageVisible.minX - pageFrame.minX) * scale,
+                y: (pageVisible.minY - pageFrame.minY) * scale,
+                width: pageVisible.width * scale,
+                height: pageVisible.height * scale
             )
-            let _ = c?.imageRectToScreenRect(imageRect)
+
+            // Capture full page then crop to visible portion
+            guard let fullImage = c.captureCurrentPageImage(),
+                  let cgImage = fullImage.cgImage else { return nil }
+            let cropRect = CGRect(
+                x: imageRect.minX * fullImage.scale,
+                y: imageRect.minY * fullImage.scale,
+                width: imageRect.width * fullImage.scale,
+                height: imageRect.height * fullImage.scale
+            ).intersection(CGRect(origin: .zero, size: CGSize(
+                width: CGFloat(cgImage.width), height: CGFloat(cgImage.height))))
+            guard !cropRect.isEmpty, let cropped = cgImage.cropping(to: cropRect) else {
+                return fullImage
+            }
+            return UIImage(cgImage: cropped, scale: fullImage.scale, orientation: fullImage.imageOrientation)
         }
 
         DispatchQueue.main.async {

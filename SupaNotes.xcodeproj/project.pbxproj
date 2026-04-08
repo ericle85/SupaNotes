@@ -7,10 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2E0F478DADEFB0AFF1E4464F /* katex in Resources */ = {isa = PBXBuildFile; fileRef = F7234F0E85DAF70E475CD486 /* katex */; };
-		4E8F4A7EB3F3C9D0B8007685 /* KaTeXRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55FA4DAABF7460027A845631 /* KaTeXRenderer.swift */; };
-		74724A8DA9A4989DC894025F /* MathLayoutEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C07B443A9545C7D0E91EC2CA /* MathLayoutEngine.swift */; };
-		EC5B42A1A56504430D3B76D7 /* MathNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A2545109E2F2531AAF7450F /* MathNode.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -24,12 +20,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		55FA4DAABF7460027A845631 /* KaTeXRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = KaTeXRenderer.swift; path = SupaNotes/ML/Overlay/KaTeXRenderer.swift; sourceTree = SOURCE_ROOT; };
-		6A2545109E2F2531AAF7450F /* MathNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MathNode.swift; path = SupaNotes/ML/Overlay/MathNode.swift; sourceTree = SOURCE_ROOT; };
 		BFAF52142F41429F0038730F /* Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BFE730DE2F3CCEC200F5DD1D /* SupaNotes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SupaNotes.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		C07B443A9545C7D0E91EC2CA /* MathLayoutEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MathLayoutEngine.swift; path = SupaNotes/ML/Overlay/MathLayoutEngine.swift; sourceTree = SOURCE_ROOT; };
-		F7234F0E85DAF70E475CD486 /* katex */ = {isa = PBXFileReference; lastKnownFileType = text; name = katex; path = SupaNotes/ML/Overlay/katex; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -78,10 +70,6 @@
 				BFE730E02F3CCEC200F5DD1D /* SupaNotes */,
 				BFAF52152F41429F0038730F /* Tests */,
 				BFE730DF2F3CCEC200F5DD1D /* Products */,
-				55FA4DAABF7460027A845631 /* KaTeXRenderer.swift */,
-				F7234F0E85DAF70E475CD486 /* katex */,
-				6A2545109E2F2531AAF7450F /* MathNode.swift */,
-				C07B443A9545C7D0E91EC2CA /* MathLayoutEngine.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -197,7 +185,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2E0F478DADEFB0AFF1E4464F /* katex in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -215,9 +202,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				4E8F4A7EB3F3C9D0B8007685 /* KaTeXRenderer.swift in Sources */,
-				EC5B42A1A56504430D3B76D7 /* MathNode.swift in Sources */,
-				74724A8DA9A4989DC894025F /* MathLayoutEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

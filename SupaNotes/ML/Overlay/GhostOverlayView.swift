@@ -3,43 +3,42 @@ import UIKit
 
 struct GhostOverlayView: View {
     let tokens: [OverlayToken]
-    let characters: [OverlayCharacter]
-    let renderedImage: UIImage?
-    let renderSize: CGSize
+    let latexImages: [UUID: UIImage]
 
     var body: some View {
         if !tokens.isEmpty {
             VStack {
                 Spacer()
-                overlayContent
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(.ultraThinMaterial)
-                    .cornerRadius(12)
-                    .opacity(0.7)
-                    .padding(.bottom, 100)
+                HStack(alignment: .center, spacing: 4) {
+                    ForEach(tokens) { token in
+                        switch token.type {
+                        case .word:
+                            Text(token.value)
+                                .font(.custom("HelveticaNeue", size: 28))
+                                .foregroundStyle(.primary)
+                        case .latex:
+                            if let img = latexImages[token.id] {
+                                Image(uiImage: img)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(height: 36)
+                            } else {
+                                Text(token.value)
+                                    .font(.system(size: 20, design: .serif))
+                                    .italic()
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial)
+                .cornerRadius(12)
+                .opacity(0.7)
+                .padding(.bottom, 100)
             }
             .allowsHitTesting(false)
             .transition(.opacity.combined(with: .move(edge: .bottom)))
-        }
-    }
-
-    @ViewBuilder
-    private var overlayContent: some View {
-        if let renderedImage {
-            // Debug boxes are baked into the image by JS
-            Image(uiImage: renderedImage)
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: 500, maxHeight: 300)
-        } else {
-            HStack(spacing: 4) {
-                ForEach(tokens) { token in
-                    Text(token.value)
-                        .font(.system(size: 20, weight: .regular, design: token.type == .latex ? .serif : .default))
-                        .italic(token.type == .latex)
-                }
-            }
         }
     }
 }
