@@ -11,7 +11,7 @@ Two modes:
 Usage:
   python run_benchmark.py --model qwen3.5:4b
   python run_benchmark.py --model gemma4:4b --mode text
-  python run_benchmark.py --model qwen3.5:4b --host 100.121.248.31
+  python run_benchmark.py --model qwen3.5:4b --host <tailscale-ip>
 """
 
 import argparse
@@ -23,7 +23,7 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 
 SCRIPT_DIR = Path(__file__).parent
-DEFAULT_HOST = "100.121.248.31"
+DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 11434
 
 SUGGEST_PROMPT = """\

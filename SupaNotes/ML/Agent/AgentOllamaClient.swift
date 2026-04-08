@@ -2,9 +2,9 @@ import UIKit
 
 @Observable
 final class AgentOllamaClient {
-    private let host = "100.121.248.31"
+    private let host = ProcessInfo.processInfo.environment["OLLAMA_HOST"] ?? "localhost"
     private let port = 11434
-    private let model = "gemma4:e4b-it-q8_0"
+    private let model = "gemma4:26b"
 
     /// Suggest what comes next in the user's handwritten notes.
     func suggest(image: UIImage) async throws -> String {
@@ -16,7 +16,7 @@ final class AgentOllamaClient {
         let prompt = """
         You autocomplete handwritten notes. Rules:
         1. Max 8 words or one short expression
-        2. Wrap ALL math/symbols/numbers in [latex]...[/latex] tags
+        2. Only wrap math/symbols/numbers in [latex]...[/latex] tags
         3. NEVER use $ signs for math
         4. Output ONLY the suggestion, nothing else
 
@@ -29,7 +29,10 @@ final class AgentOllamaClient {
         - "3+3" → [latex]= 6[/latex]
         - "3+3=" → [latex]6[/latex]
 
-        What comes next in these notes?
+
+        When given matrix arithmetic, answers should be in the form of a matrix in latex.
+
+        What comes next in these notes? If what is seen is a complete thought, suggest None.
         """
 
         return try await chat(prompt: prompt, imageBase64: base64)
@@ -46,8 +49,8 @@ final class AgentOllamaClient {
                 "images": [imageBase64]
             ]],
             "stream": false,
-            "think": false,
-            "options": ["temperature": 0, "top_p": 0.9, "top_k": 20]
+            "think": true,
+            "options": ["temperature": 1.0, "top_p": 0.95, "top_k": 64]
         ]
 
         var request = URLRequest(url: URL(string: "http://\(host):\(port)/api/chat")!)
