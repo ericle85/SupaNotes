@@ -14,8 +14,8 @@ struct GhostOverlayView: View {
                         switch token.type {
                         case .word:
                             Text(token.value)
-                                .font(.custom("HelveticaNeue", size: 28))
-                                .foregroundStyle(.primary)
+                                .font(.system(size: 28, design: .serif))
+                                .foregroundColor(Color(.darkGray))
                         case .latex:
                             if let img = latexImages[token.id] {
                                 Image(uiImage: img)

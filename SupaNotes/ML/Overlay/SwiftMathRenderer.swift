@@ -48,10 +48,8 @@ struct SwiftMathRenderer {
         let pixelSize = CGSize(width: totalWidth * renderScale, height: totalHeight * renderScale)
         let renderer = UIGraphicsImageRenderer(size: pixelSize)
         let image = renderer.image { ctx in
-            UIColor.white.setFill()
-            ctx.fill(CGRect(origin: .zero, size: pixelSize))
-
             let cgContext = ctx.cgContext
+            cgContext.clear(CGRect(origin: .zero, size: pixelSize))
             cgContext.scaleBy(x: renderScale, y: renderScale)
 
             // CoreText draws with y-up. We want baseline at baselineY from top.
