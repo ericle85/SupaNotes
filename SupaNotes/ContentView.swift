@@ -13,12 +13,20 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showOverlayPrototype) {
                 NavigationStack {
-                    SwiftMathGalleryView()
-                        .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button("Close") { showOverlayPrototype = false }
-                            }
+                    List {
+                        NavigationLink("SwiftMath Gallery") {
+                            SwiftMathGalleryView()
                         }
+                        NavigationLink("Overlay Fade Demo") {
+                            OverlayFadeDemoView()
+                        }
+                    }
+                    .navigationTitle("Prototypes")
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Close") { showOverlayPrototype = false }
+                        }
+                    }
                 }
             }
     }
