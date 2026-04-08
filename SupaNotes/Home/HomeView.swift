@@ -34,8 +34,6 @@ struct HomeView: View {
                         SettingsView()
                     case .hwrDemo:
                         HWRDemoView()
-                    case .visionBenchmark:
-                        VisionBenchmarkView()
                     case .allNotes:
                         NoteListView(
                             folder: nil,
@@ -138,7 +136,6 @@ struct HomeView: View {
         case .trash: return "Trash"
         case .settings: return "Settings"
         case .hwrDemo: return "HWR Demo"
-        case .visionBenchmark: return "Vision Benchmark"
         case .allNotes: return "All Notes"
         case .folder(let folder): return folder.name
         }

@@ -2,7 +2,7 @@ import UIKit
 
 @Observable
 final class AgentOllamaClient {
-    private let host = ProcessInfo.processInfo.environment["OLLAMA_HOST"] ?? "localhost"
+    private let host = "100.121.248.31"
     private let port = 11434
     private let model = "gemma4:26b"
 
