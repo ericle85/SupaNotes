@@ -250,9 +250,6 @@ private struct FadeTrackable {
     let fadeMaskLayers: [CAShapeLayer] // empty for wordChar
     var faded: Bool = false            // for wordChar
     var fadedGlyphs: Set<Int> = []     // for latex, indices into glyphRects
-    /// Cached per-glyph target masks (pixels belonging to this glyph, excluding children)
-    var perGlyphMasks: [[Bool]] = []
-    var cachedMaskSize: (Int, Int) = (0, 0)
 }
 
 // MARK: - Coordinator
@@ -263,12 +260,8 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate {
     weak var statusLabel: UILabel?
     var trackables: [FadeTrackable] = []
 
-    private let fadeThreshold: Double = 40.0
-    private let distanceThreshold: Int = 12
-
     @objc func clearCanvas() {
         canvasView?.drawing = PKDrawing()
-        // Reset all fades
         for i in trackables.indices {
             switch trackables[i].kind {
             case .wordChar:
@@ -276,6 +269,7 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate {
                 trackables[i].faded = false
             case .latex:
                 for layer in trackables[i].fadeMaskLayers {
+                    layer.removeAllAnimations()
                     layer.opacity = 1
                 }
                 trackables[i].fadedGlyphs = []
@@ -289,7 +283,7 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate {
     func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
         guard let overlayContainer = overlayContainer else { return }
 
-        let scale = UIScreen.main.scale
+        let strokes = canvasView.drawing.strokes
         var totalGlyphs = 0
         var fadedCount = 0
 
@@ -297,37 +291,17 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate {
             let trackable = trackables[i]
             let view = trackable.view
 
-            // Get view frame in canvas coordinates
-            let frameInCanvas = overlayContainer.convert(view.frame, to: canvasView)
-            guard frameInCanvas.width > 1, frameInCanvas.height > 1 else { continue }
-
-            // Render ink in this view's region
-            let inkImage = canvasView.drawing.image(from: frameInCanvas, scale: scale)
-            guard let inkCG = inkImage.cgImage else { continue }
-
-            let w = Int(frameInCanvas.width * scale)
-            let h = Int(frameInCanvas.height * scale)
-            guard w > 0, h > 0 else { continue }
-
-            let inkMask = binarize(image: inkCG, width: w, height: h, luminanceThreshold: 128)
-
             switch trackable.kind {
             case .wordChar:
                 totalGlyphs += 1
-                if trackable.faded {
-                    fadedCount += 1
-                    continue
-                }
+                if trackable.faded { fadedCount += 1; continue }
 
-                // Render the label to get target mask
-                let targetMask = renderViewMask(view: view, width: w, height: h, scale: scale)
-                let completeness = computeCompleteness(
-                    targetMask: targetMask, inkMask: inkMask, width: w, height: h
-                )
-                if completeness >= fadeThreshold {
+                // Check if any stroke intersects this character's frame
+                let charRect = overlayContainer.convert(view.frame, to: canvasView)
+                if strokesIntersect(strokes, rect: charRect) {
                     trackables[i].faded = true
                     fadedCount += 1
-                    UIView.animate(withDuration: 0.3) {
+                    UIView.animate(withDuration: 0.2) {
                         view.alpha = 0
                     }
                 }
@@ -336,38 +310,31 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate {
                 let glyphRects = renderResult.glyphRects
                 totalGlyphs += glyphRects.count
 
-                // Build per-glyph target masks if not cached
-                if trackables[i].perGlyphMasks.isEmpty || trackables[i].cachedMaskSize != (w, h) {
-                    trackables[i].perGlyphMasks = buildPerGlyphMasks(
-                        view: view, renderResult: renderResult,
-                        width: w, height: h, scale: scale
-                    )
-                    trackables[i].cachedMaskSize = (w, h)
-                }
-
-                let perGlyphMasks = trackables[i].perGlyphMasks
+                // Get the image view's frame in canvas coords
+                let viewFrameInCanvas = overlayContainer.convert(view.frame, to: canvasView)
+                let viewSize = view.frame.size
+                guard viewSize.width > 0, viewSize.height > 0 else { continue }
 
                 for gi in 0..<glyphRects.count {
-                    if trackables[i].fadedGlyphs.contains(gi) {
-                        fadedCount += 1
-                        continue
-                    }
+                    if trackables[i].fadedGlyphs.contains(gi) { fadedCount += 1; continue }
 
-                    guard gi < perGlyphMasks.count else { continue }
-                    let glyphMask = perGlyphMasks[gi]
-
-                    let completeness = computeCompleteness(
-                        targetMask: glyphMask, inkMask: inkMask, width: w, height: h
+                    // Convert glyph rect (render coords) to canvas coords
+                    let gr = glyphRects[gi].rect
+                    let canvasRect = CGRect(
+                        x: viewFrameInCanvas.origin.x + gr.origin.x * (viewFrameInCanvas.width / viewSize.width),
+                        y: viewFrameInCanvas.origin.y + gr.origin.y * (viewFrameInCanvas.height / viewSize.height),
+                        width: gr.width * (viewFrameInCanvas.width / viewSize.width),
+                        height: gr.height * (viewFrameInCanvas.height / viewSize.height)
                     )
 
-                    if completeness >= fadeThreshold {
+                    if strokesIntersect(strokes, rect: canvasRect) {
                         trackables[i].fadedGlyphs.insert(gi)
                         fadedCount += 1
                         let layer = trackables[i].fadeMaskLayers[gi]
                         let anim = CABasicAnimation(keyPath: "opacity")
                         anim.fromValue = 1.0
                         anim.toValue = 0.0
-                        anim.duration = 0.3
+                        anim.duration = 0.2
                         anim.fillMode = .forwards
                         anim.isRemovedOnCompletion = false
                         layer.add(anim, forKey: "fade")
@@ -381,180 +348,22 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate {
         statusLabel?.text = "Faded: \(fadedCount)/\(totalGlyphs) glyphs (\(pct)%)"
     }
 
-    // MARK: - Pixel Helpers
-
-    private func binarize(image: CGImage, width w: Int, height h: Int, luminanceThreshold: Int) -> [Bool] {
-        let pixelCount = w * h
-        var pixels = [UInt8](repeating: 0, count: pixelCount * 4)
-
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
-
-        guard let ctx = CGContext(
-            data: &pixels, width: w, height: h,
-            bitsPerComponent: 8, bytesPerRow: w * 4,
-            space: colorSpace, bitmapInfo: bitmapInfo
-        ) else {
-            return [Bool](repeating: false, count: pixelCount)
-        }
-
-        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
-
-        var mask = [Bool](repeating: false, count: pixelCount)
-        for i in 0..<pixelCount {
-            let base = i * 4
-            let alpha = pixels[base + 3]
-            guard alpha > 10 else { continue }
-            let r = Int(pixels[base])
-            let g = Int(pixels[base + 1])
-            let b = Int(pixels[base + 2])
-            let lum = (r + g + b) / 3
-            mask[i] = lum < luminanceThreshold
-        }
-        return mask
-    }
-
-    private func renderViewMask(view: UIView, width w: Int, height h: Int, scale: CGFloat) -> [Bool] {
-        let size = view.bounds.size
-        guard size.width > 0, size.height > 0 else {
-            return [Bool](repeating: false, count: w * h)
-        }
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = scale
-        let renderer = UIGraphicsImageRenderer(size: size, format: format)
-        let image = renderer.image { ctx in
-            view.layer.render(in: ctx.cgContext)
-        }
-        guard let cg = image.cgImage else {
-            return [Bool](repeating: false, count: w * h)
-        }
-        return binarize(image: cg, width: w, height: h, luminanceThreshold: 200)
-    }
-
-    /// Completeness for a single word character (whole view region)
-    private func computeCompleteness(
-        targetMask: [Bool], inkMask: [Bool], width w: Int, height h: Int
-    ) -> Double {
-        var targetCount = 0
-        var coveredCount = 0
-        let threshold = distanceThreshold
-
-        // Build covered set from ink
-        var coveredSet = [Bool](repeating: false, count: w * h)
-
-        for i in 0..<(w * h) {
-            guard inkMask[i] else { continue }
-            let ix = i % w
-            let iy = i / w
-            let minX = max(0, ix - threshold)
-            let maxX = min(w - 1, ix + threshold)
-            let minY = max(0, iy - threshold)
-            let maxY = min(h - 1, iy + threshold)
-            for sy in minY...maxY {
-                for sx in minX...maxX {
-                    let sIdx = sy * w + sx
-                    if targetMask[sIdx] && !coveredSet[sIdx] {
-                        coveredSet[sIdx] = true
+    /// Check if any stroke's bounding box intersects the given rect
+    private func strokesIntersect(_ strokes: [PKStroke], rect: CGRect) -> Bool {
+        // Expand rect slightly for tolerance
+        let expanded = rect.insetBy(dx: -4, dy: -4)
+        for stroke in strokes {
+            if stroke.renderBounds.intersects(expanded) {
+                // Fine check: see if any control point is inside
+                let path = stroke.path
+                for j in 0..<path.count {
+                    if expanded.contains(path[j].location) {
+                        return true
                     }
                 }
             }
         }
-
-        for i in 0..<(w * h) {
-            if targetMask[i] {
-                targetCount += 1
-                if coveredSet[i] { coveredCount += 1 }
-            }
-        }
-
-        return targetCount > 0 ? Double(coveredCount) / Double(targetCount) * 100 : 0
-    }
-
-    /// Build per-glyph target masks from the rendered LaTeX image.
-    /// Each mask contains only the pixels belonging to that glyph's rect,
-    /// excluding pixels that fall within any strictly-smaller child glyph rect.
-    /// This way container symbols (√, ∑, ∫) only track their own drawn pixels.
-    private func buildPerGlyphMasks(
-        view: UIView, renderResult: SwiftMathRenderResult,
-        width w: Int, height h: Int, scale: CGFloat
-    ) -> [[Bool]] {
-        // Render the full latex image view to get the target pixel mask
-        let fullMask = renderViewMask(view: view, width: w, height: h, scale: scale)
-
-        let viewSize = view.frame.size
-        guard viewSize.width > 0, viewSize.height > 0 else {
-            return Array(repeating: [Bool](repeating: false, count: w * h), count: renderResult.glyphRects.count)
-        }
-
-        let scaleX = CGFloat(w) / viewSize.width
-        let scaleY = CGFloat(h) / viewSize.height
-
-        // Convert all glyph rects to pixel coords
-        let pixelRects = renderResult.glyphRects.map { glyph -> CGRect in
-            CGRect(
-                x: glyph.rect.origin.x * scaleX,
-                y: glyph.rect.origin.y * scaleY,
-                width: glyph.rect.width * scaleX,
-                height: glyph.rect.height * scaleY
-            )
-        }
-
-        // For each glyph, find child rects (strictly smaller rects contained within it)
-        var childRectIndices: [[Int]] = Array(repeating: [], count: pixelRects.count)
-        for gi in 0..<pixelRects.count {
-            let parentRect = pixelRects[gi]
-            for ci in 0..<pixelRects.count {
-                guard ci != gi else { continue }
-                let childRect = pixelRects[ci]
-                // A child is strictly smaller and contained within the parent
-                let childArea = childRect.width * childRect.height
-                let parentArea = parentRect.width * parentRect.height
-                if parentRect.contains(childRect) && childArea < parentArea * 0.95 {
-                    childRectIndices[gi].append(ci)
-                }
-            }
-        }
-
-        // Build per-glyph masks
-        var masks: [[Bool]] = []
-        for gi in 0..<pixelRects.count {
-            let rect = pixelRects[gi]
-            let rMinX = max(0, Int(rect.minX))
-            let rMaxX = min(w - 1, Int(rect.maxX))
-            let rMinY = max(0, Int(rect.minY))
-            let rMaxY = min(h - 1, Int(rect.maxY))
-
-            var mask = [Bool](repeating: false, count: w * h)
-
-            guard rMaxX > rMinX, rMaxY > rMinY else {
-                masks.append(mask)
-                continue
-            }
-
-            for y in rMinY...rMaxY {
-                for x in rMinX...rMaxX {
-                    let idx = y * w + x
-                    guard fullMask[idx] else { continue }
-
-                    // Exclude pixels inside child rects
-                    let pt = CGPoint(x: CGFloat(x), y: CGFloat(y))
-                    var inChild = false
-                    for ci in childRectIndices[gi] {
-                        if pixelRects[ci].contains(pt) {
-                            inChild = true
-                            break
-                        }
-                    }
-                    if !inChild {
-                        mask[idx] = true
-                    }
-                }
-            }
-
-            masks.append(mask)
-        }
-
-        return masks
+        return false
     }
 }
 
