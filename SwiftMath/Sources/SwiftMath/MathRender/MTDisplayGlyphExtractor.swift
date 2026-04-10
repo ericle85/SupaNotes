@@ -129,6 +129,13 @@ public func extractGlyphRects(from display: MTDisplay, offset: CGPoint = .zero) 
         if let inner = lineDisplay.inner {
             rects.append(contentsOf: extractGlyphRects(from: inner, offset: parentOffset))
         }
+        // Add the over/underline itself as a rect
+        if lineDisplay.lineThickness > 0 {
+            let lineY = pos.y + lineDisplay.lineShiftUp
+            let lineRect = CGRect(x: pos.x, y: lineY - lineDisplay.lineThickness / 2,
+                                  width: lineDisplay.width, height: lineDisplay.lineThickness)
+            rects.append(GlyphRect(character: "—", rect: lineRect))
+        }
         return rects
 
     default:
