@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		BF1C374E2F8967D800BFF04E /* SwiftMath in Frameworks */ = {isa = PBXBuildFile; productRef = BF0000012F42000000000002 /* SwiftMath */; };
+		BF1C38382F89696E00BFF04E /* latinmodern-math.otf in Resources */ = {isa = PBXBuildFile; fileRef = BF1C38362F89696E00BFF04E /* latinmodern-math.otf */; };
+		BF1C38392F89696E00BFF04E /* cmunbx.otf in Resources */ = {isa = PBXBuildFile; fileRef = BF1C38332F89696E00BFF04E /* cmunbx.otf */; };
+		BF1C383A2F89696E00BFF04E /* cmunti.otf in Resources */ = {isa = PBXBuildFile; fileRef = BF1C38352F89696E00BFF04E /* cmunti.otf */; };
+		BF1C383B2F89696E00BFF04E /* cmunrm.otf in Resources */ = {isa = PBXBuildFile; fileRef = BF1C38342F89696E00BFF04E /* cmunrm.otf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -20,19 +25,23 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		BF1C38332F89696E00BFF04E /* cmunbx.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = cmunbx.otf; sourceTree = "<group>"; };
+		BF1C38342F89696E00BFF04E /* cmunrm.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = cmunrm.otf; sourceTree = "<group>"; };
+		BF1C38352F89696E00BFF04E /* cmunti.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = cmunti.otf; sourceTree = "<group>"; };
+		BF1C38362F89696E00BFF04E /* latinmodern-math.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "latinmodern-math.otf"; sourceTree = "<group>"; };
 		BFAF52142F41429F0038730F /* Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BFE730DE2F3CCEC200F5DD1D /* SupaNotes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SupaNotes.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		BF2FA6E72F73B1950033927D = {
+		BF2FA6E72F73B1950033927D /* Exceptions for "Tests" folder in "Tests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
 			target = BFAF52132F41429F0038730F /* Tests */;
 		};
-		BFE730F12F3CCEC200F5DD1D = {
+		BFE730F12F3CCEC200F5DD1D /* Exceptions for "SupaNotes" folder in "SupaNotes" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -42,8 +51,22 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		BFAF52152F41429F0038730F /* Tests */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (BF2FA6E72F73B1950033927D, ); path = Tests; sourceTree = "<group>"; };
-		BFE730E02F3CCEC200F5DD1D /* SupaNotes */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (BFE730F12F3CCEC200F5DD1D, ); path = SupaNotes; sourceTree = "<group>"; };
+		BFAF52152F41429F0038730F /* Tests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				BF2FA6E72F73B1950033927D /* Exceptions for "Tests" folder in "Tests" target */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		BFE730E02F3CCEC200F5DD1D /* SupaNotes */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				BFE730F12F3CCEC200F5DD1D /* Exceptions for "SupaNotes" folder in "SupaNotes" target */,
+			);
+			path = SupaNotes;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -58,15 +81,28 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BF1C374E2F8967D800BFF04E /* SwiftMath in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		BF1C38372F89696E00BFF04E /* fonts */ = {
+			isa = PBXGroup;
+			children = (
+				BF1C38332F89696E00BFF04E /* cmunbx.otf */,
+				BF1C38342F89696E00BFF04E /* cmunrm.otf */,
+				BF1C38352F89696E00BFF04E /* cmunti.otf */,
+				BF1C38362F89696E00BFF04E /* latinmodern-math.otf */,
+			);
+			path = fonts;
+			sourceTree = "<group>";
+		};
 		BFE730D52F3CCEC200F5DD1D = {
 			isa = PBXGroup;
 			children = (
+				BF1C38372F89696E00BFF04E /* fonts */,
 				BFE730E02F3CCEC200F5DD1D /* SupaNotes */,
 				BFAF52152F41429F0038730F /* Tests */,
 				BFE730DF2F3CCEC200F5DD1D /* Products */,
@@ -160,7 +196,7 @@
 			mainGroup = BFE730D52F3CCEC200F5DD1D;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				BF0000012F42000000000001 /* XCRemoteSwiftPackageReference "SwiftMath" */,
+				BF0000012F42000000000001 /* XCLocalSwiftPackageReference "SwiftMath" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BFE730DF2F3CCEC200F5DD1D /* Products */;
@@ -185,6 +221,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BF1C38382F89696E00BFF04E /* latinmodern-math.otf in Resources */,
+				BF1C38392F89696E00BFF04E /* cmunbx.otf in Resources */,
+				BF1C383A2F89696E00BFF04E /* cmunti.otf in Resources */,
+				BF1C383B2F89696E00BFF04E /* cmunrm.otf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -505,7 +545,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		BF0000012F42000000000002 /* SwiftMath */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = BF0000012F42000000000001 /* XCRemoteSwiftPackageReference "SwiftMath" */;
+			package = BF0000012F42000000000001 /* XCLocalSwiftPackageReference "SwiftMath" */;
 			productName = SwiftMath;
 		};
 /* End XCSwiftPackageProductDependency section */

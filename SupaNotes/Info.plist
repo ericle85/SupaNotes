@@ -42,10 +42,10 @@
 	</array>
 	<key>UIAppFonts</key>
 	<array>
-		<string>fonts/cmunrm.otf</string>
-		<string>fonts/cmunti.otf</string>
-		<string>fonts/cmunbx.otf</string>
-		<string>fonts/latinmodern-math.otf</string>
+		<string>cmunrm.otf</string>
+		<string>cmunti.otf</string>
+		<string>cmunbx.otf</string>
+		<string>latinmodern-math.otf</string>
 	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
