@@ -67,6 +67,14 @@ struct FolderSidebarView: View {
                 destination = .hwrDemo
             }
 
+            sidebarButton(
+                icon: "flask",
+                label: "Prototypes",
+                isSelected: destination.isPrototype
+            ) {
+                destination = .prototype
+            }
+
         }
         .padding(.vertical, 8)
         .background(Color("SidebarBackground"))

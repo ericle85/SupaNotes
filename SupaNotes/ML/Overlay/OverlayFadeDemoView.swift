@@ -61,12 +61,24 @@ private struct FadeCanvasView: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
         let container = UIView()
         container.backgroundColor = .systemBackground
+        container.clipsToBounds = true
+
+        // Zoomable wrapper — contains overlay + canvas, scaled together
+        let zoomWrapper = UIView()
+        zoomWrapper.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(zoomWrapper)
+        NSLayoutConstraint.activate([
+            zoomWrapper.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            zoomWrapper.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            zoomWrapper.topAnchor.constraint(equalTo: container.topAnchor),
+            zoomWrapper.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -60),
+        ])
 
         // Overlay container — holds word labels and latex image views
         let overlayContainer = UIView()
         overlayContainer.translatesAutoresizingMaskIntoConstraints = false
         overlayContainer.tag = 100
-        container.addSubview(overlayContainer)
+        zoomWrapper.addSubview(overlayContainer)
 
         // Build overlay content
         let renderer = SwiftMathRenderer()
@@ -173,8 +185,8 @@ private struct FadeCanvasView: UIViewRepresentable {
         stack.frame = CGRect(x: 0, y: 0, width: totalWidth, height: maxHeight)
 
         NSLayoutConstraint.activate([
-            overlayContainer.centerXAnchor.constraint(equalTo: container.centerXAnchor),
-            overlayContainer.centerYAnchor.constraint(equalTo: container.centerYAnchor, constant: -40),
+            overlayContainer.centerXAnchor.constraint(equalTo: zoomWrapper.centerXAnchor),
+            overlayContainer.centerYAnchor.constraint(equalTo: zoomWrapper.centerYAnchor, constant: -40),
             overlayContainer.widthAnchor.constraint(equalToConstant: totalWidth),
             overlayContainer.heightAnchor.constraint(equalToConstant: maxHeight),
             stack.leadingAnchor.constraint(equalTo: overlayContainer.leadingAnchor),
@@ -187,17 +199,17 @@ private struct FadeCanvasView: UIViewRepresentable {
         let canvas = PKCanvasView()
         canvas.backgroundColor = .clear
         canvas.isOpaque = false
-        canvas.drawingPolicy = .anyInput
+        canvas.drawingPolicy = .pencilOnly // .anyInput .pencilOnly
         canvas.tool = PKInkingTool(.pen, color: .black, width: 3)
         canvas.delegate = context.coordinator
         canvas.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(canvas)
+        zoomWrapper.addSubview(canvas)
 
         NSLayoutConstraint.activate([
-            canvas.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            canvas.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            canvas.topAnchor.constraint(equalTo: container.topAnchor),
-            canvas.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -60),
+            canvas.leadingAnchor.constraint(equalTo: zoomWrapper.leadingAnchor),
+            canvas.trailingAnchor.constraint(equalTo: zoomWrapper.trailingAnchor),
+            canvas.topAnchor.constraint(equalTo: zoomWrapper.topAnchor),
+            canvas.bottomAnchor.constraint(equalTo: zoomWrapper.bottomAnchor),
         ])
 
         // Status label
@@ -229,6 +241,18 @@ private struct FadeCanvasView: UIViewRepresentable {
         context.coordinator.overlayContainer = overlayContainer
         context.coordinator.trackables = trackables
         context.coordinator.statusLabel = statusLabel
+        context.coordinator.zoomWrapper = zoomWrapper
+
+        // Pinch to zoom
+        let pinch = UIPinchGestureRecognizer(target: context.coordinator, action: #selector(FadeCoordinator.handlePinch(_:)))
+        pinch.delegate = context.coordinator
+        canvas.addGestureRecognizer(pinch)
+
+        // Two-finger pan
+        let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(FadeCoordinator.handlePan(_:)))
+        pan.minimumNumberOfTouches = 2
+        pan.delegate = context.coordinator
+        canvas.addGestureRecognizer(pan)
 
         return container
     }
@@ -254,14 +278,68 @@ private struct FadeTrackable {
 
 // MARK: - Coordinator
 
-private final class FadeCoordinator: NSObject, PKCanvasViewDelegate {
+private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRecognizerDelegate {
     weak var canvasView: PKCanvasView?
     weak var overlayContainer: UIView?
     weak var statusLabel: UILabel?
+    weak var zoomWrapper: UIView?
     var trackables: [FadeTrackable] = []
+
+    private var currentScale: CGFloat = 1.0
+    private var scaleAtGestureStart: CGFloat = 1.0
+    private var currentTranslation: CGPoint = .zero
+    private var translationAtGestureStart: CGPoint = .zero
+
+    // MARK: - Zoom / Pan
+
+    @objc func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+        guard let wrapper = zoomWrapper else { return }
+        switch gesture.state {
+        case .began:
+            scaleAtGestureStart = currentScale
+        case .changed, .ended:
+            let newScale = (scaleAtGestureStart * gesture.scale).clamped(to: 0.25...5.0)
+            currentScale = newScale
+            applyTransform(to: wrapper)
+        default: break
+        }
+    }
+
+    @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
+        guard let wrapper = zoomWrapper else { return }
+        switch gesture.state {
+        case .began:
+            translationAtGestureStart = currentTranslation
+        case .changed, .ended:
+            let delta = gesture.translation(in: wrapper.superview)
+            currentTranslation = CGPoint(
+                x: translationAtGestureStart.x + delta.x,
+                y: translationAtGestureStart.y + delta.y
+            )
+            applyTransform(to: wrapper)
+        default: break
+        }
+    }
+
+    private func applyTransform(to view: UIView) {
+        view.transform = CGAffineTransform(translationX: currentTranslation.x, y: currentTranslation.y)
+            .scaledBy(x: currentScale, y: currentScale)
+    }
+
+    // Allow pinch/pan to fire alongside PKCanvasView's recognizers
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        return true
+    }
 
     @objc func clearCanvas() {
         canvasView?.drawing = PKDrawing()
+        // Reset zoom/pan
+        currentScale = 1.0
+        currentTranslation = .zero
+        if let wrapper = zoomWrapper {
+            UIView.animate(withDuration: 0.3) { self.applyTransform(to: wrapper) }
+        }
         for i in trackables.indices {
             switch trackables[i].kind {
             case .wordChar:
@@ -301,7 +379,7 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate {
                 if strokesIntersect(strokes, rect: charRect) {
                     trackables[i].faded = true
                     fadedCount += 1
-                    UIView.animate(withDuration: 0.2) {
+                    UIView.animate(withDuration: 0.65) {
                         view.alpha = 0
                     }
                 }
@@ -364,6 +442,14 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate {
             }
         }
         return false
+    }
+}
+
+// MARK: - Helpers
+
+private extension Comparable {
+    func clamped(to range: ClosedRange<Self>) -> Self {
+        min(max(self, range.lowerBound), range.upperBound)
     }
 }
 
