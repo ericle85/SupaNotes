@@ -58,19 +58,19 @@ final class GlyphExtractorTests: XCTestCase {
 
     func testSimpleAddition() {
         let rects = glyphRects(for: "a+b")
-        XCTAssertGreaterThanOrEqual(rects.count, 3, "a+b should have at least 3 glyphs")
+        XCTAssertEqual(rects.count, 3, "a+b should have at least 3 glyphs")
     }
 
     func testEquation() {
         let rects = glyphRects(for: "x=5")
-        XCTAssertGreaterThanOrEqual(rects.count, 3)
+        XCTAssertEqual(rects.count, 3)
     }
 
     // MARK: - Superscripts and subscripts
 
     func testSuperscript() {
         let rects = glyphRects(for: "x^2")
-        XCTAssertGreaterThanOrEqual(rects.count, 2, "x^2 should have at least x and 2")
+        XCTAssertEqual(rects.count, 2, "x^2 should have at least x and 2")
         // Find x and 2 rects
         let baseRects = rects.filter { $0.character.contains("𝑥") || $0.character.contains("x") }
         let supRects = rects.filter { $0.character == "2" }
@@ -83,12 +83,12 @@ final class GlyphExtractorTests: XCTestCase {
 
     func testSubscript() {
         let rects = glyphRects(for: "a_1")
-        XCTAssertGreaterThanOrEqual(rects.count, 2, "a_1 should have at least a and 1")
+        XCTAssertEqual(rects.count, 2, "a_1 should have at least a and 1")
     }
 
     func testBothScripts() {
         let rects = glyphRects(for: "x_1^2")
-        XCTAssertGreaterThanOrEqual(rects.count, 3, "x_1^2 should have at least 3 glyphs")
+        XCTAssertEqual(rects.count, 3, "x_1^2 should have at least 3 glyphs")
     }
 
     // MARK: - Fractions
@@ -96,7 +96,7 @@ final class GlyphExtractorTests: XCTestCase {
     func testSimpleFraction() {
         let rects = glyphRects(for: "\\frac{a}{b}")
         // a, b, and the fraction line
-        XCTAssertGreaterThanOrEqual(rects.count, 3, "Fraction should have numerator, denominator, and line")
+        XCTAssertEqual(rects.count, 3, "Fraction should have numerator, denominator, and line")
         // Check fraction line exists
         let lines = rects.filter { $0.character == "—" }
         XCTAssertEqual(lines.count, 1, "Should have exactly one fraction line")
@@ -105,7 +105,7 @@ final class GlyphExtractorTests: XCTestCase {
     func testNestedFraction() {
         let rects = glyphRects(for: "\\frac{\\frac{a}{b}}{c}")
         // Inner fraction: a, b, line. Outer: inner + c + line
-        XCTAssertGreaterThanOrEqual(rects.count, 5, "Nested fraction should have at least 5 elements")
+        XCTAssertEqual(rects.count, 5, "Nested fraction should have at least 5 elements")
     }
 
     func testFractionNumeratorAboveDenominator() {
@@ -123,7 +123,7 @@ final class GlyphExtractorTests: XCTestCase {
 
     func testSquareRoot() {
         let rects = glyphRects(for: "\\sqrt{x}")
-        XCTAssertGreaterThanOrEqual(rects.count, 2, "√x should have radical background + x")
+        XCTAssertEqual(rects.count, 2, "√x should have radical background + x")
         // First rect should be the radical background (√)
         let radicals = rects.filter { $0.character == "√" }
         XCTAssertEqual(radicals.count, 1, "Should have exactly one radical background rect")
@@ -144,14 +144,14 @@ final class GlyphExtractorTests: XCTestCase {
 
     func testSquareRootWithDegree() {
         let rects = glyphRects(for: "\\sqrt[3]{x}")
-        XCTAssertGreaterThanOrEqual(rects.count, 3, "³√x should have radical + 3 + x")
+        XCTAssertEqual(rects.count, 3, "³√x should have radical + 3 + x")
     }
 
     // MARK: - Greek letters
 
     func testGreekLetters() {
-        let rects = glyphRects(for: "\\alpha+\\beta")
-        XCTAssertGreaterThanOrEqual(rects.count, 3, "α+β should have at least 3 glyphs")
+        let rects: [GlyphRect] = glyphRects(for: "\\alpha+\\beta")
+        XCTAssertEqual(rects.count, 3, "α+β should have at least 3 glyphs")
         XCTAssertTrue(rects.allSatisfy { $0.rect.width > 0 && $0.rect.height > 0 })
     }
 
@@ -165,69 +165,69 @@ final class GlyphExtractorTests: XCTestCase {
 
     func testIntegral() {
         let rects = glyphRects(for: "\\int_a^b f(x) dx")
-        XCTAssertGreaterThanOrEqual(rects.count, 5, "Integral expression should have many glyphs")
+        XCTAssertEqual(rects.count, 9, "Integral expression should have 9 glyphs")
     }
 
     func testProduct() {
         let rects = glyphRects(for: "\\prod_{i=1}^{n} x_i")
-        XCTAssertGreaterThanOrEqual(rects.count, 5)
+        XCTAssertEqual(rects.count, 7, "Product expression should have 7 glyphs")
     }
 
     // MARK: - Delimiters
 
     func testParentheses() {
         let rects = glyphRects(for: "\\left(x\\right)")
-        XCTAssertGreaterThanOrEqual(rects.count, 3, "(x) should have parens + x")
+        XCTAssertEqual(rects.count, 3, "(x) should have parens + x")
     }
 
     func testBrackets() {
         let rects = glyphRects(for: "\\left[a+b\\right]")
-        XCTAssertGreaterThanOrEqual(rects.count, 4)
+        XCTAssertEqual(rects.count, 5, "[a+b] should have brackets + a + b + plus")
     }
 
     // MARK: - Matrices
 
     func testSimpleMatrix() {
         let rects = glyphRects(for: "\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}")
-        XCTAssertGreaterThanOrEqual(rects.count, 4, "2x2 matrix should have at least 4 element glyphs")
+        XCTAssertEqual(rects.count, 6, "2x2 matrix should have 4 entries +  2 parens")
     }
 
     // MARK: - Accents
 
     func testHatAccent() {
         let rects = glyphRects(for: "\\hat{x}")
-        XCTAssertGreaterThanOrEqual(rects.count, 2, "x̂ should have x and accent")
+        XCTAssertEqual(rects.count, 2, "x̂ should have x and accent")
     }
 
     func testVectorAccent() {
         let rects = glyphRects(for: "\\vec{v}")
-        XCTAssertGreaterThanOrEqual(rects.count, 2, "v⃗ should have v and accent")
+        XCTAssertEqual(rects.count, 2, "v⃗ should have v and accent")
     }
 
     func testBarAccent() {
         let rects = glyphRects(for: "\\bar{x}")
-        XCTAssertGreaterThanOrEqual(rects.count, 2)
+        XCTAssertEqual(rects.count, 2)
     }
 
     // MARK: - Overline / underline
 
     func testOverline() {
         let rects = glyphRects(for: "\\overline{AB}")
-        XCTAssertGreaterThanOrEqual(rects.count, 2, "Overline should have A, B and possibly line")
+        XCTAssertEqual(rects.count, 3, "Overline should have A, B and possibly line")
     }
 
     // MARK: - Complex expressions
 
     func testEulersIdentity() {
         let rects = glyphRects(for: "e^{i\\pi}+1=0")
-        XCTAssertGreaterThanOrEqual(rects.count, 6)
+        XCTAssertEqual(rects.count, 7, "Euler's identity should have 7 glyphs")
         XCTAssertTrue(rects.allSatisfy { $0.rect.width > 0 && $0.rect.height > 0 },
                       "All glyphs should have positive dimensions")
     }
 
     func testQuadraticFormula() {
         let rects = glyphRects(for: "x=\\frac{-b\\pm\\sqrt{b^2-4ac}}{2a}")
-        XCTAssertGreaterThanOrEqual(rects.count, 10, "Quadratic formula should have many glyphs")
+        XCTAssertEqual(rects.count, 15)
         // Should have both fraction line and radical
         let fractionLines = rects.filter { $0.character == "—" }
         let radicals = rects.filter { $0.character == "√" }
@@ -237,12 +237,12 @@ final class GlyphExtractorTests: XCTestCase {
 
     func testLimitExpression() {
         let rects = glyphRects(for: "\\lim_{x \\to 0} \\frac{\\sin x}{x}")
-        XCTAssertGreaterThanOrEqual(rects.count, 5)
+        XCTAssertEqual(rects.count, 12, "Limit expression should have at least 8 glyphs")
     }
 
     func testTrigExpression() {
         let rects = glyphRects(for: "\\sin^2\\theta + \\cos^2\\theta = 1")
-        XCTAssertGreaterThanOrEqual(rects.count, 8)
+        XCTAssertEqual(rects.count, 13, "Trigonometric identity should have 13 glyphs")
     }
 
     // MARK: - No overlap of sibling rects
