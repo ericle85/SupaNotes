@@ -28,6 +28,9 @@ struct OverlayFadeDemoView: View {
             (.latex, "\\frac{d}{dx}"),
             (.word, " is the derivative"),
         ]),
+        ("matrix", [
+            (.latex, "\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}"),
+        ]),
     ]
 
     var body: some View {
@@ -283,6 +286,7 @@ private struct ElementRegion {
     let trackableIndex: Int
     let glyphIndex: Int?   // nil for wordChar
     let groupID: Int
+    let isLatex: Bool
     let pixelBounds: CGRect
     var targetPixelCount: Int = 0
     var isFaded: Bool = false
@@ -365,7 +369,8 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
     private var isProcessing = false
 
     private let fadeThreshold: Double = 65.0
-    private let cascadeThreshold: Double = 0.6  // fade remaining group when 60% faded
+    private let wordCascadeThreshold: Double = 0.6
+    private let latexCascadeThreshold: Double = 0.8
     private let distanceThreshold: Int = 7
 
     // MARK: - Zoom / Pan
@@ -540,17 +545,19 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
                     self.fadeElement(at: ei)
                 }
 
-                // Cascade: if ≥60% of a group is faded, fade the rest
-                let cascadeThresh = self.cascadeThreshold
-                var groupCounts: [Int: (total: Int, faded: Int)] = [:]
+                // Cascade: fade remaining group when threshold met (60% words, 80% latex)
+                var groupCounts: [Int: (total: Int, faded: Int, isLatex: Bool)] = [:]
                 for region in self.elementRegions {
-                    let entry = groupCounts[region.groupID, default: (0, 0)]
-                    groupCounts[region.groupID] = (entry.total + 1, entry.faded + (region.isFaded ? 1 : 0))
+                    // Skip zero-pixel elements (spaces) from cascade ratio
+                    guard region.targetPixelCount > 0 || region.isFaded else { continue }
+                    let entry = groupCounts[region.groupID, default: (0, 0, region.isLatex)]
+                    groupCounts[region.groupID] = (entry.total + 1, entry.faded + (region.isFaded ? 1 : 0), entry.isLatex)
                 }
-                for (groupID, counts) in groupCounts {
-                    guard counts.total > 0,
-                          Double(counts.faded) / Double(counts.total) >= cascadeThresh,
-                          counts.faded < counts.total else { continue }
+                for (groupID, info) in groupCounts {
+                    guard !info.isLatex,
+                          info.total > 0,
+                          Double(info.faded) / Double(info.total) >= self.wordCascadeThreshold,
+                          info.faded < info.total else { continue }
                     for ei in self.elementRegions.indices where self.elementRegions[ei].groupID == groupID && !self.elementRegions[ei].isFaded {
                         self.fadeElement(at: ei)
                     }
@@ -629,6 +636,7 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
                     trackableIndex: ti,
                     glyphIndex: nil,
                     groupID: trackable.groupID,
+                    isLatex: false,
                     pixelBounds: pixelBounds
                 )
                 region.targetPixelCount = countTargetPixels(
@@ -652,6 +660,7 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
                         trackableIndex: ti,
                         glyphIndex: gi,
                         groupID: trackable.groupID,
+                        isLatex: true,
                         pixelBounds: pixelBounds
                     )
                     region.targetPixelCount = countTargetPixels(
