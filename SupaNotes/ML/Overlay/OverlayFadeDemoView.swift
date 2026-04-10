@@ -86,12 +86,14 @@ private struct FadeCanvasView: UIViewRepresentable {
         let fontSize: CGFloat = 40
         let overlayColor = UIColor.gray.withAlphaComponent(0.35)
 
-        // First pass: create views and measure
+        // First pass: create views and measure, assign group IDs
         var views: [(UIView, FadeTrackable)] = []
+        var nextGroupID = 0
 
         for (type, value) in tokens {
             switch type {
             case .word:
+                // Group by word: chars in same word share a group, space increments
                 for char in value {
                     let label = UILabel()
                     label.text = String(char)
@@ -102,11 +104,14 @@ private struct FadeCanvasView: UIViewRepresentable {
                     let trackable = FadeTrackable(
                         view: label,
                         kind: .wordChar,
+                        groupID: nextGroupID,
                         glyphRects: [],
                         fadeMaskLayers: []
                     )
                     views.append((label, trackable))
+                    if char == " " { nextGroupID += 1 }
                 }
+                nextGroupID += 1
 
             case .latex:
                 guard let result = renderer.render(
@@ -140,10 +145,12 @@ private struct FadeCanvasView: UIViewRepresentable {
                 let trackable = FadeTrackable(
                     view: imageView,
                     kind: .latex(renderResult: result),
+                    groupID: nextGroupID,
                     glyphRects: result.glyphRects,
                     fadeMaskLayers: maskLayers
                 )
                 views.append((imageView, trackable))
+                nextGroupID += 1
             }
         }
 
@@ -263,6 +270,7 @@ private enum TrackableKind {
 private struct FadeTrackable {
     let view: UIView
     let kind: TrackableKind
+    let groupID: Int
     let glyphRects: [GlyphRect]
     let fadeMaskLayers: [CAShapeLayer]
     var faded: Bool = false
@@ -274,6 +282,7 @@ private struct FadeTrackable {
 private struct ElementRegion {
     let trackableIndex: Int
     let glyphIndex: Int?   // nil for wordChar
+    let groupID: Int
     let pixelBounds: CGRect
     var targetPixelCount: Int = 0
     var isFaded: Bool = false
@@ -356,6 +365,7 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
     private var isProcessing = false
 
     private let fadeThreshold: Double = 65.0
+    private let cascadeThreshold: Double = 0.6  // fade remaining group when 60% faded
     private let distanceThreshold: Int = 7
 
     // MARK: - Zoom / Pan
@@ -524,41 +534,61 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
                 guard let self else { return }
                 self.isProcessing = false
 
-                var fadedCount = self.elementRegions.filter(\.isFaded).count
-
+                // Apply individual element fades
                 for (ei, pct) in elementCoverage {
                     guard pct >= fadeThresh, !self.elementRegions[ei].isFaded else { continue }
-                    self.elementRegions[ei].isFaded = true
-                    fadedCount += 1
+                    self.fadeElement(at: ei)
+                }
 
-                    let region = self.elementRegions[ei]
-                    let ti = region.trackableIndex
-
-                    if let gi = region.glyphIndex {
-                        // Latex glyph
-                        guard !self.trackables[ti].fadedGlyphs.contains(gi) else { continue }
-                        self.trackables[ti].fadedGlyphs.insert(gi)
-                        let layer = self.trackables[ti].fadeMaskLayers[gi]
-                        let anim = CABasicAnimation(keyPath: "opacity")
-                        anim.fromValue = 1.0
-                        anim.toValue = 0.0
-                        anim.duration = 0.25
-                        anim.fillMode = .forwards
-                        anim.isRemovedOnCompletion = false
-                        layer.add(anim, forKey: "fade")
-                        layer.opacity = 0
-                    } else {
-                        // Word char
-                        guard !self.trackables[ti].faded else { continue }
-                        self.trackables[ti].faded = true
-                        UIView.animate(withDuration: 0.3) {
-                            self.trackables[ti].view.alpha = 0
-                        }
+                // Cascade: if ≥60% of a group is faded, fade the rest
+                let cascadeThresh = self.cascadeThreshold
+                var groupCounts: [Int: (total: Int, faded: Int)] = [:]
+                for region in self.elementRegions {
+                    let entry = groupCounts[region.groupID, default: (0, 0)]
+                    groupCounts[region.groupID] = (entry.total + 1, entry.faded + (region.isFaded ? 1 : 0))
+                }
+                for (groupID, counts) in groupCounts {
+                    guard counts.total > 0,
+                          Double(counts.faded) / Double(counts.total) >= cascadeThresh,
+                          counts.faded < counts.total else { continue }
+                    for ei in self.elementRegions.indices where self.elementRegions[ei].groupID == groupID && !self.elementRegions[ei].isFaded {
+                        self.fadeElement(at: ei)
                     }
                 }
 
+                let fadedCount = self.elementRegions.filter(\.isFaded).count
                 let totalElements = self.elementRegions.count
                 self.statusLabel?.text = "Faded: \(fadedCount)/\(totalElements) glyphs (\(overallPct)%)"
+            }
+        }
+    }
+
+    // MARK: - Fade Helper
+
+    private func fadeElement(at ei: Int) {
+        guard !elementRegions[ei].isFaded else { return }
+        elementRegions[ei].isFaded = true
+
+        let region = elementRegions[ei]
+        let ti = region.trackableIndex
+
+        if let gi = region.glyphIndex {
+            guard !trackables[ti].fadedGlyphs.contains(gi) else { return }
+            trackables[ti].fadedGlyphs.insert(gi)
+            let layer = trackables[ti].fadeMaskLayers[gi]
+            let anim = CABasicAnimation(keyPath: "opacity")
+            anim.fromValue = 1.0
+            anim.toValue = 0.0
+            anim.duration = 0.25
+            anim.fillMode = .forwards
+            anim.isRemovedOnCompletion = false
+            layer.add(anim, forKey: "fade")
+            layer.opacity = 0
+        } else {
+            guard !trackables[ti].faded else { return }
+            trackables[ti].faded = true
+            UIView.animate(withDuration: 0.3) {
+                self.trackables[ti].view.alpha = 0
             }
         }
     }
@@ -598,6 +628,7 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
                 var region = ElementRegion(
                     trackableIndex: ti,
                     glyphIndex: nil,
+                    groupID: trackable.groupID,
                     pixelBounds: pixelBounds
                 )
                 region.targetPixelCount = countTargetPixels(
@@ -620,6 +651,7 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
                     var region = ElementRegion(
                         trackableIndex: ti,
                         glyphIndex: gi,
+                        groupID: trackable.groupID,
                         pixelBounds: pixelBounds
                     )
                     region.targetPixelCount = countTargetPixels(
