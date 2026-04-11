@@ -228,6 +228,21 @@ private struct FadeCanvasView: UIViewRepresentable {
             statusLabel.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -20),
         ])
 
+        // Debug label
+        let debugLabel = UILabel()
+        debugLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+        debugLabel.textColor = .systemYellow
+        debugLabel.textAlignment = .center
+        debugLabel.numberOfLines = 0
+        debugLabel.text = ""
+        debugLabel.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(debugLabel)
+
+        NSLayoutConstraint.activate([
+            debugLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            debugLabel.bottomAnchor.constraint(equalTo: statusLabel.topAnchor, constant: -4),
+        ])
+
         // Clear button
         let clearBtn = UIButton(type: .system)
         clearBtn.setTitle("Clear", for: .normal)
@@ -244,6 +259,7 @@ private struct FadeCanvasView: UIViewRepresentable {
         context.coordinator.overlayContainer = overlayContainer
         context.coordinator.trackables = trackables
         context.coordinator.statusLabel = statusLabel
+        context.coordinator.debugLabel = debugLabel
         context.coordinator.zoomWrapper = zoomWrapper
 
         // Pinch to zoom
@@ -353,6 +369,7 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
     weak var canvasView: PKCanvasView?
     weak var overlayContainer: UIView?
     weak var statusLabel: UILabel?
+    weak var debugLabel: UILabel?
     weak var zoomWrapper: UIView?
     var trackables: [FadeTrackable] = []
 
@@ -372,6 +389,9 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
     private let wordCascadeThreshold: Double = 0.6
     private let latexCascadeThreshold: Double = 0.8
     private let distanceThreshold: Int = 7
+    private var isResetting = false
+    private var slideTimer: Timer?
+    private let slideDelay: TimeInterval = 0.65
 
     // MARK: - Zoom / Pan
 
@@ -415,6 +435,8 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
     }
 
     @objc func clearCanvas() {
+        isResetting = true
+        slideTimer?.invalidate()
         canvasView?.drawing = PKDrawing()
         currentScale = 1.0
         currentTranslation = .zero
@@ -422,6 +444,7 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
             UIView.animate(withDuration: 0.3) { self.applyTransform(to: wrapper) }
         }
         for i in trackables.indices {
+            trackables[i].view.transform = .identity
             switch trackables[i].kind {
             case .wordChar:
                 trackables[i].view.alpha = 1
@@ -434,17 +457,19 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
                 trackables[i].fadedGlyphs = []
             }
         }
-        // Reset pixel matching cache
         cachedTransform = nil
         cachedTargetMask = nil
         elementRegions = []
         statusLabel?.text = "Draw on the suggestion to fade glyphs"
+        isResetting = false
     }
 
     // MARK: - PKCanvasViewDelegate
 
     func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
-        guard !isProcessing else { return }
+        // Any new drawing resets the slide timer
+        slideTimer?.invalidate()
+        guard !isResetting, !isProcessing else { return }
         guard let overlayContainer = overlayContainer else { return }
         guard let stack = overlayContainer.viewWithTag(101) else { return }
 
@@ -539,16 +564,19 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
                 guard let self else { return }
                 self.isProcessing = false
 
+                // Debug: always update cluster info
+                self.updateDebugInfo()
+
                 // Apply individual element fades
+                let fadedBefore = self.elementRegions.filter(\.isFaded).count
                 for (ei, pct) in elementCoverage {
                     guard pct >= fadeThresh, !self.elementRegions[ei].isFaded else { continue }
                     self.fadeElement(at: ei)
                 }
 
-                // Cascade: fade remaining group when threshold met (60% words, 80% latex)
+                // Cascade: fade remaining group when threshold met (60% words)
                 var groupCounts: [Int: (total: Int, faded: Int, isLatex: Bool)] = [:]
                 for region in self.elementRegions {
-                    // Skip zero-pixel elements (spaces) from cascade ratio
                     guard region.targetPixelCount > 0 || region.isFaded else { continue }
                     let entry = groupCounts[region.groupID, default: (0, 0, region.isLatex)]
                     groupCounts[region.groupID] = (entry.total + 1, entry.faded + (region.isFaded ? 1 : 0), entry.isLatex)
@@ -563,10 +591,25 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
                     }
                 }
 
+                // Schedule slide after 650ms of no new strokes
+                let fadedAfter = self.elementRegions.filter(\.isFaded).count
+                if fadedAfter > fadedBefore {
+                    self.scheduleSlide()
+                }
+
                 let fadedCount = self.elementRegions.filter(\.isFaded).count
                 let totalElements = self.elementRegions.count
                 self.statusLabel?.text = "Faded: \(fadedCount)/\(totalElements) glyphs (\(overallPct)%)"
             }
+        }
+    }
+
+    // MARK: - Slide Timer
+
+    private func scheduleSlide() {
+        slideTimer?.invalidate()
+        slideTimer = Timer.scheduledTimer(withTimeInterval: slideDelay, repeats: false) { [weak self] _ in
+            self?.slideUnfadedElements()
         }
     }
 
@@ -600,6 +643,193 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
         }
     }
 
+    // MARK: - Debug
+
+    private func updateDebugInfo() {
+        guard let canvasView, let overlayContainer,
+              let stack = overlayContainer.viewWithTag(101) else { return }
+
+        let strokes = canvasView.drawing.strokes
+        guard !strokes.isEmpty else {
+            debugLabel?.text = ""
+            return
+        }
+
+        var inkMaxX: CGFloat = 0
+        for stroke in strokes {
+            inkMaxX = max(inkMaxX, stroke.renderBounds.maxX)
+        }
+        // Manual coord conversion: canvas fills zoomWrapper at (0,0), stack is at overlayContainer.frame.origin
+        let stackOriginX = overlayContainer.frame.origin.x
+        let inkRightInStack = inkMaxX - stackOriginX
+
+        // First unfaded element visual x (accounts for slide transform)
+        var firstUnfadedVisualX: CGFloat = .greatestFiniteMagnitude
+        for region in elementRegions where !region.isFaded {
+            let ti = region.trackableIndex
+            let v = trackables[ti].view
+            let visualX = (v.center.x - v.bounds.width / 2) + v.transform.tx
+            if visualX > inkRightInStack - 10 {
+                firstUnfadedVisualX = min(firstUnfadedVisualX, visualX)
+            }
+        }
+
+        let gap = firstUnfadedVisualX == .greatestFiniteMagnitude ? 0 : firstUnfadedVisualX - inkRightInStack
+        let clusters = findInkClusters(strokes: strokes, in: stack)
+        let userSpace = measureSpaceFromClusters(clusters)
+        let fadedCount = elementRegions.filter(\.isFaded).count
+
+        debugLabel?.text = "ink→next: \(String(format: "%.0f", gap))pt | clusters: \(clusters.count) | space: \(userSpace.map { String(format: "%.0f", $0) } ?? "n/a") | faded: \(fadedCount)"
+
+        print("[DEBUG] inkRight=\(String(format: "%.1f", inkRightInStack)) firstUnfadedVisual=\(firstUnfadedVisualX == .greatestFiniteMagnitude ? "none" : String(format: "%.1f", firstUnfadedVisualX)) gap=\(String(format: "%.1f", gap)) clusters=\(clusters.count) userSpace=\(userSpace.map { String(format: "%.1f", $0) } ?? "nil") faded=\(fadedCount)")
+    }
+
+    // MARK: - Slide Unfaded Elements
+
+    private func slideUnfadedElements() {
+        guard let canvasView, let overlayContainer,
+              let stack = overlayContainer.viewWithTag(101) else {
+            print("[SLIDE] guard fail: missing views")
+            return
+        }
+
+        let strokes = canvasView.drawing.strokes
+        guard !strokes.isEmpty else {
+            print("[SLIDE] guard fail: no strokes")
+            return
+        }
+
+        let hasFaded = elementRegions.contains(where: \.isFaded)
+        let hasUnfaded = elementRegions.contains(where: { !$0.isFaded })
+        guard hasFaded, hasUnfaded else {
+            print("[SLIDE] guard fail: faded=\(hasFaded) unfaded=\(hasUnfaded)")
+            return
+        }
+
+        // Last stroke's latest point x (works mid-stroke and after release)
+        guard let lastStroke = strokes.last, lastStroke.path.count > 0 else { return }
+        let penX = lastStroke.path[lastStroke.path.count - 1].location.x
+        // Manual coord conversion: canvas fills zoomWrapper at (0,0), stack is at overlayContainer.frame.origin
+        let stackOriginX = overlayContainer.frame.origin.x
+        let inkRightInStack = penX - stackOriginX
+
+        // Collect unfaded trackable indices
+        var allUnfadedIndices: Set<Int> = []
+        for region in elementRegions where !region.isFaded {
+            allUnfadedIndices.insert(region.trackableIndex)
+        }
+        guard !allUnfadedIndices.isEmpty else { return }
+
+        // Find unfaded elements visually to the RIGHT of ink (using visual position = orig + transform.tx)
+        var rightUnfadedIndices: Set<Int> = []
+        var firstVisualX: CGFloat = .greatestFiniteMagnitude
+
+        for ti in allUnfadedIndices {
+            let v = trackables[ti].view
+            let visualX = (v.center.x - v.bounds.width / 2) + v.transform.tx
+            if visualX > inkRightInStack - 10 {
+                rightUnfadedIndices.insert(ti)
+                firstVisualX = min(firstVisualX, visualX)
+            }
+        }
+
+        let visualGap = firstVisualX == .greatestFiniteMagnitude ? 0 : firstVisualX - inkRightInStack
+
+        // Measure user's natural space width from last two ink clusters
+        let clusters = findInkClusters(strokes: strokes, in: stack)
+        let userSpace = measureSpaceFromClusters(clusters)
+
+        print("[SLIDE] inkRight=\(String(format: "%.1f", inkRightInStack)) firstVisualUnfaded=\(String(format: "%.1f", firstVisualX)) visualGap=\(String(format: "%.1f", visualGap)) clusters=\(clusters.count) userSpace=\(userSpace.map { String(format: "%.1f", $0) } ?? "nil")")
+
+        // Debug: show on screen
+        debugLabel?.text = "gap: \(String(format: "%.0f", visualGap))pt | clusters: \(clusters.count) | space: \(userSpace.map { String(format: "%.0f", $0) } ?? "n/a")"
+
+        // Draw debug box
+        if let container = canvasView.superview {
+            container.viewWithTag(999)?.removeFromSuperview()
+
+            if let space = userSpace {
+                let debugBox = UIView()
+                debugBox.tag = 999
+                debugBox.backgroundColor = UIColor.systemYellow.withAlphaComponent(0.3)
+                debugBox.layer.borderColor = UIColor.systemYellow.cgColor
+                debugBox.layer.borderWidth = 1
+                debugBox.frame = CGRect(
+                    x: penX,
+                    y: canvasView.frame.midY - 30,
+                    width: space,
+                    height: 60
+                )
+                container.addSubview(debugBox)
+            }
+        }
+
+        guard !rightUnfadedIndices.isEmpty else {
+            print("[SLIDE] no unfaded elements right of ink")
+            return
+        }
+        guard let space = userSpace else {
+            print("[SLIDE] no userSpace measured, skipping slide")
+            return
+        }
+
+        let excessGap = visualGap - space
+        print("[SLIDE] excessGap=\(String(format: "%.1f", excessGap))")
+        guard excessGap > 4 else {
+            print("[SLIDE] excessGap too small, skipping")
+            return
+        }
+
+        // Compute new transform: shift left by excessGap from current visual position
+        let currentTx = trackables[rightUnfadedIndices.first!].view.transform.tx
+        let newTx = currentTx - excessGap
+
+        UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseOut) {
+            for ti in rightUnfadedIndices {
+                self.trackables[ti].view.transform = CGAffineTransform(translationX: newTx, y: 0)
+            }
+        }
+        // Don't invalidate cache — slide is purely visual, pixel matching stays at original coords
+    }
+
+    /// Find horizontal ink clusters (words) in stack coords.
+    private func findInkClusters(strokes: [PKStroke], in stack: UIView) -> [(minX: CGFloat, maxX: CGFloat)] {
+        guard let canvasView else { return [] }
+
+        guard let overlayContainer else { return [] }
+        let stackOriginX = overlayContainer.frame.origin.x
+        let stackOriginY = overlayContainer.frame.origin.y
+
+        let boxes = strokes.map { stroke -> CGRect in
+            let b = stroke.renderBounds
+            return CGRect(x: b.minX - stackOriginX, y: b.minY - stackOriginY, width: b.width, height: b.height)
+        }.sorted { $0.minX < $1.minX }
+
+        guard !boxes.isEmpty else { return [] }
+
+        let clusterGapThreshold: CGFloat = 8
+        var clusters: [(minX: CGFloat, maxX: CGFloat)] = []
+
+        for box in boxes {
+            if let last = clusters.last, box.minX <= last.maxX + clusterGapThreshold {
+                clusters[clusters.count - 1].maxX = max(last.maxX, box.maxX)
+            } else {
+                clusters.append((box.minX, box.maxX))
+            }
+        }
+
+        return clusters
+    }
+
+    /// Return gap between last two clusters, or nil if < 2 clusters.
+    private func measureSpaceFromClusters(_ clusters: [(minX: CGFloat, maxX: CGFloat)]) -> CGFloat? {
+        guard clusters.count >= 2 else { return nil }
+        let secondToLast = clusters[clusters.count - 2]
+        let last = clusters[clusters.count - 1]
+        let space = last.minX - secondToLast.maxX
+        return space > 0 ? space : nil
+    }
+
     // MARK: - Transform Building
 
     private func rebuildTransform(stack: UIView, scale: CGFloat) {
@@ -622,7 +852,8 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
         // Build per-element regions
         var regions: [ElementRegion] = []
         for (ti, trackable) in trackables.enumerated() {
-            let viewFrame = trackable.view.frame // in stack coords
+            // Use convert to account for slide transforms
+            let viewFrame = trackable.view.convert(trackable.view.bounds, to: stack)
 
             switch trackable.kind {
             case .wordChar:
