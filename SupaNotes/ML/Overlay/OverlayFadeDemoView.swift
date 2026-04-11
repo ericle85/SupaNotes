@@ -391,7 +391,7 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
     private let distanceThreshold: Int = 7
     private var isResetting = false
     private var slideTimer: Timer?
-    private let slideDelay: TimeInterval = 0.65
+    private let slideDelay: TimeInterval = 0.45
 
     // MARK: - Zoom / Pan
 
@@ -591,9 +591,9 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
                     }
                 }
 
-                // Schedule slide after 650ms of no new strokes
-                let fadedAfter = self.elementRegions.filter(\.isFaded).count
-                if fadedAfter > fadedBefore {
+                // Always schedule slide check after 650ms of inactivity
+                if self.elementRegions.contains(where: \.isFaded),
+                   self.elementRegions.contains(where: { !$0.isFaded }) {
                     self.scheduleSlide()
                 }
 
@@ -706,9 +706,14 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
             return
         }
 
-        // Last stroke's latest point x (works mid-stroke and after release)
-        guard let lastStroke = strokes.last, lastStroke.path.count > 0 else { return }
-        let penX = lastStroke.path[lastStroke.path.count - 1].location.x
+        // Rightmost stroke ending point (handles non-left-to-right writing like dotting i's)
+        var penX: CGFloat = -.greatestFiniteMagnitude
+        for stroke in strokes {
+            guard stroke.path.count > 0 else { continue }
+            let endX = stroke.path[stroke.path.count - 1].location.x
+            penX = max(penX, endX)
+        }
+        guard penX > -.greatestFiniteMagnitude else { return }
         // Manual coord conversion: canvas fills zoomWrapper at (0,0), stack is at overlayContainer.frame.origin
         let stackOriginX = overlayContainer.frame.origin.x
         let inkRightInStack = penX - stackOriginX
@@ -789,7 +794,9 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
                 self.trackables[ti].view.transform = CGAffineTransform(translationX: newTx, y: 0)
             }
         }
-        // Don't invalidate cache — slide is purely visual, pixel matching stays at original coords
+        // Invalidate cache so pixel matching rebuilds at new visual positions
+        cachedTransform = nil
+        cachedTargetMask = nil
     }
 
     /// Find horizontal ink clusters (words) in stack coords.
@@ -905,6 +912,16 @@ private final class FadeCoordinator: NSObject, PKCanvasViewDelegate, UIGestureRe
         cachedTransform = DistanceTransform(mask: targetMask, width: w, height: h)
         cachedTargetMask = targetMask
         cachedRenderSize = CGSize(width: CGFloat(w), height: CGFloat(h))
+        // Carry over isFaded state from old regions
+        let oldFaded: Set<String> = Set(
+            elementRegions.filter(\.isFaded).map { "\($0.trackableIndex)_\($0.glyphIndex ?? -1)" }
+        )
+        for i in regions.indices {
+            let key = "\(regions[i].trackableIndex)_\(regions[i].glyphIndex ?? -1)"
+            if oldFaded.contains(key) {
+                regions[i].isFaded = true
+            }
+        }
         elementRegions = regions
     }
 
