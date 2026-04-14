@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import XCTest
 import UIKit
 @testable import SupaNotes
@@ -309,3 +310,4 @@ final class MathRendererTests: XCTestCase {
         XCTAssertNotNil(image, "\(name) should produce an image")
     }
 }
+#endif
