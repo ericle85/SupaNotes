@@ -33,24 +33,77 @@ final class SuggestionRunner {
         do {
             let response = try await client.suggest(image: image)
             print("[SuggestionRunner] model output: \(response)")
-            let parsed = tokenizer.tokenize(response)
-            tokens = parsed
 
-            // Pre-render latex tokens with SwiftMath
-            status = .rendering
-            let fontSize: CGFloat = 48
-            var images: [UUID: UIImage] = [:]
-            for token in parsed where token.type == .latex {
-                if let result = mathRenderer.render(latex: token.value, fontSize: fontSize) {
-                    images[token.id] = result.image
-                }
-            }
+            let (finalTokens, images) = try await renderWithRetry(image: image, response: response)
+            tokens = finalTokens
             latexImages = images
-
-            status = .done(response)
+            let finalResponse = finalTokens.map(\.value).joined(separator: " ")
+            status = .done(finalResponse)
         } catch {
             status = .failed(error.localizedDescription)
             print("[SuggestionRunner] error: \(error)")
         }
+    }
+
+    // MARK: - Private
+
+    private let maxRetries = 3
+
+    /// Returns (tokens, images) - tokens and their rendered images with matching UUIDs
+    private func renderWithRetry(image: UIImage, response: String) async throws -> ([OverlayToken], [UUID: UIImage]) {
+        let fontSize: CGFloat = 48
+        var currentResponse = response
+        var attempt = 0
+
+        while attempt < maxRetries {
+            let parsed = tokenizer.tokenize(currentResponse)
+            let (images, failures) = renderTokensWithValidation(parsed, fontSize: fontSize)
+
+            guard !failures.isEmpty else {
+                // Return tokens with matching image UUIDs
+                return (parsed, images)
+            }
+
+            attempt += 1
+            if attempt >= maxRetries {
+                print("[SuggestionRunner] max retries reached, returning partial result")
+                return (parsed, images)
+            }
+
+            print("[SuggestionRunner] render failures (attempt \(attempt)/\(maxRetries)): \(failures)")
+            currentResponse = try await client.suggest(image: image, renderFeedback: failures)
+            print("[SuggestionRunner] retry output: \(currentResponse)")
+        }
+
+        return ([], [:])
+    }
+
+    /// Render tokens with validation, returning images and detailed failure info
+    private func renderTokensWithValidation(_ tokens: [OverlayToken], fontSize: CGFloat) -> (images: [UUID: UIImage], failures: [String]) {
+        var images: [UUID: UIImage] = [:]
+        var failures: [String] = []
+
+        for token in tokens where token.type == .latex {
+            // Debug: show exact bytes in latex string
+            let debugBytes = token.value.unicodeScalars.map { String(format: "%02X", $0.value) }.joined(separator: " ")
+            print("[SuggestionRunner] latex token: \(token.value)")
+            print("[SuggestionRunner] latex bytes: \(debugBytes)")
+
+            let (result, validation) = mathRenderer.validateAndRender(
+                latex: token.value,
+                fontSize: fontSize
+            )
+
+            if let result = result {
+                images[token.id] = result.image
+                print("[SuggestionRunner] render SUCCESS for: \(token.value.prefix(40))...")
+            } else {
+                // Build detailed error message for model feedback
+                let errorDetail = validation.errorDescription ?? "render failed"
+                failures.append("- \(token.value): \(errorDetail)")
+                print("[SuggestionRunner] render FAILED: \(errorDetail)")
+            }
+        }
+        return (images, failures)
     }
 }

@@ -7,7 +7,99 @@ struct SwiftMathRenderResult {
     let glyphRects: [GlyphRect]
 }
 
+enum LaTeXValidationResult {
+    case valid
+    case corrupted(String)      // JSON escape corruption detected
+    case unsupported(String)    // Known unsupported command
+    case parseError(String)     // SwiftMath parse error
+    case emptyOutput            // Parsed but produced nothing
+
+    var isValid: Bool {
+        if case .valid = self { return true }
+        return false
+    }
+
+    var errorDescription: String? {
+        switch self {
+        case .valid: return nil
+        case .corrupted(let msg): return "corrupted: \(msg)"
+        case .unsupported(let cmd): return "unsupported command: \(cmd)"
+        case .parseError(let msg): return "parse error: \(msg)"
+        case .emptyOutput: return "empty output"
+        }
+    }
+}
+
 struct SwiftMathRenderer {
+
+    // Commands known to be unsupported by SwiftMath
+    private static let unsupportedCommands = [
+        "\\middle",      // delimiter in middle of expression
+        "\\:",           // medium space
+        "\\;",           // thick space
+        "\\!",           // negative thin space
+        "\\hspace",      // horizontal space
+        "\\vspace",      // vertical space
+        "\\phantom",     // invisible box
+        "\\smash",       // zero height/depth
+        "\\rlap",        // overlap right
+        "\\llap",        // overlap left
+    ]
+
+    /// Validate LaTeX before rendering. Returns validation result with specific error info.
+    func validate(latex: String) -> LaTeXValidationResult {
+        // Check for JSON escape corruption (control characters)
+        let controlChars: [Character] = ["\u{08}", "\u{0C}", "\u{00}"] // backspace, form feed, null
+        for char in controlChars {
+            if latex.contains(char) {
+                return .corrupted("contains control character \\u{\(String(format: "%02X", char.asciiValue ?? 0))}")
+            }
+        }
+
+        // Check for known unsupported commands
+        for cmd in Self.unsupportedCommands {
+            if latex.contains(cmd) {
+                return .unsupported(cmd)
+            }
+        }
+
+        // Try to parse with SwiftMath
+        var error: NSError?
+        let list = MTMathListBuilder.build(fromString: latex, error: &error)
+
+        if let err = error {
+            return .parseError(err.localizedDescription)
+        }
+
+        guard list != nil else {
+            return .emptyOutput
+        }
+
+        return .valid
+    }
+
+    /// Validate and render. Returns (result, validation). Result is nil if validation or render fails.
+    func validateAndRender(latex: String, fontSize: CGFloat, textColor: UIColor = .darkGray) -> (SwiftMathRenderResult?, LaTeXValidationResult) {
+        let validation = validate(latex: latex)
+        guard validation.isValid else {
+            print("[SwiftMathRenderer] validation failed: \(validation.errorDescription ?? "unknown")")
+            return (nil, validation)
+        }
+
+        let result = render(latex: latex, fontSize: fontSize, textColor: textColor)
+        if result == nil {
+            // Try to get more info about why render failed
+            let label = MTMathUILabel()
+            label.latex = latex
+            if let err = label.error {
+                print("[SwiftMathRenderer] render error: \(err.localizedDescription)")
+                return (nil, .parseError(err.localizedDescription))
+            }
+            print("[SwiftMathRenderer] render returned nil but no error (empty displayList?)")
+            return (nil, .emptyOutput)
+        }
+        return (result, .valid)
+    }
 
     /// Render a LaTeX string to a UIImage and extract per-glyph bounding rects.
     /// Rects are in UIKit coordinates (origin top-left, y-down).
@@ -23,6 +115,10 @@ struct SwiftMathRenderer {
         label.setNeedsLayout()
         label.layoutIfNeeded()
 
+        if let err = label.error {
+            print("[SwiftMathRenderer] parse error: \(err.localizedDescription)")
+            return nil
+        }
         guard let displayList = label.displayList else { return nil }
 
         // Use the display tree's actual metrics for sizing
