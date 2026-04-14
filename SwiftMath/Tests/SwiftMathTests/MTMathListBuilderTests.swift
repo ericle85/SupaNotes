@@ -185,6 +185,8 @@ final class MTMathListBuilderTests: XCTestCase {
                   ("\\begin{notanenv} x \\end{notanenv}", .invalidEnv),
                   ("\\begin{matrix} \\notacommand \\end{matrix}", .invalidCommand),
                   ("\\begin{displaylines} x & y \\end{displaylines}", .invalidNumColumns),
+                  ("\\begin{array} x & y \\end{array}", .characterNotFound),
+                  ("\\begin{array}{cp{2cm}} x & y \\end{array}", .invalidEnv),
                   // eqalign/aligned now allow any number of columns (matching KaTeX)
                   // Only split is limited to max 2 columns
                   ("\\begin{split} a & b & c \\end{split}", .invalidNumColumns),
@@ -2805,6 +2807,28 @@ final class MTMathListBuilderTests: XCTestCase {
         }
     }
 
+    func testArrayEnvironment() throws {
+        let str = "\\begin{array}{cc|c} 1 & 2 & 3 \\\\ 4 & 5 & 6 \\end{array}"
+        var error: NSError? = nil
+        let list = MTMathListBuilder.build(fromString: str, error: &error)
+        XCTAssertNil(error)
+        let unwrapped = try XCTUnwrap(list)
+        XCTAssertEqual(unwrapped.atoms.count, 1)
+
+        let table = try XCTUnwrap(unwrapped.atoms[0] as? MTMathTable)
+        XCTAssertEqual(table.environment, "array")
+        XCTAssertEqual(table.numRows, 2)
+        XCTAssertEqual(table.numColumns, 3)
+        XCTAssertEqual(table.get(alignmentForColumn: 0), .center)
+        XCTAssertEqual(table.get(alignmentForColumn: 1), .center)
+        XCTAssertEqual(table.get(alignmentForColumn: 2), .center)
+        XCTAssertEqual(table.verticalSeparators, Set([2]))
+        XCTAssertEqual(table.arrayPreamble, "cc|c")
+
+        let latex = MTMathListBuilder.mathListToString(list)
+        XCTAssertEqual(latex, "\\begin{array}{cc|c}1&2&3\\\\ 4&5&6\\end{array}")
+    }
+
     func testSmallMatrix() throws {
         // Test \smallmatrix for inline matrices
         let testCases = [
@@ -3532,5 +3556,4 @@ final class MTMathListBuilderTests: XCTestCase {
     }
 
 }
-
 

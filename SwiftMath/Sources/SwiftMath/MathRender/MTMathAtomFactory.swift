@@ -983,7 +983,15 @@ public class MTMathAtomFactory {
      - `cases`: 1 or 2 columns, left-aligned
      - `eqnarray`: Exactly 3 columns with r-c-l alignment
      */
-    public static func table(withEnvironment env: String?, alignment: MTColumnAlignment? = nil, rows: [[MTMathList]], error:inout NSError?) -> MTMathAtom? {
+    public static func table(
+        withEnvironment env: String?,
+        alignment: MTColumnAlignment? = nil,
+        arrayAlignments: [MTColumnAlignment] = [],
+        arrayVerticalSeparators: Set<Int> = [],
+        arrayPreamble: String = "",
+        rows: [[MTMathList]],
+        error:inout NSError?
+    ) -> MTMathAtom? {
         let table = MTMathTable(environment: env)
 
         for i in 0..<rows.count {
@@ -1034,6 +1042,37 @@ public class MTMathAtomFactory {
                 } else {
                     return table
                 }
+            } else if env == "array" {
+                guard !arrayAlignments.isEmpty else {
+                    let message = "array environment requires at least one column specifier"
+                    error = NSError(domain: MTParseError, code: MTParseErrors.invalidEnv.rawValue, userInfo: [NSLocalizedDescriptionKey:message])
+                    return nil
+                }
+                if table.numColumns > arrayAlignments.count {
+                    let message = "array environment has more columns than specified in preamble"
+                    if error == nil {
+                        error = NSError(domain: MTParseError, code: MTParseErrors.invalidNumColumns.rawValue, userInfo: [NSLocalizedDescriptionKey:message])
+                    }
+                    return nil
+                }
+
+                table.interRowAdditionalSpacing = 0
+                table.interColumnSpacing = 18
+                table.verticalSeparators = arrayVerticalSeparators
+                table.arrayPreamble = arrayPreamble
+
+                let style = MTMathStyle(style: .text)
+                for i in 0..<table.cells.count {
+                    for j in 0..<table.cells[i].count {
+                        table.cells[i][j].insert(style, at: 0)
+                    }
+                }
+
+                for col in 0..<arrayAlignments.count {
+                    table.set(alignment: arrayAlignments[col], forColumn: col)
+                }
+
+                return table
             } else if env == "eqalign" || env == "split" || env == "aligned" {
                 // split is limited to max 2 columns per LaTeX/KaTeX spec
                 // aligned/eqalign can have any number of columns (1, 2, 3, 4+)

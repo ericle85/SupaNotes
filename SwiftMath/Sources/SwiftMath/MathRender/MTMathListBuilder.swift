@@ -16,12 +16,24 @@ struct MTEnvProperties {
     var ended: Bool
     var numRows: Int
     var alignment: MTColumnAlignment?  // Optional alignment for starred matrix environments
+    var arrayAlignments: [MTColumnAlignment]
+    var arrayVerticalSeparators: Set<Int>
+    var arrayPreamble: String
 
-    init(name: String?, alignment: MTColumnAlignment? = nil) {
+    init(
+        name: String?,
+        alignment: MTColumnAlignment? = nil,
+        arrayAlignments: [MTColumnAlignment] = [],
+        arrayVerticalSeparators: Set<Int> = [],
+        arrayPreamble: String = ""
+    ) {
         self.envName = name
         self.numRows = 0
         self.ended = false
         self.alignment = alignment
+        self.arrayAlignments = arrayAlignments
+        self.arrayVerticalSeparators = arrayVerticalSeparators
+        self.arrayPreamble = arrayPreamble
     }
 }
 
@@ -642,14 +654,18 @@ public struct MTMathListBuilder {
                 } else if atom.type == .table {
                     if let table = atom as? MTMathTable {
                         if !table.environment.isEmpty {
-                            str += "\\begin{\(table.environment)}"
+                            if table.environment == "array" {
+                                str += "\\begin{array}{\(table.arrayPreamble)}"
+                            } else {
+                                str += "\\begin{\(table.environment)}"
+                            }
                         }
                         
                         for i in 0..<table.numRows {
                             let row = table.cells[i]
                             for j in 0..<row.count {
-                                let cell = row[j]
-                                if table.environment == "matrix" {
+                                let cell = MTMathList(row[j])!
+                                if table.environment == "matrix" || table.environment == "array" {
                                     if cell.atoms.count >= 1 && cell.atoms[0].type == .style {
                                         // remove first atom
                                         cell.atoms.removeFirst()
@@ -671,7 +687,11 @@ public struct MTMathListBuilder {
                             }
                         }
                         if !table.environment.isEmpty {
-                            str += "\\end{\(table.environment)}"
+                            if table.environment == "array" {
+                                str += "\\end{array}"
+                            } else {
+                                str += "\\end{\(table.environment)}"
+                            }
                         }
                     }
                 } else if atom.type == .overline {
@@ -973,7 +993,35 @@ public struct MTMathListBuilder {
             if env == nil {
                 return nil;
             }
-            let table = self.buildTable(env: env, firstList:nil, isRow:false)
+            var alignment: MTColumnAlignment? = nil
+            var arrayAlignments = [MTColumnAlignment]()
+            var arrayVerticalSeparators = Set<Int>()
+            var arrayPreamble = ""
+
+            if env!.hasSuffix("*") {
+                alignment = self.readOptionalAlignment()
+                if self.error != nil {
+                    return nil
+                }
+            } else if env! == "array" {
+                if let preamble = self.readArrayPreamble() {
+                    arrayAlignments = preamble.alignments
+                    arrayVerticalSeparators = preamble.verticalSeparators
+                    arrayPreamble = preamble.canonical
+                } else {
+                    return nil
+                }
+            }
+
+            let table = self.buildTable(
+                env: env,
+                alignment: alignment,
+                arrayAlignments: arrayAlignments,
+                arrayVerticalSeparators: arrayVerticalSeparators,
+                arrayPreamble: arrayPreamble,
+                firstList:nil,
+                isRow:false
+            )
             return table
         } else if command == "color" {
             // A color command has 2 arguments
@@ -1404,14 +1452,33 @@ public struct MTMathListBuilder {
             if let env = self.readEnvironment() {
                 // Check if this is a starred matrix environment and read optional alignment
                 var alignment: MTColumnAlignment? = nil
+                var arrayAlignments = [MTColumnAlignment]()
+                var arrayVerticalSeparators = Set<Int>()
+                var arrayPreamble = ""
                 if env.hasSuffix("*") {
                     alignment = self.readOptionalAlignment()
                     if self.error != nil {
                         return nil
                     }
+                } else if env == "array" {
+                    if let preamble = self.readArrayPreamble() {
+                        arrayAlignments = preamble.alignments
+                        arrayVerticalSeparators = preamble.verticalSeparators
+                        arrayPreamble = preamble.canonical
+                    } else {
+                        return nil
+                    }
                 }
 
-                let table = self.buildTable(env: env, alignment: alignment, firstList: nil, isRow: false)
+                let table = self.buildTable(
+                    env: env,
+                    alignment: alignment,
+                    arrayAlignments: arrayAlignments,
+                    arrayVerticalSeparators: arrayVerticalSeparators,
+                    arrayPreamble: arrayPreamble,
+                    firstList: nil,
+                    isRow: false
+                )
                 return table
             } else {
                 return nil
@@ -1493,16 +1560,81 @@ public struct MTMathListBuilder {
 
         return alignment
     }
+
+    /// Reads array preamble for array environments: e.g. {cc|c}
+    mutating func readArrayPreamble() -> (alignments: [MTColumnAlignment], verticalSeparators: Set<Int>, canonical: String)? {
+        self.skipSpaces()
+        guard self.expectCharacter("{") else {
+            self.setError(.characterNotFound, message: "Missing { for array column specification")
+            return nil
+        }
+
+        var alignments = [MTColumnAlignment]()
+        var verticalSeparators = Set<Int>()
+        var canonical = ""
+
+        while self.hasCharacters {
+            let ch = self.getNextCharacter()
+            if ch == "}" {
+                if alignments.isEmpty {
+                    self.setError(.invalidEnv, message: "array requires at least one column specifier (l, c, or r)")
+                    return nil
+                }
+                return (alignments, verticalSeparators, canonical)
+            }
+            if ch == " " || ch == "\t" || ch == "\n" || ch == "\r" {
+                continue
+            }
+            switch ch {
+            case "l":
+                alignments.append(.left)
+                canonical.append("l")
+            case "c":
+                alignments.append(.center)
+                canonical.append("c")
+            case "r":
+                alignments.append(.right)
+                canonical.append("r")
+            case "|":
+                if alignments.count == 0 {
+                    self.setError(.invalidEnv, message: "array preamble cannot start with |")
+                    return nil
+                }
+                verticalSeparators.insert(alignments.count)
+                canonical.append("|")
+            default:
+                self.setError(.invalidEnv, message: "Invalid array column specifier: \(ch). Only l, c, r, and | are supported")
+                return nil
+            }
+        }
+
+        self.setError(.characterNotFound, message: "Missing } for array column specification")
+        return nil
+    }
     
     func MTAssertNotSpace(_ ch: Character) {
         assert(ch >= "\u{21}" && ch <= "\u{7E}", "Expected non-space character \(ch)")
     }
     
-    mutating func buildTable(env: String?, alignment: MTColumnAlignment? = nil, firstList: MTMathList?, isRow: Bool) -> MTMathAtom? {
+    mutating func buildTable(
+        env: String?,
+        alignment: MTColumnAlignment? = nil,
+        arrayAlignments: [MTColumnAlignment] = [],
+        arrayVerticalSeparators: Set<Int> = [],
+        arrayPreamble: String = "",
+        firstList: MTMathList?,
+        isRow: Bool
+    ) -> MTMathAtom? {
         // Save the current env till an new one gets built.
         let oldEnv = self.currentEnv
 
-        currentEnv = MTEnvProperties(name: env, alignment: alignment)
+        currentEnv = MTEnvProperties(
+            name: env,
+            alignment: alignment,
+            arrayAlignments: arrayAlignments,
+            arrayVerticalSeparators: arrayVerticalSeparators,
+            arrayPreamble: arrayPreamble
+        )
         
         var currentRow = 0
         var currentCol = 0
@@ -1540,7 +1672,15 @@ public struct MTMathListBuilder {
         }
         
         var error:NSError? = self.error
-        let table = MTMathAtomFactory.table(withEnvironment: currentEnv?.envName, alignment: currentEnv?.alignment, rows: rows, error: &error)
+        let table = MTMathAtomFactory.table(
+            withEnvironment: currentEnv?.envName,
+            alignment: currentEnv?.alignment,
+            arrayAlignments: currentEnv?.arrayAlignments ?? [],
+            arrayVerticalSeparators: currentEnv?.arrayVerticalSeparators ?? [],
+            arrayPreamble: currentEnv?.arrayPreamble ?? "",
+            rows: rows,
+            error: &error
+        )
         if table == nil && self.error == nil {
             self.error = error
             return nil

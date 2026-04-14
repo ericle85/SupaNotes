@@ -605,12 +605,16 @@ final class MTMathListTests: XCTestCase {
         table.set(alignment: .right, forColumn:1)
         table.interRowAdditionalSpacing = 3;
         table.interColumnSpacing = 10;
+        table.verticalSeparators = Set([1, 2])
+        table.arrayPreamble = "c|c|l"
 
         let copy = MTMathTable(table)
         try checkAtomCopy(copy, original:table, forTest:self.description)
         XCTAssertEqual(copy.interColumnSpacing, table.interColumnSpacing);
         XCTAssertEqual(copy.interRowAdditionalSpacing, table.interRowAdditionalSpacing);
         XCTAssertEqual(copy.alignments, table.alignments)
+        XCTAssertEqual(copy.verticalSeparators, table.verticalSeparators)
+        XCTAssertEqual(copy.arrayPreamble, table.arrayPreamble)
 
         XCTAssertNotEqual(copy.cells, table.cells);
         XCTAssertNotEqual(copy.cells[0], table.cells[0] );

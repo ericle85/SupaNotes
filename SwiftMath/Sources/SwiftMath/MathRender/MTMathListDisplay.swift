@@ -824,6 +824,39 @@ public class MTLineDisplay : MTDisplay {
     
 }
 
+/// Rendering of a vertical rule used by array column separators.
+public class MTVerticalLineDisplay: MTDisplay {
+    public var yMin: CGFloat = 0
+    public var yMax: CGFloat = 0
+    public var lineThickness: CGFloat = 0
+
+    init(x: CGFloat, yMin: CGFloat, yMax: CGFloat, lineThickness: CGFloat, range: NSRange) {
+        super.init()
+        self.position = CGPointMake(x, 0)
+        self.yMin = yMin
+        self.yMax = yMax
+        self.lineThickness = lineThickness
+        self.range = range
+        self.width = lineThickness
+        self.ascent = max(0, yMax)
+        self.descent = max(0, -yMin)
+    }
+
+    override public func draw(_ context: CGContext) {
+        super.draw(context)
+        context.saveGState()
+        self.textColor?.setStroke()
+
+        let path = MTBezierPath()
+        path.move(to: CGPointMake(self.position.x, self.yMin))
+        path.addLine(to: CGPointMake(self.position.x, self.yMax))
+        path.lineWidth = self.lineThickness
+        path.stroke()
+
+        context.restoreGState()
+    }
+}
+
 // MARK: - MTAccentDisplay
 
 /// Rendering an accent as a display

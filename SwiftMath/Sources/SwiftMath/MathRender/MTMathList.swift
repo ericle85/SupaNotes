@@ -797,6 +797,10 @@ public class MTMathTable: MTMathAtom {
     /// Additional spacing between rows in jots (one jot is 0.3 times font size).
     /// If the additional spacing is 0, then normal row spacing is used are used.
     public var interRowAdditionalSpacing: CGFloat = 0
+    /// Vertical separators before the given column index (1-based boundaries between columns).
+    public var verticalSeparators = Set<Int>()
+    /// Canonical array preamble (e.g. "cc|c") for round-tripping array environments.
+    public var arrayPreamble = ""
     
     override public var finalized: MTMathAtom {
         let table = super.finalized as! MTMathTable
@@ -820,6 +824,8 @@ public class MTMathTable: MTMathAtom {
         self.alignments = table.alignments
         self.interRowAdditionalSpacing = table.interRowAdditionalSpacing
         self.interColumnSpacing = table.interColumnSpacing
+        self.verticalSeparators = table.verticalSeparators
+        self.arrayPreamble = table.arrayPreamble
         self.environment = table.environment
         var cellCopy = [[MTMathList]]()
         for row in table.cells {

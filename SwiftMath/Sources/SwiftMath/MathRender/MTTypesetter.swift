@@ -1811,7 +1811,38 @@ class MTTypesetter {
 
         // Position all the rows
         self.positionRows(rowDisplays, forTable:table)
-        let tableDisplay = MTMathListDisplay(withDisplays: rowDisplays, range: table!.indexRange)
+        var allDisplays = rowDisplays
+
+        if !table!.verticalSeparators.isEmpty {
+            let spacing = table!.interColumnSpacing * styleFont.mathTable!.muUnit
+            var prefixWidths = [CGFloat](repeating: 0, count: numColumns + 1)
+            for i in 0..<numColumns {
+                prefixWidths[i + 1] = prefixWidths[i] + columnWidths[i]
+            }
+
+            var yTop = CGFloat.leastNormalMagnitude
+            var yBottom = CGFloat.greatestFiniteMagnitude
+            for row in rowDisplays {
+                yTop = max(yTop, row.position.y + row.ascent)
+                yBottom = min(yBottom, row.position.y - row.descent)
+            }
+            let thickness = styleFont.mathTable!.fractionRuleThickness
+            for separator in table!.verticalSeparators.sorted() {
+                guard separator > 0 && separator <= numColumns else { continue }
+                let xBase = prefixWidths[separator] + CGFloat(separator - 1) * spacing
+                let x = xBase + spacing / 2
+                let line = MTVerticalLineDisplay(
+                    x: x,
+                    yMin: yBottom,
+                    yMax: yTop,
+                    lineThickness: thickness,
+                    range: table!.indexRange
+                )
+                allDisplays.append(line)
+            }
+        }
+
+        let tableDisplay = MTMathListDisplay(withDisplays: allDisplays, range: table!.indexRange)
         tableDisplay.position = currentPosition;
         return tableDisplay;
     }
