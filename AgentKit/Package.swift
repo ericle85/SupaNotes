@@ -8,7 +8,7 @@ let package = Package(
         .library(name: "AgentKit", targets: ["AgentKit"])
     ],
     targets: [
-        .target(name: "AgentKit"),
+        .target(name: "AgentKit", resources: [.process("Prompts")]),
         .testTarget(name: "AgentKitTests", dependencies: ["AgentKit"])
     ]
 )
