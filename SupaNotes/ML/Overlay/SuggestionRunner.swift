@@ -1,4 +1,5 @@
 import UIKit
+import AgentKit
 
 @Observable
 final class SuggestionRunner {
@@ -31,7 +32,8 @@ final class SuggestionRunner {
         status = .thinking
 
         do {
-            let response = try await client.suggest(image: image)
+            guard let png = image.pngData() else { throw AgentError.invalidResponse }
+            let response = try await client.suggest(imagePNG: png)
             print("[SuggestionRunner] model output: \(response)")
 
             let (finalTokens, images) = try await renderWithRetry(image: image, response: response)
@@ -71,7 +73,8 @@ final class SuggestionRunner {
             }
 
             print("[SuggestionRunner] render failures (attempt \(attempt)/\(maxRetries)): \(failures)")
-            currentResponse = try await client.suggest(image: image, renderFeedback: failures)
+            guard let png = image.pngData() else { throw AgentError.invalidResponse }
+            currentResponse = try await client.suggest(imagePNG: png, renderFeedback: failures)
             print("[SuggestionRunner] retry output: \(currentResponse)")
         }
 

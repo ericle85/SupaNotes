@@ -1,25 +1,25 @@
-import UIKit
+import Foundation
 
 // MARK: - Types
 
-struct Tool: Codable {
+public struct Tool: Codable {
     let type: String
     let function: ToolFunction
 }
 
-struct ToolFunction: Codable {
+public struct ToolFunction: Codable {
     let name: String
     let description: String
     let parameters: ToolParameters
 }
 
-struct ToolParameters: Codable {
+public struct ToolParameters: Codable {
     let type: String
     let properties: [String: PropertyDefinition]
     let required: [String]
 }
 
-struct PropertyDefinition: Codable {
+public struct PropertyDefinition: Codable {
     let type: String
     let description: String
 }
@@ -80,26 +80,46 @@ struct AnyCodable: Codable {
 
 // MARK: - Client
 
-@Observable
-final class AgentOllamaClient {
-    private let host = "100.121.248.31"
-    private let port = 11434
-    private let model = "gemma4:e4b-it-q4_K_M"
+public final class AgentOllamaClient {
+    private let host: String
+    private let port: Int
+    private let model: String
+
+    /// Tool calls made during the last `suggest` invocation.
+    public private(set) var toolCallLog: [String] = []
+    public func clearLog() { toolCallLog = [] }
 
     private let availableTools: [Tool] = [
-        mathTool("add", "Add two numbers together. Use this for any addition or subtraction operations."),
+        mathTool("add",      "Add two numbers together. Use this for any addition operations."),
         mathTool("multiply", "Multiply two numbers together. Use this for any multiplication operations."),
-        mathTool("divide", "Divide a by b. Use this for any division operations.")
+        mathTool("divide",   "Divide a by b. Use this for any division operations.")
     ]
 
-    func suggest(image: UIImage, renderFeedback: [String] = []) async throws -> String {
-        guard let png = image.pngData(), !png.isEmpty else { throw AgentError.imageEncodingFailed }
-        let ocrText = try await ocr(imageBase64: png.base64EncodedString())
+    private let thinking: Bool
 
-        let smallImage = image.resized(toMaxDimension: 512)
-        guard let smallPng = smallImage.pngData(), !smallPng.isEmpty else { throw AgentError.imageEncodingFailed }
+    public init(host: String = "100.121.248.31", port: Int = 11434, model: String = "gemma4:e4b-it-q4_K_M", thinking: Bool = true) {
+        self.host = host
+        self.port = port
+        self.model = model
+        self.thinking = thinking
+    }
 
-        let prompt = """
+    /// Text-only path — no image needed. Used by tests.
+    public func suggest(text ocrText: String, renderFeedback: [String] = []) async throws -> String {
+        try await chat(prompt: buildPrompt(ocrText: ocrText, renderFeedback: renderFeedback), imageBase64: nil)
+    }
+
+    /// Image path — pass raw PNG bytes. Caller owns UIImage → Data conversion.
+    public func suggest(imagePNG: Data, renderFeedback: [String] = []) async throws -> String {
+        let ocrText = try await ocr(imageBase64: imagePNG.base64EncodedString())
+        return try await chat(
+            prompt: buildPrompt(ocrText: ocrText, renderFeedback: renderFeedback),
+            imageBase64: imagePNG.base64EncodedString()
+        )
+    }
+
+    private func buildPrompt(ocrText: String, renderFeedback: [String]) -> String {
+        """
         The handwritten notes contain:
         \(ocrText)
 
@@ -142,8 +162,6 @@ final class AgentOllamaClient {
         """
         )
         """
-
-        return try await chat(prompt: prompt, imageBase64: smallPng.base64EncodedString())
     }
 
     private func ocr(imageBase64: String) async throws -> String {
@@ -157,12 +175,13 @@ final class AgentOllamaClient {
         guard let outer = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let msg = outer["message"] as? [String: Any],
               let text = msg["content"] as? String else { throw AgentError.invalidResponse }
-        print("[AgentOllama] GLM OCR result: \(text)")
         return text
     }
 
-    private func chat(prompt: String, imageBase64: String) async throws -> String {
-        var messages: [[String: Any]] = [["role": "user", "content": prompt, "images": [imageBase64]]]
+    private func chat(prompt: String, imageBase64: String?) async throws -> String {
+        var userMsg: [String: Any] = ["role": "user", "content": prompt]
+        if let img = imageBase64 { userMsg["images"] = [img] }
+        var messages: [[String: Any]] = [userMsg]
         var body = chatBody(messages: messages)
 
         let data = try await send(body: body, timeout: 120)
@@ -170,7 +189,6 @@ final class AgentOllamaClient {
               let message = outer["message"] as? [String: Any] else { throw AgentError.invalidResponse }
 
         if let toolCalls = message["tool_calls"] as? [[String: Any]], !toolCalls.isEmpty {
-            print("[AgentOllama] 🔍 Model requested tool calls: \(toolCalls.count)")
             messages = appendToolResults(toolCalls: toolCalls, assistantMessage: message, to: messages)
             body["messages"] = messages
             let finalData = try await send(body: body, timeout: 120)
@@ -192,7 +210,7 @@ final class AgentOllamaClient {
         toolCalls.reduce(into: messages) { acc, toolCallDict in
             guard let d = try? JSONSerialization.data(withJSONObject: toolCallDict),
                   let toolCall = try? JSONDecoder().decode(ToolCall.self, from: d) else {
-                print("[AgentOllama] ❌ Failed to decode tool call")
+                toolCallLog.append("FAIL decode tool call")
                 return
             }
             let result = executeMathTool(toolCall)
@@ -201,12 +219,38 @@ final class AgentOllamaClient {
         }
     }
 
+    private func executeMathTool(_ toolCall: ToolCall) -> String {
+        guard let data = toolCall.function.arguments.data(using: .utf8),
+              let args = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let a = (args["a"] as? Double) ?? (args["a"] as? Int).map(Double.init),
+              let b = (args["b"] as? Double) ?? (args["b"] as? Int).map(Double.init) else {
+            toolCallLog.append("FAIL invalid arguments for \(toolCall.function.name)")
+            return "Error: Invalid arguments"
+        }
+        let result: Double
+        switch toolCall.function.name {
+        case "add":      result = a + b
+        case "multiply": result = a * b
+        case "divide":
+            guard b != 0 else {
+                toolCallLog.append("FAIL division by zero")
+                return "Error: Division by zero"
+            }
+            result = a / b
+        default:
+            toolCallLog.append("FAIL unknown tool: \(toolCall.function.name)")
+            return "Error: Unknown tool"
+        }
+        toolCallLog.append("TOOL \(toolCall.function.name)(\(a), \(b)) = \(result)")
+        return String(format: "%.2f", result)
+    }
+
     private func chatBody(messages: [[String: Any]]) -> [String: Any] {
         let toolsJSON = (try? JSONEncoder().encode(availableTools))
             .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [[String: Any]] } ?? []
         return [
             "model": model, "messages": messages, "stream": false,
-            "think": true, "tools": toolsJSON,
+            "think": thinking, "tools": toolsJSON,
             "options": ["temperature": 1.0, "top_p": 0.95, "top_k": 64]
         ]
     }
@@ -238,45 +282,13 @@ private func mathTool(_ name: String, _ description: String) -> Tool {
     ))
 }
 
-private func executeMathTool(_ toolCall: ToolCall) -> String {
-    guard let data = toolCall.function.arguments.data(using: .utf8),
-          let args = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-          let a = (args["a"] as? Double) ?? (args["a"] as? Int).map(Double.init),
-          let b = (args["b"] as? Double) ?? (args["b"] as? Int).map(Double.init) else {
-        print("[AgentOllama] ❌ Invalid arguments for \(toolCall.function.name)")
-        return "Error: Invalid arguments"
-    }
-    let result: Double
-    switch toolCall.function.name {
-    case "add":      result = a + b
-    case "multiply": result = a * b
-    case "divide":
-        guard b != 0 else { return "Error: Division by zero" }
-        result = a / b
-    default:
-        print("[AgentOllama] ❌ Unknown tool: \(toolCall.function.name)")
-        return "Error: Unknown tool"
-    }
-    print("[AgentOllama] 🔧 \(toolCall.function.name)(\(a), \(b)) = \(result)")
-    return String(format: "%.2f", result)
-}
 
-private extension UIImage {
-    func resized(toMaxDimension maxDim: CGFloat) -> UIImage {
-        let scale = min(maxDim / size.width, maxDim / size.height, 1)
-        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
-        return UIGraphicsImageRenderer(size: newSize).image { _ in draw(in: CGRect(origin: .zero, size: newSize)) }
-    }
-}
-
-enum AgentError: LocalizedError {
-    case imageEncodingFailed
+public enum AgentError: LocalizedError {
     case invalidResponse
     case parseError(String)
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
-        case .imageEncodingFailed: return "Failed to encode image"
         case .invalidResponse:     return "Invalid response from model"
         case .parseError(let raw): return "Parse error: \(raw.prefix(80))"
         }

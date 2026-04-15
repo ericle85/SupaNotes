@@ -162,6 +162,7 @@
 			name = SupaNotes;
 			packageProductDependencies = (
 				BF0000012F42000000000002 /* SwiftMath */,
+				BF07314A2F8F15BB00050541 /* AgentKit */,
 			);
 			productName = SupaNotes;
 			productReference = BFE730DE2F3CCEC200F5DD1D /* SupaNotes.app */;
@@ -197,6 +198,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				BF0000012F42000000000001 /* XCLocalSwiftPackageReference "SwiftMath" */,
+				BF07314A2F8F15BB00050540 /* XCLocalSwiftPackageReference "AgentKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BFE730DF2F3CCEC200F5DD1D /* Products */;
@@ -540,6 +542,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = SwiftMath;
 		};
+		BF07314A2F8F15BB00050540 /* XCLocalSwiftPackageReference "AgentKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = AgentKit;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -547,6 +553,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = BF0000012F42000000000001 /* XCLocalSwiftPackageReference "SwiftMath" */;
 			productName = SwiftMath;
+		};
+		BF07314A2F8F15BB00050541 /* AgentKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BF07314A2F8F15BB00050540 /* XCLocalSwiftPackageReference "AgentKit" */;
+			productName = AgentKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
