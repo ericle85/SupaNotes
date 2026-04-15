@@ -10,8 +10,9 @@ public final class AgentOllamaClient {
 
     private static let promptTemplate: String = {
         guard let url = Bundle.module.url(forResource: "SuggestionPrompt", withExtension: "md"),
-              let text = try? String(contentsOf: url, encoding: .utf8) else {
-            return ""
+              let text = try? String(contentsOf: url, encoding: .utf8),
+              !text.isEmpty else {
+            fatalError("SuggestionPrompt.md missing or empty from bundle")
         }
         return text
     }()
