@@ -1,10 +1,152 @@
 import UIKit
 
+// MARK: - Tool Definitions
+
+struct Tool: Codable {
+    let type: String
+    let function: ToolFunction
+}
+
+struct ToolFunction: Codable {
+    let name: String
+    let description: String
+    let parameters: ToolParameters
+}
+
+struct ToolParameters: Codable {
+    let type: String
+    let properties: [String: PropertyDefinition]
+    let required: [String]
+}
+
+struct PropertyDefinition: Codable {
+    let type: String
+    let description: String
+}
+
+struct ToolCall: Codable {
+    let id: String?
+    let type: String?
+    let function: FunctionCall
+}
+
+struct FunctionCall: Codable {
+    let name: String
+    let arguments: String  // normalized to JSON string
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String.self, forKey: .name)
+        // Ollama sends arguments as a dict; normalize to JSON string
+        if let str = try? c.decode(String.self, forKey: .arguments) {
+            arguments = str
+        } else {
+            let dict = try c.decode([String: AnyCodable].self, forKey: .arguments)
+            let data = try JSONEncoder().encode(dict)
+            arguments = String(data: data, encoding: .utf8) ?? "{}"
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(name, forKey: .name)
+        try c.encode(arguments, forKey: .arguments)
+    }
+
+    private enum CodingKeys: String, CodingKey { case name, arguments }
+}
+
+struct AnyCodable: Codable {
+    let value: Any
+
+    init(_ value: Any) { self.value = value }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if let i = try? c.decode(Int.self) { value = i }
+        else if let d = try? c.decode(Double.self) { value = d }
+        else if let s = try? c.decode(String.self) { value = s }
+        else if let b = try? c.decode(Bool.self) { value = b }
+        else { value = "" }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        switch value {
+        case let i as Int:    try c.encode(i)
+        case let d as Double: try c.encode(d)
+        case let s as String: try c.encode(s)
+        case let b as Bool:   try c.encode(b)
+        default: try c.encode("")
+        }
+    }
+}
+
+// MARK: - Math Tool Functions
+
 @Observable
 final class AgentOllamaClient {
     private let host = "100.121.248.31"
     private let port = 11434
     private let model = "gemma4:e4b-it-q4_K_M"
+
+    private let availableTools: [Tool] = [
+        Tool(
+            type: "function",
+            function: ToolFunction(
+                name: "add",
+                description: "Add two numbers together. Use this for any addition operations.",
+                parameters: ToolParameters(
+                    type: "object",
+                    properties: [
+                        "a": PropertyDefinition(type: "number", description: "First number to add"),
+                        "b": PropertyDefinition(type: "number", description: "Second number to add")
+                    ],
+                    required: ["a", "b"]
+                )
+            )
+        ),
+        Tool(
+            type: "function",
+            function: ToolFunction(
+                name: "multiply",
+                description: "Multiply two numbers together. Use this for any multiplication operations.",
+                parameters: ToolParameters(
+                    type: "object",
+                    properties: [
+                        "a": PropertyDefinition(type: "number", description: "First number to multiply"),
+                        "b": PropertyDefinition(type: "number", description: "Second number to multiply")
+                    ],
+                    required: ["a", "b"]
+                )
+            )
+        )
+    ]
+
+    private func executeToolCall(_ toolCall: ToolCall) -> String {
+        guard let argumentsData = toolCall.function.arguments.data(using: .utf8),
+              let arguments = try? JSONSerialization.jsonObject(with: argumentsData) as? [String: Any],
+              let a = arguments["a"] as? Double,
+              let b = arguments["b"] as? Double else {
+            print("[AgentOllama] ❌ Tool call failed: invalid arguments for \(toolCall.function.name)")
+            return "Error: Invalid arguments"
+        }
+
+        let result: Double
+        switch toolCall.function.name {
+        case "add":
+            result = a + b
+            print("[AgentOllama] 🔧 Tool called: add(\(a), \(b)) = \(result)")
+        case "multiply":
+            result = a * b
+            print("[AgentOllama] 🔧 Tool called: multiply(\(a), \(b)) = \(result)")
+        default:
+            print("[AgentOllama] ❌ Unknown tool: \(toolCall.function.name)")
+            return "Error: Unknown tool"
+        }
+
+        return String(format: "%.2f", result)
+    }
 
     /// Suggest what comes next in the user's handwritten notes.
     func suggest(image: UIImage, renderFeedback: [String] = []) async throws -> String {
@@ -30,6 +172,7 @@ final class AgentOllamaClient {
         2. Only wrap math/symbols/numbers in [latex]...[/latex] tags
         3. NEVER use $ signs for math
         4. Output ONLY the suggestion, nothing else
+        5. For any math problem (addition, multiplication), you MUST use the available tools: add(a, b) and multiply(a, b). Do not calculate math yourself.
 
         SUPPORTED LaTeX (use these):
         - Fractions: \\frac{a}{b}, \\dfrac, \\tfrac, \\cfrac
@@ -92,6 +235,7 @@ final class AgentOllamaClient {
               let text = message["content"] as? String else {
             throw AgentError.invalidResponse
         }
+        // MARK: - Debug: OCR result
         print("[AgentOllama] GLM OCR result: \(text)")
         return text
     }
@@ -99,17 +243,25 @@ final class AgentOllamaClient {
     // MARK: - Shared request
 
     private func chat(prompt: String, imageBase64: String) async throws -> String {
-        let body: [String: Any] = [
+        var messages: [[String: Any]] = [[
+            "role": "user",
+            "content": prompt,
+            "images": [imageBase64]
+        ]]
+
+        var body: [String: Any] = [
             "model": model,
-            "messages": [[
-                "role": "user",
-                "content": prompt,
-                "images": [imageBase64]
-            ]],
+            "messages": messages,
             "stream": false,
             "think": true,
             "options": ["temperature": 1.0, "top_p": 0.95, "top_k": 64]
         ]
+
+        // Add tools to the request
+        let toolsData = try JSONEncoder().encode(availableTools)
+        if let toolsJSON = try? JSONSerialization.jsonObject(with: toolsData) as? [[String: Any]] {
+            body["tools"] = toolsJSON
+        }
 
         var request = URLRequest(url: URL(string: "http://\(host):\(port)/api/chat")!)
         request.httpMethod = "POST"
@@ -120,12 +272,66 @@ final class AgentOllamaClient {
         let (data, _) = try await URLSession.shared.data(for: request)
 
         guard let outer = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let message = outer["message"] as? [String: Any],
-              let responseText = message["content"] as? String else {
+              let message = outer["message"] as? [String: Any] else {
             let raw = String(data: data, encoding: .utf8) ?? "nil"
-            print("[AgentOllama] unexpected response: \(raw.prefix(300))")
+            // MARK: - Debug: Unexpected response
+            // print("[AgentOllama] unexpected response: \(raw.prefix(300))")
             throw AgentError.invalidResponse
         }
+
+        // Check if the model wants to call a tool
+        if let toolCalls = message["tool_calls"] as? [[String: Any]],
+           !toolCalls.isEmpty {
+            print("[AgentOllama] 🔍 Model requested tool calls: \(toolCalls.count)")
+
+            // Execute each tool call and build response messages
+            for toolCallDict in toolCalls {
+                guard let toolCallData = try? JSONSerialization.data(withJSONObject: toolCallDict),
+                      let toolCall = try? JSONDecoder().decode(ToolCall.self, from: toolCallData) else {
+                    print("[AgentOllama] ❌ Failed to decode tool call")
+                    continue
+                }
+
+                let toolResult = executeToolCall(toolCall)
+
+                // Add assistant message with tool call
+                messages.append([
+                    "role": "assistant",
+                    "content": message["content"] as? String ?? "",
+                    "tool_calls": [toolCallDict]
+                ])
+
+                // Add tool response message
+                messages.append([
+                    "role": "tool",
+                    "content": toolResult,
+                    "tool_call_id": toolCall.id ?? ""
+                ])
+            }
+
+            // Send the messages back to get the final response
+            body["messages"] = messages
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            let (finalData, _) = try await URLSession.shared.data(for: request)
+
+            guard let finalOuter = try JSONSerialization.jsonObject(with: finalData) as? [String: Any],
+                  let finalMessage = finalOuter["message"] as? [String: Any],
+                  let responseText = finalMessage["content"] as? String else {
+                let raw = String(data: finalData, encoding: .utf8) ?? "nil"
+                print("[AgentOllama] ❌ Failed to get final response after tool call: \(raw.prefix(300))")
+                throw AgentError.invalidResponse
+            }
+
+            print("[AgentOllama] ✅ Final response after tool execution")
+            return responseText
+        }
+
+        // No tool calls, return the response directly
+        guard let responseText = message["content"] as? String else {
+            throw AgentError.invalidResponse
+        }
+
         return responseText
     }
 }
