@@ -84,11 +84,6 @@ final class SuggestionRunner {
         var failures: [String] = []
 
         for token in tokens where token.type == .latex {
-            // Debug: show exact bytes in latex string
-            let debugBytes = token.value.unicodeScalars.map { String(format: "%02X", $0.value) }.joined(separator: " ")
-            print("[SuggestionRunner] latex token: \(token.value)")
-            print("[SuggestionRunner] latex bytes: \(debugBytes)")
-
             let (result, validation) = mathRenderer.validateAndRender(
                 latex: token.value,
                 fontSize: fontSize
