@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import PencilKit
+import UniformTypeIdentifiers
 
 struct NoteEditorView: View {
     @Environment(\.colorScheme) private var colorScheme
@@ -61,6 +62,9 @@ struct NoteEditorView: View {
                     .padding(.leading, Design.Spacing.headerHorizontal)
                     .padding(.top, 12)
                     Spacer()
+                    editorTopActions(note: note, pageManager: pageManager)
+                        .padding(.trailing, Design.Spacing.headerHorizontal)
+                        .padding(.top, 12)
                 }
                 Spacer()
             }
@@ -94,5 +98,89 @@ struct NoteEditorView: View {
             toolbar.save(colorScheme: colorScheme)
         }
         .onChange(of: toolbar.toolbarIcons) { toolbar.save(colorScheme: colorScheme) }
+        .sheet(isPresented: $showingBookmarks) {
+            BookmarkListSheet(note: note, onTap: scrollToPage)
+        }
+        .sheet(isPresented: $showingExport) {
+            PDFExportSheet(note: note)
+        }
+        .fileImporter(isPresented: $showingImport, allowedContentTypes: [.pdf]) { result in
+            handleImport(result: result, note: note)
+        }
     }
+
+    @State private var showingBookmarks = false
+    @State private var showingExport = false
+    @State private var showingImport = false
+
+    private var currentPage: Page? {
+        guard let note else { return nil }
+        let sorted = note.sortedPages
+        guard sorted.indices.contains(currentPageIndex) else { return nil }
+        return sorted[currentPageIndex]
+    }
+
+    @ViewBuilder
+    private func editorTopActions(note: Note, pageManager: PageManager) -> some View {
+        HStack(spacing: 10) {
+            Button {
+                if let page = currentPage {
+                    page.isBookmarked.toggle()
+                    note.updatedAt = .now
+                }
+            } label: {
+                Image(systemName: (currentPage?.isBookmarked ?? false) ? "bookmark.fill" : "bookmark")
+                    .font(.system(size: Design.FontSize.headerIcon, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .floatingButton()
+            }
+
+            Button { showingBookmarks = true } label: {
+                Image(systemName: "list.bullet")
+                    .font(.system(size: Design.FontSize.headerIcon, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .floatingButton()
+            }
+
+            Menu {
+                Button { showingImport = true } label: { Label("Import PDF", systemImage: "square.and.arrow.down") }
+                Button { flushDrawings(); showingExport = true } label: { Label("Export PDF", systemImage: "square.and.arrow.up") }
+                Button { flushDrawings(); printNote(note) } label: { Label("Print", systemImage: "printer") }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.system(size: Design.FontSize.headerIcon, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .floatingButton()
+            }
+        }
+        .opacity(isWriting ? 0 : 1)
+    }
+
+    private func scrollToPage(_ page: Page) {
+        guard let note else { return }
+        if let idx = note.sortedPages.firstIndex(where: { $0.id == page.id }) {
+            NotificationCenter.default.post(name: .scrollToPage, object: idx)
+        }
+    }
+
+    private func handleImport(result: Result<URL, Error>, note: Note) {
+        guard case .success(let url) = result else { return }
+        let didAccess = url.startAccessingSecurityScopedResource()
+        defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+        PDFService.importPDF(url: url, into: note, modelContext: modelContext)
+    }
+
+    private func flushDrawings() {
+        NotificationCenter.default.post(name: Notification.Name("SupaNotes.flushDrawings"), object: nil)
+        try? modelContext.save()
+    }
+
+    private func printNote(_ note: Note) {
+        guard let data = PDFService.exportNote(note, pages: nil) else { return }
+        PrintService.print(pdfData: data, jobName: note.title)
+    }
+}
+
+extension Notification.Name {
+    static let scrollToPage = Notification.Name("SupaNotes.scrollToPage")
 }

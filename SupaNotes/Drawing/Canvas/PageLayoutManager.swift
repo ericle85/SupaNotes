@@ -56,12 +56,22 @@ class PageLayoutManager {
     private static func makeCanvasView(page: Page, index: Int, frame: CGRect, tool: PKTool, delegate: PKCanvasViewDelegate) -> PKCanvasView {
         let canvasView = SupaCanvasView()
         canvasView.drawingPolicy = .pencilOnly
-        canvasView.backgroundColor = .white
-        canvasView.overrideUserInterfaceStyle = .light
+        canvasView.backgroundColor = page.template.backgroundColor
+        canvasView.overrideUserInterfaceStyle = page.template.interfaceStyle
         canvasView.isScrollEnabled = false
         canvasView.tool = tool
         canvasView.tag = index
         canvasView.delegate = delegate
+
+        if let data = page.backgroundImageData, let image = UIImage(data: data) {
+            let bg = UIImageView(image: image)
+            bg.contentMode = .scaleToFill
+            bg.frame = canvasView.bounds
+            bg.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            canvasView.insertSubview(bg, at: 0)
+            canvasView.isOpaque = false
+            canvasView.backgroundColor = .clear
+        }
 
         if !page.drawingData.isEmpty, let drawing = try? PKDrawing(data: page.drawingData) {
             canvasView.drawing = drawing
@@ -103,6 +113,18 @@ class PageLayoutManager {
             contentSize: containerView.frame.size,
             scrollBounds: scrollView.bounds.size
         )
+    }
+
+    func scrollToPage(index: Int) {
+        guard let scrollView = scrollView, canvasViews.indices.contains(index) else { return }
+        let pageH = PageConstants.internalHeight
+        let gap = PageConstants.internalGap
+        let y = gap + CGFloat(index) * (pageH + gap)
+        let maxY = max(0, scrollView.contentSize.height - scrollView.bounds.height)
+        let targetY = min(max(0, y * scrollView.zoomScale - 20), maxY)
+        UIView.animate(withDuration: 0.3) {
+            scrollView.contentOffset = CGPoint(x: 0, y: targetY)
+        }
     }
 
     func updateCurrentPage(pages: [Page], onCurrentPageChanged: ((Int) -> Void)?) {

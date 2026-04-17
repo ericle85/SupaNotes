@@ -13,6 +13,7 @@ struct HomeView: View {
     @State private var destination: SidebarDestination = .allNotes
     @State private var sortOrder: NoteSortOrder = .lastEdited
     @State private var navigationPath = NavigationPath()
+    @State private var tabs = TabsState()
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -50,9 +51,10 @@ struct HomeView: View {
             .background(Color("PaperBackground"))
             .navigationBarHidden(true)
             .navigationDestination(for: UUID.self) { noteID in
-                NoteEditorView(noteID: noteID)
+                TabbedEditorRoot(initialID: noteID)
             }
         }
+        .environment(tabs)
     }
 
     @ViewBuilder

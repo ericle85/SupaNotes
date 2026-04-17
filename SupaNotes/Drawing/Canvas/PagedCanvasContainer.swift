@@ -120,7 +120,28 @@ struct PagedCanvasContainer: UIViewRepresentable {
             self.onCurrentPageChanged = onCurrentPageChanged
             self.addPage = addPage
             self.addPageAbove = addPageAbove
+            super.init()
+            NotificationCenter.default.addObserver(
+                forName: Notification.Name("SupaNotes.scrollToPage"),
+                object: nil,
+                queue: .main
+            ) { [weak self] note in
+                guard let idx = note.object as? Int else { return }
+                self?.layoutManager.scrollToPage(index: idx)
+            }
+            NotificationCenter.default.addObserver(
+                forName: Notification.Name("SupaNotes.flushDrawings"),
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                guard let self else { return }
+                for canvas in self.layoutManager.canvasViews {
+                    self.saveController.immediateSave(canvasView: canvas, pages: self.pages)
+                }
+            }
         }
+
+        deinit { NotificationCenter.default.removeObserver(self) }
 
         func rebuildPages(pages: [Page], tool: PKTool) {
             layoutManager.rebuildPages(
