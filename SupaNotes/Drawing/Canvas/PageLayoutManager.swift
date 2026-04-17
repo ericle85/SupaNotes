@@ -28,20 +28,19 @@ class PageLayoutManager {
         let pageW = PageConstants.internalWidth
         let pageH = PageConstants.internalHeight
         let gap = PageConstants.internalGap
-        let totalHeight = CGFloat(sortedPages.count) * pageH + CGFloat(max(0, sortedPages.count - 1)) * gap + gap * 2
+        let size = PageLayout.containerSize(pageCount: sortedPages.count, pageW: pageW, pageH: pageH, gap: gap, scrollWidth: scrollView.bounds.width)
 
-        containerView.frame = CGRect(
-            x: 0, y: 0,
-            width: max(pageW + gap * 2, scrollView.bounds.width),
-            height: totalHeight
-        )
-        scrollView.contentSize = containerView.frame.size
+        // Set bounds.size (not frame) so we don't clobber a live zoom transform.
+        containerView.bounds.size = size
+        scrollView.contentSize = PageLayout.scrollContentSize(containerSize: size, zoomScale: scrollView.zoomScale)
 
-        for (index, page) in sortedPages.enumerated() {
-            let canvasView = makeCanvasView(for: page, at: index, tool: tool, pageW: pageW, pageH: pageH, gap: gap, containerWidth: containerView.frame.width, delegate: delegate)
-            containerView.addSubview(canvasView)
-            canvasViews.append(canvasView)
-        }
+        canvasViews = PageLayout.pageFrames(count: sortedPages.count, pageW: pageW, pageH: pageH, gap: gap, containerWidth: size.width)
+            .enumerated()
+            .map { index, frame in
+                let canvas = Self.makeCanvasView(page: sortedPages[index], index: index, frame: frame, tool: tool, delegate: delegate)
+                containerView.addSubview(canvas)
+                return canvas
+            }
 
         centerContainerIfNeeded()
         pullController.setupIndicators(in: scrollView)
@@ -54,7 +53,7 @@ class PageLayoutManager {
         }
     }
 
-    private func makeCanvasView(for page: Page, at index: Int, tool: PKTool, pageW: CGFloat, pageH: CGFloat, gap: CGFloat, containerWidth: CGFloat, delegate: PKCanvasViewDelegate) -> PKCanvasView {
+    private static func makeCanvasView(page: Page, index: Int, frame: CGRect, tool: PKTool, delegate: PKCanvasViewDelegate) -> PKCanvasView {
         let canvasView = SupaCanvasView()
         canvasView.drawingPolicy = .pencilOnly
         canvasView.backgroundColor = .white
@@ -72,10 +71,7 @@ class PageLayoutManager {
         canvasView.layer.shadowOpacity = Float(Design.Shadow.page.color)
         canvasView.layer.shadowOffset = CGSize(width: Design.Shadow.page.x, height: Design.Shadow.page.y)
         canvasView.layer.shadowRadius = Design.Shadow.page.radius
-
-        let xOffset = (containerWidth - pageW) / 2
-        let yOffset = gap + CGFloat(index) * (pageH + gap)
-        canvasView.frame = CGRect(x: xOffset, y: yOffset, width: pageW, height: pageH)
+        canvasView.frame = frame
         return canvasView
     }
 
@@ -86,8 +82,7 @@ class PageLayoutManager {
 
         let target: CGPoint
         switch action {
-        case .none:
-            return
+        case .none: return
         case .scrollToFirst:
             target = .zero
         case .scrollToLast:
@@ -104,12 +99,9 @@ class PageLayoutManager {
 
     func centerContainerIfNeeded() {
         guard let scrollView = scrollView, let containerView = containerView else { return }
-        let bounds = scrollView.bounds.size
-        let content = scrollView.contentSize
-
-        containerView.center = CGPoint(
-            x: content.width / 2 + max(0, (bounds.width - content.width) / 2),
-            y: content.height / 2 + max(0, (bounds.height - content.height) / 2)
+        containerView.frame.origin = PageLayout.centeringOrigin(
+            contentSize: containerView.frame.size,
+            scrollBounds: scrollView.bounds.size
         )
     }
 

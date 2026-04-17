@@ -1,2 +1,2 @@
-- Build on ipad
+- Build on ipad air 11 inch (M3)
 - UI needs to be intuitive

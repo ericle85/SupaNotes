@@ -37,6 +37,7 @@ struct PagedCanvasContainer: UIViewRepresentable {
 
         DispatchQueue.main.async {
             scrollView.zoomScale = 1.0 / PageConstants.renderScale
+            c.layoutManager.centerContainerIfNeeded()
         }
 
         return scrollView
@@ -62,6 +63,7 @@ struct PagedCanvasContainer: UIViewRepresentable {
             c.layoutManager.hasCompletedInitialLayout = scrollView.bounds.width > 0
             c.rebuildPages(pages: pages, tool: tool)
         }
+        c.layoutManager.centerContainerIfNeeded()
     }
 
     func makeCoordinator() -> Coordinator {
@@ -140,6 +142,10 @@ struct PagedCanvasContainer: UIViewRepresentable {
         }
 
         func scrollViewDidZoom(_ scrollView: UIScrollView) { layoutManager.centerContainerIfNeeded() }
+
+        func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+            layoutManager.centerContainerIfNeeded()
+        }
 
         func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
             let scroll = pullController.handleEndDragging(addPage: addPage, addPageAbove: addPageAbove)
