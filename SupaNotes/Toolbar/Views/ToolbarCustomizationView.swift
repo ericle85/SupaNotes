@@ -7,6 +7,7 @@ struct ToolbarCustomizationView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var showAddColor = false
     @State private var isRearranging = false
+    @State private var positioning = ToolbarPositioning()
 
     private var toolRows: [ToolbarIcon] { toolbar.toolbarIcons.filter { $0.type != .color } }
     private var colorRows: [ToolbarIcon] { toolbar.toolbarIcons.filter { $0.type == .color } }
@@ -15,22 +16,23 @@ struct ToolbarCustomizationView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            HStack(alignment: .top, spacing: 0) {
+            if positioning.axis == .horizontal {
                 previewBlock
-                    .frame(width: 200)
                     .padding(16)
-                    .frame(maxHeight: .infinity)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 140)
                     .background(Color.secondary.opacity(0.06))
                 Divider()
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        rearrangeToggle
-                        layoutBlock
-                        toolsBlock
-                        colorsBlock
-                        if !isRearranging { resetButton }
-                    }
-                    .padding(20)
+                settingsScroll
+            } else {
+                HStack(alignment: .top, spacing: 0) {
+                    previewBlock
+                        .frame(width: 200)
+                        .padding(16)
+                        .frame(maxHeight: .infinity)
+                        .background(Color.secondary.opacity(0.06))
+                    Divider()
+                    settingsScroll
                 }
             }
         }
@@ -49,6 +51,19 @@ struct ToolbarCustomizationView: View {
                 onBack: { showAddColor = false }
             )
             .presentationDetents([.medium])
+        }
+    }
+
+    private var settingsScroll: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                rearrangeToggle
+                layoutBlock
+                toolsBlock
+                colorsBlock
+                if !isRearranging { resetButton }
+            }
+            .padding(20)
         }
     }
 
