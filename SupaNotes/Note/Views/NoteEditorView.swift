@@ -72,9 +72,7 @@ struct NoteEditorView: View {
             .animation(.easeInOut(duration: Design.Animation.writingFadeDuration), value: isWriting)
 
             DrawingToolbar(
-                toolbarIcons: $toolbar.toolbarIcons,
-                selectedColor: $toolbar.selectedColor,
-                activeTool: $toolbar.activeTool,
+                toolbar: toolbar,
                 undoManager: canvasUndoManager
             )
             .animation(.easeInOut(duration: Design.Animation.writingFadeDuration), value: isWriting)

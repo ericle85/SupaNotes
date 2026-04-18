@@ -5,12 +5,27 @@ enum ActiveTool: String, Codable, Equatable {
     case pen, eraser, highlighter, lasso
 }
 
+enum ToolbarSection: String, Codable, CaseIterable, Identifiable {
+    case undoRedo, tools, colors
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .undoRedo: return "Undo / Redo"
+        case .tools: return "Tools"
+        case .colors: return "Colors"
+        }
+    }
+}
+
 @Observable
 final class ToolbarState {
     var selectedColor: Color = .black
     var activeTool: ActiveTool = .pen
     var toolbarIcons: [ToolbarIcon] = []
     var previousTool: ActiveTool = .eraser
+    var sectionOrder: [ToolbarSection] = [.undoRedo, .tools, .colors]
+    var showUndoRedo: Bool = true
+    var showCustomization: Bool = false
 
     func switchToPreviousTool() {
         let oldTool = activeTool
@@ -43,5 +58,11 @@ final class ToolbarState {
 
     func save(colorScheme: ColorScheme) {
         ToolbarPersistence.save(self, colorScheme: colorScheme)
+    }
+
+    func resetToDefaults(colorScheme: ColorScheme) {
+        toolbarIcons = ToolbarPersistence.defaultIcons(colorScheme: colorScheme)
+        sectionOrder = [.undoRedo, .tools, .colors]
+        showUndoRedo = true
     }
 }

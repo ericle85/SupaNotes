@@ -1,24 +1,20 @@
 import SwiftUI
 
 struct DrawingToolbar: View {
-    @Binding var toolbarIcons: [ToolbarIcon]
-    @Binding var selectedColor: Color
-    @Binding var activeTool: ActiveTool
+    @Bindable var toolbar: ToolbarState
     var undoManager: UndoManager?
 
     @State private var showColorPicker = false
     @State private var editingIconID: UUID?
-    @State private var dragState = IconDragState()
     @State private var lastDeletedColor: Color = .blue
 
-    // Toolbar repositioning
     @State private var positioning = ToolbarPositioning()
     @State private var toolbarDragOffset: CGSize = .zero
     @State private var isDraggingToolbar = false
     @State private var didRepositionToolbar = false
 
-    private var toolIcons: [ToolbarIcon] { toolbarIcons.filter { $0.type != .color } }
-    private var colorIcons: [ToolbarIcon] { toolbarIcons.filter { $0.type == .color } }
+    private var toolIcons: [ToolbarIcon] { toolbar.toolbarIcons.filter { $0.type != .color } }
+    private var colorIcons: [ToolbarIcon] { toolbar.toolbarIcons.filter { $0.type == .color } }
 
     var body: some View {
         GeometryReader { geometry in
@@ -26,7 +22,7 @@ struct DrawingToolbar: View {
                 .fixedSize()
                 .simultaneousGesture(
                     ToolbarPositioning.repositionGesture(
-                        draggedIconID: dragState.draggedIconID,
+                        draggedIconID: nil,
                         isDraggingToolbar: $isDraggingToolbar,
                         didRepositionToolbar: $didRepositionToolbar,
                         toolbarDragOffset: $toolbarDragOffset,
@@ -39,6 +35,9 @@ struct DrawingToolbar: View {
                 .padding(.vertical, 0)
                 .padding(.horizontal, positioning.edge == .leading || positioning.edge == .trailing ? Design.Spacing.toolbarEdgePadding : 0)
         }
+        .fullScreenCover(isPresented: $toolbar.showCustomization) {
+            customizationOverlay
+        }
     }
 
     @ViewBuilder
@@ -48,71 +47,13 @@ struct DrawingToolbar: View {
             : AnyLayout(VStackLayout(spacing: 2))
 
         layout {
-            UndoRedoButtons(undoManager: undoManager, didRepositionToolbar: didRepositionToolbar)
-
-            dividerView
-
-            ForEach(toolIcons) { icon in
-                ToolbarIconButton(
-                    icon: icon,
-                    toolbarIcons: $toolbarIcons,
-                    selectedColor: $selectedColor,
-                    activeTool: $activeTool,
-                    positioning: positioning,
-                    dragState: dragState,
-                    toolIcons: toolIcons,
-                    colorIcons: colorIcons,
-                    didRepositionToolbar: didRepositionToolbar,
-                    lastDeletedColor: $lastDeletedColor,
-                    editingIconID: $editingIconID
-                )
-            }
-
-            dividerView
-
-            ForEach(colorIcons) { icon in
-                ToolbarIconButton(
-                    icon: icon,
-                    toolbarIcons: $toolbarIcons,
-                    selectedColor: $selectedColor,
-                    activeTool: $activeTool,
-                    positioning: positioning,
-                    dragState: dragState,
-                    toolIcons: toolIcons,
-                    colorIcons: colorIcons,
-                    didRepositionToolbar: didRepositionToolbar,
-                    lastDeletedColor: $lastDeletedColor,
-                    editingIconID: $editingIconID
-                )
-            }
-
-            // Plus button
-            Button {
-                guard !didRepositionToolbar else { return }
-                showColorPicker = true
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(Color.secondary.opacity(0.15))
-                        .frame(width: Design.Layout.plusButtonSize, height: Design.Layout.plusButtonSize)
-                    Image(systemName: "plus")
-                        .font(.system(size: Design.FontSize.plusIcon, weight: .bold))
-                        .foregroundStyle(.primary)
+            ForEach(Array(toolbar.sectionOrder.enumerated()), id: \.element) { idx, section in
+                sectionView(section)
+                if idx < toolbar.sectionOrder.count - 1, isSectionVisible(section) {
+                    dividerView
                 }
-                .overlay {
-                    Circle().stroke(Color.primary.opacity(0.3), lineWidth: 1)
-                }
-                .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
-                .contentShape(Circle())
             }
-            .popover(isPresented: $showColorPicker) {
-                AddToolMenuView(
-                    toolbarIcons: $toolbarIcons,
-                    selectedColor: $selectedColor,
-                    activeTool: $activeTool,
-                    defaultColor: lastDeletedColor
-                )
-            }
+            plusAndCogButtons
         }
         .font(.title3)
         .buttonStyle(.plain)
@@ -131,6 +72,93 @@ struct DrawingToolbar: View {
         }
     }
 
+    private func isSectionVisible(_ section: ToolbarSection) -> Bool {
+        switch section {
+        case .undoRedo: return toolbar.showUndoRedo
+        case .tools: return !toolIcons.isEmpty
+        case .colors: return !colorIcons.isEmpty
+        }
+    }
+
+    @ViewBuilder
+    private func sectionView(_ section: ToolbarSection) -> some View {
+        switch section {
+        case .undoRedo:
+            if toolbar.showUndoRedo {
+                UndoRedoButtons(undoManager: undoManager, didRepositionToolbar: didRepositionToolbar)
+            }
+        case .tools:
+            ForEach(toolIcons) { icon in
+                ToolbarIconButton(
+                    icon: icon,
+                    toolbarIcons: $toolbar.toolbarIcons,
+                    selectedColor: $toolbar.selectedColor,
+                    activeTool: $toolbar.activeTool,
+                    didRepositionToolbar: didRepositionToolbar,
+                    editingIconID: $editingIconID
+                )
+            }
+        case .colors:
+            ForEach(colorIcons) { icon in
+                ToolbarIconButton(
+                    icon: icon,
+                    toolbarIcons: $toolbar.toolbarIcons,
+                    selectedColor: $toolbar.selectedColor,
+                    activeTool: $toolbar.activeTool,
+                    didRepositionToolbar: didRepositionToolbar,
+                    editingIconID: $editingIconID
+                )
+            }
+        }
+    }
+
+    private var plusAndCogButtons: some View {
+        Group {
+            Button {
+                guard !didRepositionToolbar else { return }
+                showColorPicker = true
+            } label: {
+                Image(systemName: "plus.circle.dashed")
+                    .font(.system(size: Design.Layout.plusButtonSize * 0.75, weight: .regular))
+                    .foregroundStyle(.primary)
+                    .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
+                    .contentShape(Circle())
+            }
+            .popover(isPresented: $showColorPicker) {
+                AddColorView(
+                    toolbarIcons: $toolbar.toolbarIcons,
+                    selectedColor: $toolbar.selectedColor,
+                    activeTool: $toolbar.activeTool,
+                    defaultColor: lastDeletedColor,
+                    onBack: { showColorPicker = false }
+                )
+            }
+
+            Button {
+                guard !didRepositionToolbar else { return }
+                toolbar.showCustomization = true
+            } label: {
+                plusCogLabel(systemName: "gearshape.fill")
+            }
+        }
+    }
+
+    private func plusCogLabel(systemName: String) -> some View {
+        ZStack {
+            Circle()
+                .fill(Color.secondary.opacity(0.15))
+                .frame(width: Design.Layout.plusButtonSize, height: Design.Layout.plusButtonSize)
+            Image(systemName: systemName)
+                .font(.system(size: Design.FontSize.plusIcon, weight: .bold))
+                .foregroundStyle(.primary)
+        }
+        .overlay {
+            Circle().stroke(Color.primary.opacity(0.3), lineWidth: 1)
+        }
+        .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
+        .contentShape(Circle())
+    }
+
     @ViewBuilder
     private var dividerView: some View {
         if positioning.axis == .horizontal {
@@ -138,5 +166,18 @@ struct DrawingToolbar: View {
         } else {
             Divider().frame(width: Design.Layout.headerButtonSize)
         }
+    }
+
+    private var customizationOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.35)
+                .ignoresSafeArea()
+                .background(.ultraThinMaterial)
+                .onTapGesture { toolbar.showCustomization = false }
+            ToolbarCustomizationView(toolbar: toolbar) {
+                toolbar.showCustomization = false
+            }
+        }
+        .presentationBackground(.clear)
     }
 }

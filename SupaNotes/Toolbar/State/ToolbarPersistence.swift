@@ -4,6 +4,21 @@ enum ToolbarPersistence {
     private static let selectedColorKey = "toolbar.selectedColor"
     private static let activeToolKey = "toolbar.activeTool"
     private static let toolbarIconsKey = "toolbar.toolbarIcons"
+    private static let sectionOrderKey = "toolbar.sectionOrder"
+    private static let showUndoRedoKey = "toolbar.showUndoRedo"
+
+    static func defaultIcons(colorScheme: ColorScheme) -> [ToolbarIcon] {
+        [
+            ToolbarIcon.toolIcon(.pen),
+            ToolbarIcon.toolIcon(.eraser),
+            ToolbarIcon.toolIcon(.highlighter),
+            ToolbarIcon.toolIcon(.lasso),
+            ToolbarIcon.colorIcon(.black, name: "Black", colorScheme: colorScheme),
+            ToolbarIcon.colorIcon(.red, name: "Red", colorScheme: colorScheme),
+            ToolbarIcon.colorIcon(.blue, name: "Blue", colorScheme: colorScheme),
+            ToolbarIcon.colorIcon(.green, name: "Green", colorScheme: colorScheme),
+        ]
+    }
 
     static func load(into state: ToolbarState) {
         let defaults = UserDefaults.standard
@@ -13,14 +28,7 @@ enum ToolbarPersistence {
            !icons.isEmpty {
             state.toolbarIcons = icons
         } else {
-            state.toolbarIcons = [
-                ToolbarIcon.toolIcon(.pen),
-                ToolbarIcon.toolIcon(.eraser),
-                ToolbarIcon.colorIcon(.black, name: "Black", colorScheme: .light),
-                ToolbarIcon.colorIcon(.red, name: "Red", colorScheme: .light),
-                ToolbarIcon.colorIcon(.blue, name: "Blue", colorScheme: .light),
-                ToolbarIcon.colorIcon(.green, name: "Green", colorScheme: .light),
-            ]
+            state.toolbarIcons = defaultIcons(colorScheme: .light)
         }
 
         // Ensure pen and eraser always exist
@@ -41,6 +49,16 @@ enum ToolbarPersistence {
            let tool = ActiveTool(rawValue: rawTool) {
             state.activeTool = tool
         }
+
+        if let data = defaults.data(forKey: sectionOrderKey),
+           let order = try? JSONDecoder().decode([ToolbarSection].self, from: data),
+           Set(order) == Set(ToolbarSection.allCases) {
+            state.sectionOrder = order
+        }
+
+        if defaults.object(forKey: showUndoRedoKey) != nil {
+            state.showUndoRedo = defaults.bool(forKey: showUndoRedoKey)
+        }
     }
 
     static func save(_ state: ToolbarState, colorScheme: ColorScheme) {
@@ -56,5 +74,10 @@ enum ToolbarPersistence {
         }
 
         defaults.set(state.activeTool.rawValue, forKey: activeToolKey)
+
+        if let data = try? JSONEncoder().encode(state.sectionOrder) {
+            defaults.set(data, forKey: sectionOrderKey)
+        }
+        defaults.set(state.showUndoRedo, forKey: showUndoRedoKey)
     }
 }
