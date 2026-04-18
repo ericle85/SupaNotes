@@ -40,6 +40,7 @@ struct NoteEditorView: View {
                     set: { _ in }
                 ),
                 tool: toolbar.currentPKTool,
+                isLassoActive: toolbar.isLassoActive,
                 onUndoManagerReady: { canvasUndoManager = $0 },
                 onPencilDoubleTap: { toolbar.switchToPreviousTool() },
                 onCurrentPageChanged: { currentPageIndex = $0 },

@@ -44,6 +44,8 @@ final class ToolbarState {
             ?? WritingInstrumentSettings.pen().width
     }
 
+    var isLassoActive: Bool { activeTool == .lasso }
+
     var currentPKTool: PKTool {
         let scale = PageConstants.renderScale
         switch activeTool {
@@ -54,7 +56,7 @@ final class ToolbarState {
         case .highlighter:
             return PKInkingTool(.marker, color: UIColor(selectedColor), width: instrumentWidth(for: .highlighter) * scale)
         case .lasso:
-            return PKLassoTool()
+            return PKInkingTool(.pen, color: .black, width: 1)
         }
     }
 

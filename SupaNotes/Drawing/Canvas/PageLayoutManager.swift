@@ -5,6 +5,7 @@ class PageLayoutManager {
     weak var scrollView: UIScrollView?
     weak var containerView: UIView?
     var canvasViews: [PKCanvasView] = []
+    var lassoOverlays: [LassoOverlayView] = []
     var hasCompletedInitialLayout = false
 
     func rebuildPages(
@@ -23,6 +24,8 @@ class PageLayoutManager {
 
         canvasViews.forEach { $0.removeFromSuperview() }
         canvasViews.removeAll()
+        lassoOverlays.forEach { $0.removeFromSuperview() }
+        lassoOverlays.removeAll()
 
         let sortedPages = pages.sorted { $0.orderIndex < $1.orderIndex }
         let pageW = PageConstants.internalWidth
@@ -34,13 +37,20 @@ class PageLayoutManager {
         containerView.bounds.size = size
         scrollView.contentSize = PageLayout.scrollContentSize(containerSize: size, zoomScale: scrollView.zoomScale)
 
-        canvasViews = PageLayout.pageFrames(count: sortedPages.count, pageW: pageW, pageH: pageH, gap: gap, containerWidth: size.width)
-            .enumerated()
-            .map { index, frame in
-                let canvas = Self.makeCanvasView(page: sortedPages[index], index: index, frame: frame, tool: tool, delegate: delegate)
-                containerView.addSubview(canvas)
-                return canvas
-            }
+        let frames = PageLayout.pageFrames(count: sortedPages.count, pageW: pageW, pageH: pageH, gap: gap, containerWidth: size.width)
+        canvasViews = frames.enumerated().map { index, frame in
+            let canvas = Self.makeCanvasView(page: sortedPages[index], index: index, frame: frame, tool: tool, delegate: delegate)
+            containerView.addSubview(canvas)
+            return canvas
+        }
+        lassoOverlays = zip(canvasViews, frames).map { canvas, frame in
+            let overlay = LassoOverlayView(frame: frame)
+            overlay.canvasView = canvas
+            overlay.outerScrollView = scrollView
+            overlay.isHidden = true
+            containerView.addSubview(overlay)
+            return overlay
+        }
 
         centerContainerIfNeeded()
         pullController.setupIndicators(in: scrollView)
