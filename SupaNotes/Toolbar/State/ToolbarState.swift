@@ -26,6 +26,8 @@ final class ToolbarState {
     var sectionOrder: [ToolbarSection] = [.undoRedo, .tools, .colors]
     var showUndoRedo: Bool = true
     var showCustomization: Bool = false
+    var previewDraggedIconID: UUID?
+    var previewDraggedSection: ToolbarSection?
 
     func switchToPreviousTool() {
         let oldTool = activeTool
