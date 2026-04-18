@@ -31,15 +31,6 @@ enum ToolbarPersistence {
             state.toolbarIcons = defaultIcons(colorScheme: .light)
         }
 
-        // Ensure pen and eraser always exist
-        if !state.toolbarIcons.contains(where: { $0.type == .pen }) {
-            state.toolbarIcons.insert(ToolbarIcon.toolIcon(.pen), at: 0)
-        }
-        if !state.toolbarIcons.contains(where: { $0.type == .eraser }) {
-            let penIndex = state.toolbarIcons.firstIndex(where: { $0.type == .pen }) ?? 0
-            state.toolbarIcons.insert(ToolbarIcon.toolIcon(.eraser), at: penIndex + 1)
-        }
-
         if let data = defaults.data(forKey: selectedColorKey),
            let codable = try? JSONDecoder().decode(CodableColor.self, from: data) {
             state.selectedColor = codable.toColor()

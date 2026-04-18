@@ -53,7 +53,7 @@ struct DrawingToolbar: View {
                     dividerView
                 }
             }
-            plusAndCogButtons
+            cogButton
         }
         .font(.title3)
         .buttonStyle(.plain)
@@ -109,37 +109,38 @@ struct DrawingToolbar: View {
                     editingIconID: $editingIconID
                 )
             }
+            addColorButton
         }
     }
 
-    private var plusAndCogButtons: some View {
-        Group {
-            Button {
-                guard !didRepositionToolbar else { return }
-                showColorPicker = true
-            } label: {
-                Image(systemName: "plus.circle.dashed")
-                    .font(.system(size: Design.Layout.plusButtonSize * 0.75, weight: .regular))
-                    .foregroundStyle(.primary)
-                    .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
-                    .contentShape(Circle())
-            }
-            .popover(isPresented: $showColorPicker) {
-                AddColorView(
-                    toolbarIcons: $toolbar.toolbarIcons,
-                    selectedColor: $toolbar.selectedColor,
-                    activeTool: $toolbar.activeTool,
-                    defaultColor: lastDeletedColor,
-                    onBack: { showColorPicker = false }
-                )
-            }
+    private var addColorButton: some View {
+        Button {
+            guard !didRepositionToolbar else { return }
+            showColorPicker = true
+        } label: {
+            Image(systemName: "plus.circle.dashed")
+                .font(.system(size: Design.Layout.plusButtonSize * 0.75, weight: .regular))
+                .foregroundStyle(.primary)
+                .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
+                .contentShape(Circle())
+        }
+        .popover(isPresented: $showColorPicker) {
+            AddColorView(
+                toolbarIcons: $toolbar.toolbarIcons,
+                selectedColor: $toolbar.selectedColor,
+                activeTool: $toolbar.activeTool,
+                defaultColor: lastDeletedColor,
+                onBack: { showColorPicker = false }
+            )
+        }
+    }
 
-            Button {
-                guard !didRepositionToolbar else { return }
-                toolbar.showCustomization = true
-            } label: {
-                plusCogLabel(systemName: "gearshape.fill")
-            }
+    private var cogButton: some View {
+        Button {
+            guard !didRepositionToolbar else { return }
+            toolbar.showCustomization = true
+        } label: {
+            plusCogLabel(systemName: "gearshape.fill")
         }
     }
 

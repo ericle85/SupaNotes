@@ -117,7 +117,6 @@ struct ToolbarCustomizationView: View {
 
     private func toolToggleRow(type: ToolType) -> some View {
         let present = toolbar.toolbarIcons.contains(where: { $0.type == type })
-        let isEssential = ToolbarIcon.essentialTypes.contains(type)
         return HStack {
             Image(systemName: type.iconName).frame(width: 24)
             Text(type.displayName)
@@ -127,7 +126,6 @@ struct ToolbarCustomizationView: View {
                 set: { newValue in toggleTool(type, on: newValue) }
             ))
             .labelsHidden()
-            .disabled(isEssential)
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 12)
@@ -179,10 +177,11 @@ struct ToolbarCustomizationView: View {
                     Image(systemName: "chevron.down")
                 }
                 .disabled(index == colorRows.count - 1)
-                Button(role: .destructive) {
+                Button {
                     removeColor(id: icon.id)
                 } label: {
                     Image(systemName: "trash")
+                        .foregroundStyle(colorRows.count <= 1 ? Color.secondary.opacity(0.4) : Color.red)
                 }
                 .disabled(colorRows.count <= 1)
             }
