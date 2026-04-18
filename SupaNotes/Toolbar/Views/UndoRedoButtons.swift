@@ -13,6 +13,7 @@ struct UndoRedoButtons: View {
             undoManager?.undo()
         } label: {
             Image(systemName: "arrow.uturn.backward")
+                .font(.system(size: Design.FontSize.toolIcon))
                 .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
                 .contentShape(Rectangle())
         }
@@ -24,6 +25,7 @@ struct UndoRedoButtons: View {
             undoManager?.redo()
         } label: {
             Image(systemName: "arrow.uturn.forward")
+                .font(.system(size: Design.FontSize.toolIcon))
                 .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
                 .contentShape(Rectangle())
         }

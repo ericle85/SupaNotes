@@ -10,7 +10,6 @@ struct NoteEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var notes: [Note]
     @State private var canvasUndoManager: UndoManager?
-    @State private var isWriting: Bool = false
     @State private var currentPageIndex: Int = 0
 
     private var note: Note? { notes.first }
@@ -43,7 +42,6 @@ struct NoteEditorView: View {
                 tool: toolbar.currentPKTool,
                 onUndoManagerReady: { canvasUndoManager = $0 },
                 onPencilDoubleTap: { toolbar.switchToPreviousTool() },
-                onWritingStateChanged: { isWriting = $0 },
                 onCurrentPageChanged: { currentPageIndex = $0 },
                 addPage: { pageManager.addPage(to: note) },
                 addPageAbove: { pageManager.addPageAbove(in: note) }
@@ -68,14 +66,11 @@ struct NoteEditorView: View {
                 }
                 Spacer()
             }
-            .opacity(isWriting ? 0 : 1)
-            .animation(.easeInOut(duration: Design.Animation.writingFadeDuration), value: isWriting)
 
             DrawingToolbar(
                 toolbar: toolbar,
                 undoManager: canvasUndoManager
             )
-            .animation(.easeInOut(duration: Design.Animation.writingFadeDuration), value: isWriting)
 
             VStack {
                 Spacer()
@@ -86,8 +81,6 @@ struct NoteEditorView: View {
                     Spacer()
                 }
             }
-            .opacity(isWriting ? 0 : 1)
-            .animation(.easeInOut(duration: Design.Animation.writingFadeDuration), value: isWriting)
         }
         .navigationBarHidden(true)
         .onChange(of: toolbar.selectedColor) { toolbar.save(colorScheme: colorScheme) }
@@ -151,7 +144,6 @@ struct NoteEditorView: View {
                     .floatingButton()
             }
         }
-        .opacity(isWriting ? 0 : 1)
     }
 
     private func scrollToPage(_ page: Page) {

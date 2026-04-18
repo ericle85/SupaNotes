@@ -55,7 +55,6 @@ enum Design {
     // MARK: - Animation
     enum Animation {
         static let sidebarDuration: Double = 0.25
-        static let writingFadeDuration: Double = 0.5
         static let springResponse: Double = 0.35
         static let springDamping: Double = 0.8
     }

@@ -6,7 +6,6 @@ struct PagedCanvasContainer: UIViewRepresentable {
     var tool: PKTool
     var onUndoManagerReady: (UndoManager?) -> Void
     var onPencilDoubleTap: (() -> Void)?
-    var onWritingStateChanged: ((Bool) -> Void)?
     var onCurrentPageChanged: ((Int) -> Void)?
     var addPage: () -> Void
     var addPageAbove: (() -> Void)?
@@ -48,7 +47,6 @@ struct PagedCanvasContainer: UIViewRepresentable {
         c.pages = pages
         c.tool = tool
         c.onPencilDoubleTap = onPencilDoubleTap
-        c.onWritingStateChanged = onWritingStateChanged
         c.onCurrentPageChanged = onCurrentPageChanged
         c.addPage = addPage
         c.addPageAbove = addPageAbove
@@ -72,7 +70,6 @@ struct PagedCanvasContainer: UIViewRepresentable {
             tool: tool,
             onUndoManagerReady: onUndoManagerReady,
             onPencilDoubleTap: onPencilDoubleTap,
-            onWritingStateChanged: onWritingStateChanged,
             onCurrentPageChanged: onCurrentPageChanged,
             addPage: addPage,
             addPageAbove: addPageAbove
@@ -92,7 +89,6 @@ struct PagedCanvasContainer: UIViewRepresentable {
         var tool: PKTool
         var onUndoManagerReady: (UndoManager?) -> Void
         var onPencilDoubleTap: (() -> Void)?
-        var onWritingStateChanged: ((Bool) -> Void)?
         var onCurrentPageChanged: ((Int) -> Void)?
         var addPage: () -> Void
         var addPageAbove: (() -> Void)?
@@ -107,7 +103,6 @@ struct PagedCanvasContainer: UIViewRepresentable {
             tool: PKTool,
             onUndoManagerReady: @escaping (UndoManager?) -> Void,
             onPencilDoubleTap: (() -> Void)?,
-            onWritingStateChanged: ((Bool) -> Void)?,
             onCurrentPageChanged: ((Int) -> Void)?,
             addPage: @escaping () -> Void,
             addPageAbove: (() -> Void)?
@@ -116,7 +111,6 @@ struct PagedCanvasContainer: UIViewRepresentable {
             self.tool = tool
             self.onUndoManagerReady = onUndoManagerReady
             self.onPencilDoubleTap = onPencilDoubleTap
-            self.onWritingStateChanged = onWritingStateChanged
             self.onCurrentPageChanged = onCurrentPageChanged
             self.addPage = addPage
             self.addPageAbove = addPageAbove
@@ -181,12 +175,10 @@ struct PagedCanvasContainer: UIViewRepresentable {
         }
 
         func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
-            onWritingStateChanged?(true)
             onUndoManagerReady(canvasView.undoManager)
         }
 
         func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
-            onWritingStateChanged?(false)
             saveController.immediateSave(canvasView: canvasView, pages: pages)
         }
 
