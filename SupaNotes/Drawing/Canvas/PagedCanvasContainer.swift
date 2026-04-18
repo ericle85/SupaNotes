@@ -4,7 +4,6 @@ import PencilKit
 struct PagedCanvasContainer: UIViewRepresentable {
     @Binding var pages: [Page]
     var tool: PKTool
-    var isLassoActive: Bool
     var onUndoManagerReady: (UndoManager?) -> Void
     var onPencilDoubleTap: (() -> Void)?
     var onCurrentPageChanged: ((Int) -> Void)?
@@ -34,7 +33,6 @@ struct PagedCanvasContainer: UIViewRepresentable {
         scrollView.addInteraction(pencilInteraction)
 
         c.rebuildPages(pages: pages, tool: tool)
-        c.applyLassoActive(isLassoActive)
 
         DispatchQueue.main.async {
             scrollView.zoomScale = 1.0 / PageConstants.renderScale
@@ -54,7 +52,6 @@ struct PagedCanvasContainer: UIViewRepresentable {
         c.addPageAbove = addPageAbove
 
         c.layoutManager.canvasViews.forEach { $0.tool = tool }
-        c.applyLassoActive(isLassoActive)
 
         let containerWidth = c.layoutManager.containerView?.frame.width ?? 0
         let needsRebuild = c.layoutManager.canvasViews.count != pages.count
@@ -63,7 +60,6 @@ struct PagedCanvasContainer: UIViewRepresentable {
         if needsRebuild {
             c.layoutManager.hasCompletedInitialLayout = scrollView.bounds.width > 0
             c.rebuildPages(pages: pages, tool: tool)
-            c.applyLassoActive(isLassoActive)
         }
         c.layoutManager.centerContainerIfNeeded()
     }
@@ -140,26 +136,6 @@ struct PagedCanvasContainer: UIViewRepresentable {
         }
 
         deinit { NotificationCenter.default.removeObserver(self) }
-
-        func applyLassoActive(_ active: Bool) {
-            for canvas in layoutManager.canvasViews {
-                canvas.isUserInteractionEnabled = !active
-            }
-            for overlay in layoutManager.lassoOverlays {
-                overlay.isHidden = !active
-                if !active { overlay.deactivate() }
-            }
-            if let pan = layoutManager.scrollView?.panGestureRecognizer {
-                pan.allowedTouchTypes = active
-                    ? [NSNumber(value: UITouch.TouchType.direct.rawValue),
-                       NSNumber(value: UITouch.TouchType.indirect.rawValue),
-                       NSNumber(value: UITouch.TouchType.indirectPointer.rawValue)]
-                    : [NSNumber(value: UITouch.TouchType.direct.rawValue),
-                       NSNumber(value: UITouch.TouchType.indirect.rawValue),
-                       NSNumber(value: UITouch.TouchType.indirectPointer.rawValue),
-                       NSNumber(value: UITouch.TouchType.pencil.rawValue)]
-            }
-        }
 
         func rebuildPages(pages: [Page], tool: PKTool) {
             layoutManager.rebuildPages(
