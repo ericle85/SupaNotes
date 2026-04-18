@@ -9,7 +9,6 @@ enum NoteSortOrder: String, CaseIterable {
 
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
-    @State private var isSidebarVisible = true
     @State private var destination: SidebarDestination = .allNotes
     @State private var sortOrder: NoteSortOrder = .lastEdited
     @State private var navigationPath = NavigationPath()
@@ -17,35 +16,29 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            HStack(spacing: 0) {
-                if isSidebarVisible {
-                    FolderSidebarView(destination: $destination)
-                        .frame(width: Design.Layout.sidebarWidth)
-                        .transition(.move(edge: .leading))
-                }
+            VStack(spacing: 0) {
+                headerView
+                Divider()
 
-                VStack(spacing: 0) {
-                    headerView
-                    Divider()
-
-                    switch destination {
-                    case .trash:
-                        TrashView()
-                    case .settings:
-                        SettingsView()
-                    case .allNotes:
-                        NoteListView(
-                            folder: nil,
-                            sortOrder: sortOrder,
-                            onOpenNote: { navigationPath.append($0) }
-                        )
-                    case .folder(let folder):
-                        NoteListView(
-                            folder: folder,
-                            sortOrder: sortOrder,
-                            onOpenNote: { navigationPath.append($0) }
-                        )
-                    }
+                switch destination {
+                case .trash:
+                    TrashView()
+                case .settings:
+                    SettingsView()
+                case .allNotes:
+                    NoteListView(
+                        folder: nil,
+                        sortOrder: sortOrder,
+                        onOpenNote: { navigationPath.append($0) },
+                        onOpenFolder: { destination = .folder($0) }
+                    )
+                case .folder(let folder):
+                    NoteListView(
+                        folder: folder,
+                        sortOrder: sortOrder,
+                        onOpenNote: { navigationPath.append($0) },
+                        onOpenFolder: { destination = .folder($0) }
+                    )
                 }
             }
             .background(Color("PaperBackground"))
@@ -60,15 +53,24 @@ struct HomeView: View {
     @ViewBuilder
     private var headerView: some View {
         HStack(spacing: 12) {
-            Button {
-                withAnimation(.easeInOut(duration: Design.Animation.sidebarDuration)) {
-                    isSidebarVisible.toggle()
+            if case .folder = destination {
+                Button {
+                    destination = .allNotes
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: Design.FontSize.headerIcon))
+                        .foregroundStyle(.primary)
+                        .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
                 }
-            } label: {
-                Image(systemName: "sidebar.left")
-                    .font(.system(size: Design.FontSize.headerIcon))
-                    .foregroundStyle(.primary)
-                    .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
+            } else if destination.isTrash || destination.isSettings {
+                Button {
+                    destination = .allNotes
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: Design.FontSize.headerIcon))
+                        .foregroundStyle(.primary)
+                        .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
+                }
             }
 
             Text(headerTitle)
@@ -103,6 +105,24 @@ struct HomeView: View {
                     modelContext.insert(folder)
                 } label: {
                     Image(systemName: "folder.badge.plus")
+                        .font(.system(size: Design.FontSize.toolIcon))
+                        .foregroundStyle(.secondary)
+                        .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
+                }
+
+                Button {
+                    destination = .trash
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: Design.FontSize.toolIcon))
+                        .foregroundStyle(.secondary)
+                        .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
+                }
+
+                Button {
+                    destination = .settings
+                } label: {
+                    Image(systemName: "gearshape")
                         .font(.system(size: Design.FontSize.toolIcon))
                         .foregroundStyle(.secondary)
                         .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
