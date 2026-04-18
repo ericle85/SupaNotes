@@ -64,7 +64,13 @@ struct ToolbarCustomizationView: View {
         HStack {
             Text("Customize Toolbar").font(.headline)
             Spacer()
-            Button(action: onDismiss) {
+            Button(action: {
+                if isRearranging {
+                    withAnimation(.easeInOut(duration: 0.2)) { isRearranging = false }
+                } else {
+                    onDismiss()
+                }
+            }) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.title2)
                     .foregroundStyle(.secondary)
@@ -246,9 +252,9 @@ struct ToolbarCustomizationView: View {
 
     private func removeColor(id: UUID) {
         guard colorRows.count > 1 else { return }
-        var tx = Transaction()
-        tx.disablesAnimations = true
-        withTransaction(tx) {
+        var t = Transaction()
+        t.disablesAnimations = true
+        withTransaction(t) {
             toolbar.toolbarIcons.removeAll { $0.id == id }
         }
     }

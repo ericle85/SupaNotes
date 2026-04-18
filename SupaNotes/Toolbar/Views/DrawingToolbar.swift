@@ -82,35 +82,42 @@ struct DrawingToolbar: View {
 
     @ViewBuilder
     private func sectionView(_ section: ToolbarSection) -> some View {
-        switch section {
-        case .undoRedo:
-            if toolbar.showUndoRedo {
-                UndoRedoButtons(undoManager: undoManager, didRepositionToolbar: didRepositionToolbar)
+        Group {
+            switch section {
+            case .undoRedo:
+                if toolbar.showUndoRedo {
+                    UndoRedoButtons(undoManager: undoManager, didRepositionToolbar: didRepositionToolbar)
+                        .transition(.scale.combined(with: .opacity))
+                }
+            case .tools:
+                ForEach(toolIcons) { icon in
+                    ToolbarIconButton(
+                        icon: icon,
+                        toolbarIcons: $toolbar.toolbarIcons,
+                        selectedColor: $toolbar.selectedColor,
+                        activeTool: $toolbar.activeTool,
+                        didRepositionToolbar: didRepositionToolbar,
+                        editingIconID: $editingIconID
+                    )
+                    .transition(.scale.combined(with: .opacity))
+                }
+            case .colors:
+                ForEach(colorIcons) { icon in
+                    ToolbarIconButton(
+                        icon: icon,
+                        toolbarIcons: $toolbar.toolbarIcons,
+                        selectedColor: $toolbar.selectedColor,
+                        activeTool: $toolbar.activeTool,
+                        didRepositionToolbar: didRepositionToolbar,
+                        editingIconID: $editingIconID
+                    )
+                    .transition(.scale.combined(with: .opacity))
+                }
+                addColorButton
             }
-        case .tools:
-            ForEach(toolIcons) { icon in
-                ToolbarIconButton(
-                    icon: icon,
-                    toolbarIcons: $toolbar.toolbarIcons,
-                    selectedColor: $toolbar.selectedColor,
-                    activeTool: $toolbar.activeTool,
-                    didRepositionToolbar: didRepositionToolbar,
-                    editingIconID: $editingIconID
-                )
-            }
-        case .colors:
-            ForEach(colorIcons) { icon in
-                ToolbarIconButton(
-                    icon: icon,
-                    toolbarIcons: $toolbar.toolbarIcons,
-                    selectedColor: $toolbar.selectedColor,
-                    activeTool: $toolbar.activeTool,
-                    didRepositionToolbar: didRepositionToolbar,
-                    editingIconID: $editingIconID
-                )
-            }
-            addColorButton
         }
+        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: toolbar.toolbarIcons.map(\.id))
+        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: toolbar.showUndoRedo)
     }
 
     private var addColorButton: some View {

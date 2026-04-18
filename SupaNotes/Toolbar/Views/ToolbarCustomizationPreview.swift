@@ -7,15 +7,37 @@ struct ToolbarCustomizationPreview: View {
     private var toolIcons: [ToolbarIcon] { toolbar.toolbarIcons.filter { $0.type != .color } }
     private var colorIcons: [ToolbarIcon] { toolbar.toolbarIcons.filter { $0.type == .color } }
 
+    @State private var intrinsicSize: CGSize = .zero
+
     var body: some View {
-        Group {
-            if positioning.axis == .horizontal {
-                horizontalContent
-            } else {
-                verticalContent
+        GeometryReader { geo in
+            let scale = fitScale(intrinsic: intrinsicSize, available: geo.size)
+            Group {
+                if positioning.axis == .horizontal {
+                    horizontalContent
+                } else {
+                    verticalContent
+                }
             }
+            .fixedSize()
+            .background(
+                GeometryReader { inner in
+                    Color.clear.preference(key: PreviewSizeKey.self, value: inner.size)
+                }
+            )
+            .scaleEffect(scale, anchor: .center)
+            .frame(width: geo.size.width, height: geo.size.height)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onPreferenceChange(PreviewSizeKey.self) { intrinsicSize = $0 }
+        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: toolbar.toolbarIcons.map(\.id))
+        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: toolbar.showUndoRedo)
+    }
+
+    private func fitScale(intrinsic: CGSize, available: CGSize) -> CGFloat {
+        guard intrinsic.width > 0, intrinsic.height > 0 else { return 1 }
+        let sx = available.width / intrinsic.width
+        let sy = available.height / intrinsic.height
+        return min(1, min(sx, sy))
     }
 
     private var visibleSections: [ToolbarSection] {
@@ -36,50 +58,25 @@ struct ToolbarCustomizationPreview: View {
     }
 
     private var horizontalContent: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 2) {
-                ForEach(Array(visibleSections.enumerated()), id: \.element) { idx, section in
-                    HStack(spacing: 2) { sectionContent(section) }
-                    if idx < visibleSections.count - 1 { dividerView }
-                }
+        HStack(spacing: 2) {
+            ForEach(Array(visibleSections.enumerated()), id: \.element) { idx, section in
+                HStack(spacing: 2) { sectionContent(section) }
+                if idx < visibleSections.count - 1 { dividerView }
             }
-            .padding(Design.Spacing.toolbarPadding)
-            .background(barBackground)
-
-            HStack(spacing: 2) {
-                ForEach(Array(visibleSections.enumerated()), id: \.element) { idx, section in
-                    sectionLabel(section).frame(width: sectionExtent(section))
-                    if idx < visibleSections.count - 1 {
-                        Color.clear.frame(width: 1)
-                    }
-                }
-            }
-            .padding(.horizontal, Design.Spacing.toolbarPadding)
         }
+        .padding(Design.Spacing.toolbarPadding)
+        .background(barBackground)
     }
 
     private var verticalContent: some View {
-        HStack(spacing: 2) {
-            VStack(spacing: 2) {
-                ForEach(Array(visibleSections.enumerated()), id: \.element) { idx, section in
-                    VStack(spacing: 2) { sectionContent(section) }
-                    if idx < visibleSections.count - 1 { dividerView }
-                }
+        VStack(spacing: 2) {
+            ForEach(Array(visibleSections.enumerated()), id: \.element) { idx, section in
+                VStack(spacing: 2) { sectionContent(section) }
+                if idx < visibleSections.count - 1 { dividerView }
             }
-            .padding(Design.Spacing.toolbarPadding)
-            .background(barBackground)
-
-            VStack(spacing: 2) {
-                ForEach(Array(visibleSections.enumerated()), id: \.element) { idx, section in
-                    sectionLabel(section)
-                        .frame(height: sectionExtent(section))
-                    if idx < visibleSections.count - 1 {
-                        Color.clear.frame(height: 1)
-                    }
-                }
-            }
-            .padding(.vertical, Design.Spacing.toolbarPadding)
         }
+        .padding(Design.Spacing.toolbarPadding)
+        .background(barBackground)
     }
 
     private func sectionLabel(_ section: ToolbarSection) -> some View {
@@ -155,6 +152,14 @@ struct ToolbarCustomizationPreview: View {
             }
         }
         .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
+        .transition(.scale.combined(with: .opacity))
+    }
+}
+
+private struct PreviewSizeKey: PreferenceKey {
+    static var defaultValue: CGSize = .zero
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        value = nextValue()
     }
 }
 
