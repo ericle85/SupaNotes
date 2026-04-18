@@ -3,6 +3,7 @@ import SwiftData
 
 struct NoteListView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(TabsState.self) private var tabs
     @Query private var notes: [Note]
     @Query(sort: \Folder.createdAt) private var folders: [Folder]
     var folder: Folder?
@@ -12,6 +13,7 @@ struct NoteListView: View {
 
     @State private var editingFolder: Folder?
     @State private var editingName: String = ""
+    @State private var pendingDeleteFolder: Folder?
 
     init(
         folder: Folder?,
@@ -72,18 +74,55 @@ struct NoteListView: View {
                     }
                     .swipeActions(edge: .trailing) {
                         Button("Delete", role: .destructive) {
+                            tabs.close(noteID: note.id)
                             note.moveToTrash()
                         }
                     }
                     .contextMenu {
                         Button("Move to Trash", role: .destructive) {
+                            tabs.close(noteID: note.id)
                             note.moveToTrash()
                         }
                     }
                 }
             }
             .listStyle(.plain)
+            .alert(
+                "Delete \"\(pendingDeleteFolder?.name ?? "")\"?",
+                isPresented: Binding(
+                    get: { pendingDeleteFolder != nil },
+                    set: { if !$0 { pendingDeleteFolder = nil } }
+                ),
+                presenting: pendingDeleteFolder
+            ) { folder in
+                Button("Cancel", role: .cancel) {}
+                Button("Delete", role: .destructive) {
+                    deleteFolder(folder)
+                }
+            } message: { folder in
+                Text("This folder contains \(liveNoteCount(folder)) notes. They will be moved to trash.")
+            }
         }
+    }
+
+    private func liveNoteCount(_ folder: Folder) -> Int {
+        folder.notes.filter { !$0.isDeleted }.count
+    }
+
+    private func requestDelete(_ folder: Folder) {
+        if liveNoteCount(folder) > 0 {
+            pendingDeleteFolder = folder
+        } else {
+            deleteFolder(folder)
+        }
+    }
+
+    private func deleteFolder(_ folder: Folder) {
+        for note in folder.notes where !note.isDeleted {
+            tabs.close(noteID: note.id)
+            note.moveToTrash()
+        }
+        modelContext.delete(folder)
     }
 
     @ViewBuilder
@@ -119,7 +158,7 @@ struct NoteListView: View {
             }
             .swipeActions(edge: .trailing) {
                 Button("Delete", role: .destructive) {
-                    modelContext.delete(folder)
+                    requestDelete(folder)
                 }
                 Button("Rename") {
                     editingName = folder.name
@@ -133,7 +172,7 @@ struct NoteListView: View {
                     editingFolder = folder
                 }
                 Button("Delete", role: .destructive) {
-                    modelContext.delete(folder)
+                    requestDelete(folder)
                 }
             }
         }
