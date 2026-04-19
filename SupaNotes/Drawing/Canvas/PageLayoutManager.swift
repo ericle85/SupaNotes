@@ -90,7 +90,7 @@ class PageLayoutManager {
             canvasView.backgroundColor = .clear
         }
 
-        if !page.drawingData.isEmpty, let drawing = try? PKDrawing(data: page.drawingData) {
+        if let drawing = DrawingScaleNormalizer.normalizedDrawing(for: page) {
             canvasView.drawing = drawing
         }
 

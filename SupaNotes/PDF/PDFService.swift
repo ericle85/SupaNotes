@@ -93,7 +93,15 @@ enum PDFService {
         let targetPages = pages ?? note.sortedPages
         guard !targetPages.isEmpty else { return nil }
 
+        // Fast path: all pages are unannotated PDF placeholders — return original data as-is
+        let allArePDFPlaceholders = targetPages.allSatisfy { $0.pdfPageNumber != nil && $0.drawingData.isEmpty && $0.backgroundImageData == nil }
+        if allArePDFPlaceholders, let originalData = note.originalPdfData {
+            print("⚡️ Fast path: returning original PDF (\(originalData.count) bytes)")
+            return originalData
+        }
+
         print("--- 📝 [Debug] Internal Note Size Breakdown ---")
+        let pdfSize = note.originalPdfData?.count ?? 0
         var totalBgSize = 0
         var totalDrawingSize = 0
         
@@ -102,12 +110,14 @@ enum PDFService {
             let drSize = page.drawingData.count
             totalBgSize += bgSize
             totalDrawingSize += drSize
-            print("Page \(index + 1): Background \(bgSize / 1024) KB, Drawing \(drSize / 1024) KB")
+            print("Page \(index + 1): Raster BG \(bgSize / 1024) KB, Drawing \(drSize / 1024) KB")
         }
         
-        let totalKb = (totalBgSize + totalDrawingSize) / 1024
-        print("Total: Backgrounds \(totalBgSize / 1024) KB, Drawings \(totalDrawingSize / 1024) KB")
-        print("Grand Total Internal: \(totalKb) KB")
+        let totalKb = (pdfSize + totalBgSize + totalDrawingSize) / 1024
+        print("PDF Source: \(pdfSize / 1024) KB")
+        print("Raster BGs: \(totalBgSize / 1024) KB")
+        print("All Drawings: \(totalDrawingSize / 1024) KB")
+        print("Grand Total Note Footprint: \(totalKb) KB")
         print("---------------------------------------------")
 
         let bounds = CGRect(origin: .zero, size: pageSize)
@@ -146,13 +156,31 @@ enum PDFService {
         }
         
         // 3. Draw PencilKit strokes
-        guard !page.drawingData.isEmpty, let drawing = try? PKDrawing(data: page.drawingData) else { return }
-        let strokeRect = CGRect(x: 0, y: 0, width: PageConstants.internalWidth, height: PageConstants.internalHeight)
+        guard let drawing = DrawingScaleNormalizer.normalizedDrawing(for: page) else { return }
+        
+        // Optimize: Only rasterize the area that actually has ink
+        let bounds = drawing.bounds
+        guard !bounds.isEmpty else { return }
+        
         var image: UIImage = UIImage()
         UITraitCollection(userInterfaceStyle: .light).performAsCurrent {
-            image = drawing.image(from: strokeRect, scale: 1.0)
+            // Render only the ink's bounding box at 1x scale for the PDF
+            image = drawing.image(from: bounds, scale: 1.0)
         }
-        image.draw(in: rect)
+        
+        // Calculate where the ink should sit relative to the PDF page
+        // PageConstants.internalWidth/Height is the 4x scale coordinate system PencilKit uses
+        let scaleX = rect.width / PageConstants.internalWidth
+        let scaleY = rect.height / PageConstants.internalHeight
+        
+        let targetRect = CGRect(
+            x: bounds.origin.x * scaleX,
+            y: bounds.origin.y * scaleY,
+            width: bounds.width * scaleX,
+            height: bounds.height * scaleY
+        )
+        
+        image.draw(in: targetRect)
     }
 
     // MARK: - Thumbnail

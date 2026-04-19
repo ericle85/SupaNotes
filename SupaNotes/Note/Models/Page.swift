@@ -6,6 +6,7 @@ final class Page {
     var id: UUID
     var orderIndex: Int
     @Attribute(.externalStorage) var drawingData: Data
+    var drawingScale: Double?
     @Attribute(.externalStorage) var backgroundImageData: Data?
     var pdfPageNumber: Int?
     var templateRaw: String?
@@ -21,6 +22,7 @@ final class Page {
         self.id = UUID()
         self.orderIndex = orderIndex
         self.drawingData = drawingData
+        self.drawingScale = Double(PageConstants.renderScale)
         self.templateRaw = template.rawValue
     }
 }

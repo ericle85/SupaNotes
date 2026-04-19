@@ -12,6 +12,7 @@ class DrawingSaveController {
             let sorted = pages.sorted { $0.orderIndex < $1.orderIndex }
             guard index < sorted.count else { return }
             sorted[index].drawingData = drawing.dataRepresentation()
+            sorted[index].drawingScale = Double(PageConstants.renderScale)
         }
         saveWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + Design.Debounce.drawingSave, execute: workItem)
@@ -23,5 +24,6 @@ class DrawingSaveController {
         guard index < sorted.count else { return }
         saveWorkItem?.cancel()
         sorted[index].drawingData = canvasView.drawing.dataRepresentation()
+        sorted[index].drawingScale = Double(PageConstants.renderScale)
     }
 }

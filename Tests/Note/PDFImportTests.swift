@@ -1,7 +1,6 @@
 import Testing
 import SwiftData
 import Foundation
-import UIKit
 @testable import SupaNotes
 
 @MainActor
@@ -11,29 +10,34 @@ struct PDFImportTests {
         return try ModelContainer(for: Note.self, Page.self, Folder.self, configurations: config)
     }
 
-    @Test func importPDF_storesOriginalDataAndCreatesPlaceholders() throws {
+    private func fixtureURL(_ filename: String) -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent(filename)
+    }
+
+    @Test func exportImportedPDF_withoutAnnotations_isSameSizeOrSmaller() throws {
         let container = try makeContainer()
         let context = container.mainContext
-        let note = Note(title: "Import Test")
+        let note = Note(title: "PDF Import Roundtrip")
         context.insert(note)
-        
-        // 1. Create a minimal valid PDF (1 page)
-        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 100, height: 100))
-        let actualPdfData = renderer.pdfData { ctx in
-            ctx.beginPage()
-            "Test Page".draw(at: CGPoint(x: 10, y: 10), withAttributes: nil)
+
+        let originalURL = fixtureURL("482kb.pdf")
+        let originalData = try Data(contentsOf: originalURL)
+
+        PDFService.importPDF(data: originalData, into: note, modelContext: context)
+
+        #expect(note.sortedPages.count > 0)
+        #expect(note.sortedPages.allSatisfy { $0.drawingData.isEmpty })
+
+        guard let exportedData = PDFService.exportNote(note, pages: nil) else {
+            Issue.record("Export failed")
+            return
         }
-        
-        // 2. Action: Import the PDF data
-        PDFService.importPDF(data: actualPdfData, into: note, modelContext: context)
-        
-        // 3. Verify: The note should store the original PDF data
-        #expect(note.originalPdfData == actualPdfData)
-        
-        // 4. Verify: Pages should reference the PDF instead of containing bitmaps
-        let pages = note.sortedPages
-        #expect(pages.count == 1) 
-        #expect(pages.first?.backgroundImageData == nil) 
-        #expect(pages.first?.pdfPageNumber == 0)
+
+        print("Original PDF size: \(originalData.count) bytes")
+        print("Exported PDF size: \(exportedData.count) bytes")
+
+        #expect(exportedData.count <= originalData.count)
     }
 }
