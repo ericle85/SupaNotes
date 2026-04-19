@@ -17,7 +17,7 @@ enum PDFService {
             let image = rasterize(pdfPage: pdfPage)
             let page = Page(orderIndex: startIndex + i, template: .white)
             page.note = note
-            page.backgroundImageData = image?.pngData()
+            page.backgroundImageData = image?.jpegData(compressionQuality: 0.8)
             modelContext.insert(page)
         }
         note.updatedAt = .now
@@ -44,14 +44,23 @@ enum PDFService {
     static func exportNote(_ note: Note, pages: [Page]?) -> Data? {
         let targetPages = pages ?? note.sortedPages
         guard !targetPages.isEmpty else { return nil }
+
+        let totalDbSize = targetPages.reduce(0) { sum, page in
+            sum + (page.backgroundImageData?.count ?? 0) + page.drawingData.count
+        }
+        print("📝 [Debug] Total internal note size (background + drawing) before PDF export: \(totalDbSize / 1024) KB")
+
         let bounds = CGRect(origin: .zero, size: pageSize)
         let renderer = UIGraphicsPDFRenderer(bounds: bounds)
-        return renderer.pdfData { ctx in
+        let data = renderer.pdfData { ctx in
             for page in targetPages {
                 ctx.beginPage()
                 drawPage(page, in: ctx.cgContext, rect: bounds)
             }
         }
+
+        print("📄 [Debug] Exported PDF size: \(data.count / 1024) KB")
+        return data
     }
 
     private static func drawPage(_ page: Page, in ctx: CGContext, rect: CGRect) {
