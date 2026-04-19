@@ -116,3 +116,5 @@ iOSInjectionProject/
 # Debugging
 *.xclog
 xcdebugger/
+
+skills/

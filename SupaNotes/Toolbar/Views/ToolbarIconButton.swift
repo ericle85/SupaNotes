@@ -91,7 +91,7 @@ struct ToolbarIconButton: View {
             EditColorView(
                 toolbarIcons: $toolbarIcons,
                 icon: icon,
-                selectedColor: $colorSelectedByUser
+                colorSelectedByUser: $colorSelectedByUser
             )
         } else if icon.type.isWritingInstrument,
                   let index = toolbarIcons.firstIndex(where: { $0.id == icon.id }) {

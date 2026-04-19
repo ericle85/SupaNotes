@@ -14,10 +14,6 @@ enum PageLayout {
         max(pageW + gap * 2, scrollWidth)
     }
 
-    static func containerHeight(pageCount: Int, pageH: CGFloat, gap: CGFloat) -> CGFloat {
-        CGFloat(pageCount) * pageH + CGFloat(max(0, pageCount - 1)) * gap + gap * 2
-    }
-
     static func pageFrame(index: Int, pageW: CGFloat, pageH: CGFloat, gap: CGFloat, containerWidth: CGFloat) -> CGRect {
         CGRect(
             x: (containerWidth - pageW) / 2,

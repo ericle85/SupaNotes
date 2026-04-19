@@ -3,7 +3,7 @@ import SwiftUI
 struct EditColorView: View {
     @Binding var toolbarIcons: [ToolbarIcon]
     let icon: ToolbarIcon
-    @Binding var selectedColor: Color
+    @Binding var colorSelectedByUser: Color
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) var dismiss
 
@@ -43,11 +43,11 @@ struct EditColorView: View {
             withAnimation(.spring(response: 0.3)) {
                 toolbarIcons.removeAll { $0.id == icon.id }
             }
-            selectedColor = existing.color ?? newColor
+            colorSelectedByUser = existing.color ?? newColor
             dismiss()
         } else if let index = toolbarIcons.firstIndex(where: { $0.id == icon.id }) {
             toolbarIcons[index].colorData = CodableColor(color: newColor, colorScheme: colorScheme)
-            selectedColor = newColor
+            colorSelectedByUser = newColor
         }
     }
 }

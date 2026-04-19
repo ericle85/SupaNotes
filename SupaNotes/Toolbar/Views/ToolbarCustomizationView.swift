@@ -45,8 +45,8 @@ struct ToolbarCustomizationView: View {
         .sheet(isPresented: $showAddColor) {
             AddColorView(
                 toolbarIcons: $toolbar.toolbarIcons,
-                selectedColor: $toolbar.selectedColor,
-                activeTool: $toolbar.activeTool,
+                selectedColor: $toolbar.colorSelectedByUser,
+                activeTool: $toolbar.currentlyActiveTool,
                 defaultColor: .blue,
                 onBack: { showAddColor = false }
             )

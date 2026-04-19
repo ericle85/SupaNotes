@@ -14,30 +14,30 @@ struct ToolbarStateTests {
     @Test func switchToPreviousTool_swapsActiveAndPrevious() {
         // Start with pen as active and eraser as previous
         let state = ToolbarState()
-        state.activeTool = .pen
-        state.previousTool = .eraser
+        state.currentlyActiveTool = .pen
+        state.toolUsedPreviously = .eraser
 
         // Switch to the previous tool
         state.switchToPreviousTool()
 
         // Now eraser should be active and pen should be the previous tool
-        #expect(state.activeTool == .eraser)
-        #expect(state.previousTool == .pen)
+        #expect(state.currentlyActiveTool == .eraser)
+        #expect(state.toolUsedPreviously == .pen)
     }
 
     @Test func switchToPreviousTool_doubleSwap_restoresOriginal() {
         // Start with highlighter as active and lasso as previous
         let state = ToolbarState()
-        state.activeTool = .highlighter
-        state.previousTool = .lasso
+        state.currentlyActiveTool = .highlighter
+        state.toolUsedPreviously = .lasso
 
         // Switch twice - should toggle back to the original
         state.switchToPreviousTool()
         state.switchToPreviousTool()
 
         // Should be back where we started
-        #expect(state.activeTool == .highlighter)
-        #expect(state.previousTool == .lasso)
+        #expect(state.currentlyActiveTool == .highlighter)
+        #expect(state.toolUsedPreviously == .lasso)
     }
 
     // MARK: - instrumentWidth

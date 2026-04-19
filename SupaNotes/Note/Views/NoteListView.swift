@@ -8,8 +8,8 @@ struct NoteListView: View {
     /// A list of all notes, sorted and filtered by the database (SwiftData)
     @Query private var allNotesFromDatabase: [Note]
     
-    /// A list of all folders, sorted by when they were created
-    @Query(sort: \Folder.createdAt) private var allFoldersFromDatabase: [Folder]
+    /// A list of all folders, sorted to match the user's preference
+    @Query private var allFoldersFromDatabase: [Folder]
     
     /// The specific folder the user is looking at. If this is nil, we are at the "All Notes" root.
     var userSelectedFolder: Folder?
@@ -38,8 +38,8 @@ struct NoteListView: View {
         self.handleOpeningNote = onOpenNote
         self.handleOpeningFolder = onOpenFolder
 
-        // Decide how to sort based on the user's preference
-        let sortDescriptor: SortDescriptor<Note> = switch sortOrder {
+        // Decide how to sort notes based on the user's preference
+        let noteSortDescriptor: SortDescriptor<Note> = switch sortOrder {
         case .name: SortDescriptor(\Note.title)
         case .lastEdited: SortDescriptor(\Note.updatedAt, order: .reverse)
         case .dateCreated: SortDescriptor(\Note.createdAt, order: .reverse)
@@ -50,8 +50,17 @@ struct NoteListView: View {
             filter: #Predicate<Note> { note in
                 note.isDeleted == false
             },
-            sort: [sortDescriptor]
+            sort: [noteSortDescriptor]
         )
+        
+        // Decide how to sort folders to match. Since folders don't have a "last edited"
+        // property, we fall back to "date created" for that case.
+        let folderSortDescriptor: SortDescriptor<Folder> = switch sortOrder {
+        case .name: SortDescriptor(\Folder.name)
+        case .lastEdited, .dateCreated: SortDescriptor(\Folder.createdAt, order: .reverse)
+        }
+        
+        _allFoldersFromDatabase = Query(sort: [folderSortDescriptor])
     }
 
     /// Returns only the notes that should be shown in the current folder view
@@ -90,16 +99,16 @@ struct NoteListView: View {
     @ViewBuilder
     private var notesAndFoldersList: some View {
         List {
-            // Only show folders if we are at the top level
+            // Show the notes for the current view first
+            ForEach(notesInSelectedFolder) { note in
+                noteRow(for: note)
+            }
+
+            // Then show folders if we are at the top level
             if isAtRootLevel {
                 ForEach(allFoldersFromDatabase) { folder in
                     folderRow(for: folder)
                 }
-            }
-            
-            // Show the notes for the current view
-            ForEach(notesInSelectedFolder) { note in
-                noteRow(for: note)
             }
         }
         .listStyle(.plain)

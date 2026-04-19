@@ -27,8 +27,4 @@ struct PageManager {
         note.updatedAt = .now
     }
 
-    func setTemplate(_ template: PageTemplate, for page: Page) {
-        page.template = template
-        page.note?.updatedAt = .now
-    }
 }

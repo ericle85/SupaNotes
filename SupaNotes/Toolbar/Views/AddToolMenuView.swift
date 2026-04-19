@@ -2,8 +2,8 @@ import SwiftUI
 
 struct AddToolMenuView: View {
     @Binding var toolbarIcons: [ToolbarIcon]
-    @Binding var selectedColor: Color
-    @Binding var activeTool: ActiveTool
+    @Binding var colorSelectedByUser: Color
+    @Binding var currentlyActiveTool: ActiveTool
     let defaultColor: Color
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -14,8 +14,8 @@ struct AddToolMenuView: View {
         if showColorPage {
             AddColorView(
                 toolbarIcons: $toolbarIcons,
-                selectedColor: $selectedColor,
-                activeTool: $activeTool,
+                selectedColor: $colorSelectedByUser,
+                activeTool: $currentlyActiveTool,
                 defaultColor: defaultColor,
                 onBack: { showColorPage = false }
             )
@@ -31,13 +31,13 @@ struct AddToolMenuView: View {
 
                 toolRow(icon: "highlighter", color: .orange, label: "Highlighter") {
                     addToolIfNeeded(.highlighter)
-                    activeTool = .highlighter
+                    currentlyActiveTool = .highlighter
                     dismiss()
                 }
 
                 toolRow(icon: "lasso", color: .purple, label: "Lasso") {
                     addToolIfNeeded(.lasso)
-                    activeTool = .lasso
+                    currentlyActiveTool = .lasso
                     dismiss()
                 }
             }
@@ -82,8 +82,8 @@ struct AddToolMenuView: View {
 // MARK: - Add Color View
 struct AddColorView: View {
     @Binding var toolbarIcons: [ToolbarIcon]
-    @Binding var selectedColor: Color
-    @Binding var activeTool: ActiveTool
+    @Binding var colorSelectedByUser: Color
+    @Binding var currentlyActiveTool: ActiveTool
     let defaultColor: Color
     var onBack: () -> Void
     @Environment(\.dismiss) var dismiss
@@ -93,8 +93,8 @@ struct AddColorView: View {
 
     init(toolbarIcons: Binding<[ToolbarIcon]>, selectedColor: Binding<Color>, activeTool: Binding<ActiveTool>, defaultColor: Color, onBack: @escaping () -> Void) {
         _toolbarIcons = toolbarIcons
-        _selectedColor = selectedColor
-        _activeTool = activeTool
+        _colorSelectedByUser = selectedColor
+        _currentlyActiveTool = activeTool
         self.defaultColor = defaultColor
         self.onBack = onBack
         _newColor = State(initialValue: defaultColor)
@@ -137,16 +137,16 @@ struct AddColorView: View {
     private func addOrSelect(_ color: Color) {
         let candidate = ToolbarIcon.colorIcon(color, colorScheme: colorScheme)
         if let existing = toolbarIcons.first(where: { $0.isEquivalent(to: candidate, colorScheme: colorScheme) }) {
-            selectedColor = existing.color ?? color
+            colorSelectedByUser = existing.color ?? color
         } else {
             let newIcon = ToolbarIcon.colorIcon(color, name: "Custom", colorScheme: colorScheme)
             withAnimation(.spring(response: 0.3)) {
                 toolbarIcons.appendToZone(newIcon)
             }
-            selectedColor = color
+            colorSelectedByUser = color
         }
-        if activeTool == .eraser || activeTool == .lasso {
-            activeTool = .pen
+        if currentlyActiveTool == .eraser || currentlyActiveTool == .lasso {
+            currentlyActiveTool = .pen
         }
         dismiss()
     }
