@@ -7,6 +7,7 @@ final class Page {
     var orderIndex: Int
     @Attribute(.externalStorage) var drawingData: Data
     @Attribute(.externalStorage) var backgroundImageData: Data?
+    var pdfPageNumber: Int?
     var templateRaw: String?
     var isBookmarked: Bool = false
     var note: Note?

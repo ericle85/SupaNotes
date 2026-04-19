@@ -80,7 +80,7 @@ class PageLayoutManager {
         canvasView.tag = index
         canvasView.delegate = delegate
 
-        if let data = page.backgroundImageData, let image = UIImage(data: data) {
+        if let image = PDFService.imageForPage(page) {
             let bg = UIImageView(image: image)
             bg.contentMode = .scaleToFill
             bg.frame = canvasView.bounds

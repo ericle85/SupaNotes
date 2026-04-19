@@ -10,6 +10,7 @@ final class Note {
     var isDeleted: Bool = false
     var deletedAt: Date?
     var folder: Folder?
+    @Attribute(.externalStorage) var originalPdfData: Data?
     @Relationship(deleteRule: .cascade, inverse: \Page.note) var pages: [Page]
 
     var sortedPages: [Page] {
