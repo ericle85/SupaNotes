@@ -23,30 +23,36 @@ enum ToolbarPersistence {
     static func load(into state: ToolbarState) {
         let defaults = UserDefaults.standard
 
+        // 1. Load the icons (tools and colors)
         if let data = defaults.data(forKey: toolbarIconsKey),
            let icons = try? JSONDecoder().decode([ToolbarIcon].self, from: data),
            !icons.isEmpty {
             state.toolbarIcons = icons
         } else {
+            // If no icons are saved, use the defaults
             state.toolbarIcons = defaultIcons(colorScheme: .light)
         }
 
+        // 2. Load the color the user was using
         if let data = defaults.data(forKey: selectedColorKey),
            let codable = try? JSONDecoder().decode(CodableColor.self, from: data) {
-            state.selectedColor = codable.toColor()
+            state.colorSelectedByUser = codable.toColor()
         }
 
+        // 3. Load the tool the user was using (Pen, Eraser, etc.)
         if let rawTool = defaults.string(forKey: activeToolKey),
            let tool = ActiveTool(rawValue: rawTool) {
-            state.activeTool = tool
+            state.currentlyActiveTool = tool
         }
 
+        // 4. Load the order of the toolbar sections
         if let data = defaults.data(forKey: sectionOrderKey),
            let order = try? JSONDecoder().decode([ToolbarSection].self, from: data),
            Set(order) == Set(ToolbarSection.allCases) {
             state.sectionOrder = order
         }
 
+        // 5. Load whether to show the Undo/Redo buttons
         if defaults.object(forKey: showUndoRedoKey) != nil {
             state.showUndoRedo = defaults.bool(forKey: showUndoRedoKey)
         }
@@ -55,20 +61,26 @@ enum ToolbarPersistence {
     static func save(_ state: ToolbarState, colorScheme: ColorScheme) {
         let defaults = UserDefaults.standard
 
+        // Save the list of icons
         if let data = try? JSONEncoder().encode(state.toolbarIcons) {
             defaults.set(data, forKey: toolbarIconsKey)
         }
 
-        let codableColor = CodableColor(color: state.selectedColor, colorScheme: colorScheme)
+        // Save the current color
+        let codableColor = CodableColor(color: state.colorSelectedByUser, colorScheme: colorScheme)
         if let data = try? JSONEncoder().encode(codableColor) {
             defaults.set(data, forKey: selectedColorKey)
         }
 
-        defaults.set(state.activeTool.rawValue, forKey: activeToolKey)
+        // Save the currently active tool
+        defaults.set(state.currentlyActiveTool.rawValue, forKey: activeToolKey)
 
+        // Save the order of sections
         if let data = try? JSONEncoder().encode(state.sectionOrder) {
             defaults.set(data, forKey: sectionOrderKey)
         }
+        
+        // Save the Undo/Redo visibility
         defaults.set(state.showUndoRedo, forKey: showUndoRedoKey)
     }
 }

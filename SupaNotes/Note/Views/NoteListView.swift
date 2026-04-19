@@ -4,16 +4,28 @@ import SwiftData
 struct NoteListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(TabsState.self) private var tabs
-    @Query private var notes: [Note]
-    @Query(sort: \Folder.createdAt) private var folders: [Folder]
-    var folder: Folder?
-    var sortOrder: NoteSortOrder
-    var onOpenNote: (UUID) -> Void
-    var onOpenFolder: (Folder) -> Void
+    
+    /// A list of all notes, sorted and filtered by the database (SwiftData)
+    @Query private var allNotesFromDatabase: [Note]
+    
+    /// A list of all folders, sorted by when they were created
+    @Query(sort: \Folder.createdAt) private var allFoldersFromDatabase: [Folder]
+    
+    /// The specific folder the user is looking at. If this is nil, we are at the "All Notes" root.
+    var userSelectedFolder: Folder?
+    
+    /// How the notes should be ordered in the list
+    var currentNoteSortOrder: NoteSortOrder
+    
+    /// A function (closure) to call when the user taps on a note
+    var handleOpeningNote: (UUID) -> Void
+    
+    /// A function (closure) to call when the user taps on a folder
+    var handleOpeningFolder: (Folder) -> Void
 
-    @State private var editingFolder: Folder?
-    @State private var editingName: String = ""
-    @State private var pendingDeleteFolder: Folder?
+    @State private var folderBeingRenamed: Folder?
+    @State private var newNameForFolder: String = ""
+    @State private var folderThatIsAboutToBeDeleted: Folder?
 
     init(
         folder: Folder?,
@@ -21,18 +33,20 @@ struct NoteListView: View {
         onOpenNote: @escaping (UUID) -> Void,
         onOpenFolder: @escaping (Folder) -> Void
     ) {
-        self.folder = folder
-        self.sortOrder = sortOrder
-        self.onOpenNote = onOpenNote
-        self.onOpenFolder = onOpenFolder
+        self.userSelectedFolder = folder
+        self.currentNoteSortOrder = sortOrder
+        self.handleOpeningNote = onOpenNote
+        self.handleOpeningFolder = onOpenFolder
 
+        // Decide how to sort based on the user's preference
         let sortDescriptor: SortDescriptor<Note> = switch sortOrder {
         case .name: SortDescriptor(\Note.title)
         case .lastEdited: SortDescriptor(\Note.updatedAt, order: .reverse)
         case .dateCreated: SortDescriptor(\Note.createdAt, order: .reverse)
         }
 
-        _notes = Query(
+        // Only fetch notes that are NOT in the trash (isDeleted == false)
+        _allNotesFromDatabase = Query(
             filter: #Predicate<Note> { note in
                 note.isDeleted == false
             },
@@ -40,141 +54,187 @@ struct NoteListView: View {
         )
     }
 
-    private var filteredNotes: [Note] {
-        if let folder {
-            return notes.filter { $0.folder?.id == folder.id }
+    /// Returns only the notes that should be shown in the current folder view
+    private var notesInSelectedFolder: [Note] {
+        allNotesFromDatabase.filter { note in
+            if let currentFolder = userSelectedFolder {
+                // We are inside a folder, so only show notes that belong to it
+                return note.folder?.id == currentFolder.id
+            } else {
+                // We are at the root (All Notes), so only show notes that have NO folder
+                return note.folder == nil
+            }
         }
-        return notes.filter { $0.folder == nil }
     }
 
-    private var showsFolders: Bool { folder == nil }
+    /// Helper to check if we are at the top level (not inside any folder)
+    private var isAtRootLevel: Bool { userSelectedFolder == nil }
 
     var body: some View {
-        if filteredNotes.isEmpty && (!showsFolders || folders.isEmpty) {
-            ContentUnavailableView(
-                "No Notes",
-                systemImage: "note.text",
-                description: Text("Tap + to create a new note.")
+        if notesInSelectedFolder.isEmpty && (!isAtRootLevel || allFoldersFromDatabase.isEmpty) {
+            emptyStatePlaceholderView
+        } else {
+            notesAndFoldersList
+        }
+    }
+
+    @ViewBuilder
+    private var emptyStatePlaceholderView: some View {
+        ContentUnavailableView(
+            "No Notes",
+            systemImage: "note.text",
+            description: Text("Tap + to create a new note.")
+        )
+    }
+
+    @ViewBuilder
+    private var notesAndFoldersList: some View {
+        List {
+            // Only show folders if we are at the top level
+            if isAtRootLevel {
+                ForEach(allFoldersFromDatabase) { folder in
+                    folderRow(for: folder)
+                }
+            }
+            
+            // Show the notes for the current view
+            ForEach(notesInSelectedFolder) { note in
+                noteRow(for: note)
+            }
+        }
+        .listStyle(.plain)
+        .alert(
+            "Delete \"\(folderThatIsAboutToBeDeleted?.name ?? "")\"?",
+            isPresented: isDeleteAlertShowing,
+            presenting: folderThatIsAboutToBeDeleted
+        ) { folder in
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                permanentlyDeleteFolder(folder)
+            }
+        } message: { folder in
+            Text("This folder contains \(countLiveNotesIn(folder)) notes. They will be moved to trash.")
+        }
+    }
+
+    private var isDeleteAlertShowing: Binding<Bool> {
+        Binding(
+            get: { folderThatIsAboutToBeDeleted != nil },
+            set: { if !$0 { folderThatIsAboutToBeDeleted = nil } }
+        )
+    }
+
+    @ViewBuilder
+    private func noteRow(for note: Note) -> some View {
+        Button {
+            handleOpeningNote(note.id)
+        } label: {
+            NoteRowView(
+                title: note.title,
+                subtitle: note.updatedAt.formatted(.relative(presentation: .named))
             )
-        } else {
-            List {
-                if showsFolders {
-                    ForEach(folders) { folder in
-                        folderRow(folder)
-                    }
-                }
-                ForEach(filteredNotes) { note in
-                    Button {
-                        onOpenNote(note.id)
-                    } label: {
-                        NoteRowView(
-                            title: note.title,
-                            subtitle: note.updatedAt.formatted(.relative(presentation: .named))
-                        )
-                    }
-                    .swipeActions(edge: .trailing) {
-                        Button("Delete", role: .destructive) {
-                            tabs.close(noteID: note.id)
-                            note.moveToTrash()
-                        }
-                    }
-                    .contextMenu {
-                        Button("Move to Trash", role: .destructive) {
-                            tabs.close(noteID: note.id)
-                            note.moveToTrash()
-                        }
-                    }
-                }
+        }
+        .swipeActions(edge: .trailing) {
+            Button("Delete", role: .destructive) {
+                tabs.close(noteID: note.id)
+                note.moveToTrash()
             }
-            .listStyle(.plain)
-            .alert(
-                "Delete \"\(pendingDeleteFolder?.name ?? "")\"?",
-                isPresented: Binding(
-                    get: { pendingDeleteFolder != nil },
-                    set: { if !$0 { pendingDeleteFolder = nil } }
-                ),
-                presenting: pendingDeleteFolder
-            ) { folder in
-                Button("Cancel", role: .cancel) {}
-                Button("Delete", role: .destructive) {
-                    deleteFolder(folder)
-                }
-            } message: { folder in
-                Text("This folder contains \(liveNoteCount(folder)) notes. They will be moved to trash.")
+        }
+        .contextMenu {
+            Button("Move to Trash", role: .destructive) {
+                tabs.close(noteID: note.id)
+                note.moveToTrash()
             }
         }
     }
 
-    private func liveNoteCount(_ folder: Folder) -> Int {
-        folder.notes.filter { !$0.isDeleted }.count
-    }
-
-    private func requestDelete(_ folder: Folder) {
-        if liveNoteCount(folder) > 0 {
-            pendingDeleteFolder = folder
+    @ViewBuilder
+    private func folderRow(for folder: Folder) -> some View {
+        if folderBeingRenamed?.id == folder.id {
+            folderEditingRow(for: folder)
         } else {
-            deleteFolder(folder)
+            folderNormalRow(for: folder)
         }
     }
 
-    private func deleteFolder(_ folder: Folder) {
+    @ViewBuilder
+    private func folderEditingRow(for folder: Folder) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "folder")
+                .foregroundStyle(.secondary)
+            TextField("Folder name", text: $newNameForFolder)
+                .textFieldStyle(.plain)
+                .onSubmit {
+                    folder.name = newNameForFolder
+                    folderBeingRenamed = nil
+                }
+        }
+    }
+
+    @ViewBuilder
+    private func folderNormalRow(for folder: Folder) -> some View {
+        Button {
+            handleOpeningFolder(folder)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "folder")
+                    .foregroundStyle(.secondary)
+                Text(folder.name)
+                    .foregroundStyle(.primary)
+                Spacer()
+                Text("\(countLiveNotesIn(folder))")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .swipeActions(edge: .trailing) {
+            Button("Delete", role: .destructive) {
+                askUserToDeleteFolder(folder)
+            }
+            Button("Rename") {
+                beginRenamingFolder(folder)
+            }
+            .tint(.blue)
+        }
+        .contextMenu {
+            Button("Rename") {
+                beginRenamingFolder(folder)
+            }
+            Button("Delete", role: .destructive) {
+                askUserToDeleteFolder(folder)
+            }
+        }
+    }
+
+    private func beginRenamingFolder(_ folder: Folder) {
+        newNameForFolder = folder.name
+        folderBeingRenamed = folder
+    }
+
+    private func countLiveNotesIn(_ folder: Folder) -> Int {
+        // Only count notes that aren't in the trash
+        folder.notes.filter { note in !note.isDeleted }.count
+    }
+
+    private func askUserToDeleteFolder(_ folder: Folder) {
+        // If the folder has notes, we show an alert. If it's empty, we just delete it.
+        if countLiveNotesIn(folder) > 0 {
+            folderThatIsAboutToBeDeleted = folder
+        } else {
+            permanentlyDeleteFolder(folder)
+        }
+    }
+
+    private func permanentlyDeleteFolder(_ folder: Folder) {
+        // Move all notes in this folder to the trash first
         for note in folder.notes where !note.isDeleted {
             tabs.close(noteID: note.id)
             note.moveToTrash()
         }
+        // Then delete the folder itself
         modelContext.delete(folder)
-    }
-
-    @ViewBuilder
-    private func folderRow(_ folder: Folder) -> some View {
-        if editingFolder?.id == folder.id {
-            HStack(spacing: 10) {
-                Image(systemName: "folder")
-                    .foregroundStyle(.secondary)
-                TextField("Folder name", text: $editingName)
-                    .textFieldStyle(.plain)
-                    .onSubmit {
-                        folder.name = editingName
-                        editingFolder = nil
-                    }
-            }
-        } else {
-            Button {
-                onOpenFolder(folder)
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "folder")
-                        .foregroundStyle(.secondary)
-                    Text(folder.name)
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    Text("\(folder.notes.filter { !$0.isDeleted }.count)")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .swipeActions(edge: .trailing) {
-                Button("Delete", role: .destructive) {
-                    requestDelete(folder)
-                }
-                Button("Rename") {
-                    editingName = folder.name
-                    editingFolder = folder
-                }
-                .tint(.blue)
-            }
-            .contextMenu {
-                Button("Rename") {
-                    editingName = folder.name
-                    editingFolder = folder
-                }
-                Button("Delete", role: .destructive) {
-                    requestDelete(folder)
-                }
-            }
-        }
     }
 }

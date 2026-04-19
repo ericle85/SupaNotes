@@ -7,6 +7,12 @@ class PageLayoutManager {
     var canvasViews: [PKCanvasView] = []
     var hasCompletedInitialLayout = false
 
+    /// This method completely recreates all page views.
+    /// 
+    /// Why do we do this instead of just updating existing ones?
+    /// 1. PencilKit's PKCanvasView is complex and doesn't always handle frame changes well while zoomed.
+    /// 2. Rebuilding ensures that the stack of pages always matches the SwiftData state perfectly.
+    /// 3. It simplifies the math for positioning pages in a large, zoomable scroll view.
     func rebuildPages(
         pages: [Page],
         tool: PKTool,
@@ -17,24 +23,35 @@ class PageLayoutManager {
     ) {
         guard let containerView = containerView, let scrollView = scrollView else { return }
 
+        // If we are about to scroll, reset zoom to 1:1 first to make math easier
         if pendingScroll != .none {
             scrollView.zoomScale = 1.0 / PageConstants.renderScale
         }
 
+        // Clean up old views
         canvasViews.forEach { $0.removeFromSuperview() }
         canvasViews.removeAll()
 
+        // Calculate layout
         let sortedPages = pages.sorted { $0.orderIndex < $1.orderIndex }
-        let pageW = PageConstants.internalWidth
-        let pageH = PageConstants.internalHeight
-        let gap = PageConstants.internalGap
-        let size = PageLayout.containerSize(pageCount: sortedPages.count, pageW: pageW, pageH: pageH, gap: gap, scrollWidth: scrollView.bounds.width)
+        let width = PageConstants.internalWidth
+        let height = PageConstants.internalHeight
+        let spacing = PageConstants.internalGap
+        
+        let totalSize = PageLayout.containerSize(
+            pageCount: sortedPages.count,
+            pageW: width,
+            pageH: height,
+            gap: spacing,
+            scrollWidth: scrollView.bounds.width
+        )
 
         // Set bounds.size (not frame) so we don't clobber a live zoom transform.
-        containerView.bounds.size = size
-        scrollView.contentSize = PageLayout.scrollContentSize(containerSize: size, zoomScale: scrollView.zoomScale)
+        containerView.bounds.size = totalSize
+        scrollView.contentSize = PageLayout.scrollContentSize(containerSize: totalSize, zoomScale: scrollView.zoomScale)
 
-        canvasViews = PageLayout.pageFrames(count: sortedPages.count, pageW: pageW, pageH: pageH, gap: gap, containerWidth: size.width)
+        // Create and add new canvas views for each page
+        canvasViews = PageLayout.pageFrames(count: sortedPages.count, pageW: width, pageH: height, gap: spacing, containerWidth: totalSize.width)
             .enumerated()
             .map { index, frame in
                 let canvas = Self.makeCanvasView(page: sortedPages[index], index: index, frame: frame, tool: tool, delegate: delegate)
@@ -44,7 +61,7 @@ class PageLayoutManager {
 
         centerContainerIfNeeded()
         pullController.setupIndicators(in: scrollView)
-        applyPendingScroll(&pendingScroll, pageH: pageH, gap: gap, pageCount: sortedPages.count)
+        applyPendingScroll(&pendingScroll, pageH: height, gap: spacing, pageCount: sortedPages.count)
 
         if let firstCanvas = canvasViews.first {
             DispatchQueue.main.async {

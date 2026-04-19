@@ -3,74 +3,79 @@ import SwiftUI
 struct ToolbarIconButton: View {
     let icon: ToolbarIcon
     @Binding var toolbarIcons: [ToolbarIcon]
-    @Binding var selectedColor: Color
-    @Binding var activeTool: ActiveTool
+    @Binding var colorSelectedByUser: Color
+    @Binding var currentlyActiveTool: ActiveTool
     var didRepositionToolbar: Bool
-    var editingIconID: Binding<UUID?>
+    var iconIDBeingEdited: Binding<UUID?>
 
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Group {
             if icon.type == .color, let color = icon.color {
+                // Show a colored circle for color choices
                 colorIconView(color: color)
             } else {
+                // Show an icon for tools (Pen, Eraser, etc.)
                 toolIconView()
             }
         }
         .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
         .contentShape(Rectangle())
         .popover(isPresented: Binding(
-            get: { editingIconID.wrappedValue == icon.id },
-            set: { if !$0 { editingIconID.wrappedValue = nil } }
+            get: { iconIDBeingEdited.wrappedValue == icon.id },
+            set: { if !$0 { iconIDBeingEdited.wrappedValue = nil } }
         )) {
+            // This is the little menu that pops up when you tap a tool twice
             popoverContent()
         }
         .onTapGesture {
+            // Don't do anything if the user was just dragging the toolbar
             guard !didRepositionToolbar else { return }
             handleIconTap()
         }
     }
 
     private func colorIconView(color: Color) -> some View {
-        let isDrawingTool = activeTool == .pen || activeTool == .highlighter
+        let isDrawingTool = currentlyActiveTool == .pen || currentlyActiveTool == .highlighter
         return ColorSwatchView(
             color: color,
-            showCheckmark: isDrawingTool && selectedColor.isSimilar(to: color, colorScheme: colorScheme)
+            showCheckmark: isDrawingTool && colorSelectedByUser.isSimilar(to: color, colorScheme: colorScheme)
         )
     }
 
     private func toolIconView() -> some View {
-        let isActive = activeToolMatches(icon.type)
+        let isThisToolActive = doesToolMatchIconType(icon.type)
         return Image(systemName: icon.type.iconName)
             .font(.system(size: Design.FontSize.toolIcon))
-            .fontWeight(isActive ? .bold : .regular)
-            .scaleEffect(isActive ? 1.2 : 1.0)
+            .fontWeight(isThisToolActive ? .bold : .regular)
+            .scaleEffect(isThisToolActive ? 1.2 : 1.0)
             .frame(width: Design.Layout.colorSwatchSize, height: Design.Layout.colorSwatchSize)
-            .foregroundStyle(toolForeground(for: icon.type, isActive: isActive))
+            .foregroundStyle(toolForeground(for: icon.type, isActive: isThisToolActive))
     }
 
     private func toolForeground(for type: ToolType, isActive: Bool) -> some ShapeStyle {
         if !isActive { return AnyShapeStyle(.secondary) }
         switch type {
         case .pen, .highlighter:
-            return AnyShapeStyle(selectedColor)
+            // Use the user's selected color for drawing tools
+            return AnyShapeStyle(colorSelectedByUser)
         default:
             return AnyShapeStyle(.primary)
         }
     }
 
-    private func activeToolMatches(_ type: ToolType) -> Bool {
+    private func doesToolMatchIconType(_ type: ToolType) -> Bool {
         switch type {
-        case .pen: return activeTool == .pen
-        case .eraser: return activeTool == .eraser
-        case .highlighter: return activeTool == .highlighter
-        case .lasso: return activeTool == .lasso
+        case .pen: return currentlyActiveTool == .pen
+        case .eraser: return currentlyActiveTool == .eraser
+        case .highlighter: return currentlyActiveTool == .highlighter
+        case .lasso: return currentlyActiveTool == .lasso
         default: return false
         }
     }
 
-    private func activeToolFor(_ type: ToolType) -> ActiveTool {
+    private func toolFor(_ type: ToolType) -> ActiveTool {
         switch type {
         case .pen: return .pen
         case .eraser: return .eraser
@@ -86,15 +91,15 @@ struct ToolbarIconButton: View {
             EditColorView(
                 toolbarIcons: $toolbarIcons,
                 icon: icon,
-                selectedColor: $selectedColor
+                selectedColor: $colorSelectedByUser
             )
         } else if icon.type.isWritingInstrument,
-                  let idx = toolbarIcons.firstIndex(where: { $0.id == icon.id }) {
+                  let index = toolbarIcons.firstIndex(where: { $0.id == icon.id }) {
             let range = sliderRange(for: icon.type)
             let opacity: Double = icon.type == .highlighter ? 0.4 : 1.0
-            let color = icon.type == .eraser ? Color.primary : selectedColor
+            let color = icon.type == .eraser ? Color.primary : colorSelectedByUser
             InstrumentPopoverView(
-                settings: $toolbarIcons[idx].instrumentSettings ?? .constant(.pen()),
+                settings: $toolbarIcons[index].instrumentSettings ?? .constant(.pen()),
                 sliderRange: range,
                 displayColor: color,
                 colorOpacity: opacity
@@ -115,24 +120,27 @@ struct ToolbarIconButton: View {
         switch icon.type {
         case .color:
             if let color = icon.color {
-                if (activeTool == .pen || activeTool == .highlighter) && selectedColor.isSimilar(to: color, colorScheme: colorScheme) {
-                    editingIconID.wrappedValue = icon.id
+                // If this color is already selected, open the editor. Otherwise, select it.
+                if (currentlyActiveTool == .pen || currentlyActiveTool == .highlighter) && colorSelectedByUser.isSimilar(to: color, colorScheme: colorScheme) {
+                    iconIDBeingEdited.wrappedValue = icon.id
                 } else {
-                    selectedColor = color
-                    if activeTool == .eraser || activeTool == .lasso {
-                        activeTool = .pen
+                    colorSelectedByUser = color
+                    // Auto-switch to pen if the user picks a color while using the eraser
+                    if currentlyActiveTool == .eraser || currentlyActiveTool == .lasso {
+                        currentlyActiveTool = .pen
                     }
                 }
             }
         case .pen, .eraser, .highlighter:
-            let targetTool = activeToolFor(icon.type)
-            if activeTool == targetTool {
-                editingIconID.wrappedValue = icon.id
+            let targetTool = toolFor(icon.type)
+            // If the tool is already active, open its settings. Otherwise, switch to it.
+            if currentlyActiveTool == targetTool {
+                iconIDBeingEdited.wrappedValue = icon.id
             } else {
-                activeTool = targetTool
+                currentlyActiveTool = targetTool
             }
         case .lasso:
-            activeTool = .lasso
+            currentlyActiveTool = .lasso
         }
     }
 }

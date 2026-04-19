@@ -83,12 +83,24 @@ struct NoteEditorView: View {
             }
         }
         .navigationBarHidden(true)
-        .onChange(of: toolbar.selectedColor) { toolbar.save(colorScheme: colorScheme) }
-        .onChange(of: toolbar.activeTool) { oldValue, newValue in
-            if oldValue != newValue { toolbar.previousTool = oldValue }
+        
+        // Save whenever the user changes the color
+        .onChange(of: toolbar.colorSelectedByUser) {
             toolbar.save(colorScheme: colorScheme)
         }
-        .onChange(of: toolbar.toolbarIcons) { toolbar.save(colorScheme: colorScheme) }
+        
+        // Save whenever the user switches tools (and remember the old one)
+        .onChange(of: toolbar.currentlyActiveTool) { oldValue, newValue in
+            if oldValue != newValue {
+                toolbar.toolUsedPreviously = oldValue
+            }
+            toolbar.save(colorScheme: colorScheme)
+        }
+        
+        // Save whenever the user rearranges the toolbar icons
+        .onChange(of: toolbar.toolbarIcons) {
+            toolbar.save(colorScheme: colorScheme)
+        }
         .sheet(isPresented: $showingBookmarks) {
             BookmarkListSheet(note: note, onTap: scrollToPage)
         }
