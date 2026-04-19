@@ -11,8 +11,9 @@ class DrawingSaveController {
         let workItem = DispatchWorkItem {
             let sorted = pages.sorted { $0.orderIndex < $1.orderIndex }
             guard index < sorted.count else { return }
-            sorted[index].drawingData = drawing.dataRepresentation()
-            sorted[index].drawingScale = Double(PageConstants.renderScale)
+            let storageDrawing = Self.storageDrawing(for: canvasView, drawing: drawing)
+            sorted[index].drawingData = storageDrawing.dataRepresentation()
+            sorted[index].drawingScale = Double(DrawingCoordinateSpace.storageScale)
         }
         saveWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + Design.Debounce.drawingSave, execute: workItem)
@@ -23,7 +24,13 @@ class DrawingSaveController {
         let sorted = pages.sorted { $0.orderIndex < $1.orderIndex }
         guard index < sorted.count else { return }
         saveWorkItem?.cancel()
-        sorted[index].drawingData = canvasView.drawing.dataRepresentation()
-        sorted[index].drawingScale = Double(PageConstants.renderScale)
+        let storageDrawing = Self.storageDrawing(for: canvasView, drawing: canvasView.drawing)
+        sorted[index].drawingData = storageDrawing.dataRepresentation()
+        sorted[index].drawingScale = Double(DrawingCoordinateSpace.storageScale)
+    }
+
+    private static func storageDrawing(for canvasView: PKCanvasView, drawing: PKDrawing) -> PKDrawing {
+        let presentationScale = (canvasView as? SupaCanvasView)?.presentationScale ?? 1.0
+        return DrawingCoordinateSpace.storageDrawing(fromPresentation: drawing, presentationScale: presentationScale)
     }
 }

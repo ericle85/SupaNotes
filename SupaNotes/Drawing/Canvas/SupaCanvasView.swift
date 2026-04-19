@@ -5,6 +5,7 @@ import PencilKit
 /// from the lasso selection context menu via swizzling PKTiledView's
 /// UIEditMenuInteraction delegate method.
 class SupaCanvasView: PKCanvasView {
+    var presentationScale: CGFloat = 1.0
 
     private static var hasSwizzled = false
 

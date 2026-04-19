@@ -156,7 +156,7 @@ enum PDFService {
         }
         
         // 3. Draw PencilKit strokes
-        guard let drawing = DrawingScaleNormalizer.normalizedDrawing(for: page) else { return }
+        guard let drawing = DrawingCoordinateSpace.logicalDrawing(for: page) else { return }
         
         // Optimize: Only rasterize the area that actually has ink
         let bounds = drawing.bounds
@@ -168,10 +168,9 @@ enum PDFService {
             image = drawing.image(from: bounds, scale: 1.0)
         }
         
-        // Calculate where the ink should sit relative to the PDF page
-        // PageConstants.internalWidth/Height is the 4x scale coordinate system PencilKit uses
-        let scaleX = rect.width / PageConstants.internalWidth
-        let scaleY = rect.height / PageConstants.internalHeight
+        // Calculate where the ink should sit relative to the logical page space.
+        let scaleX = rect.width / PageConstants.pageWidth
+        let scaleY = rect.height / PageConstants.pageHeight
         
         let targetRect = CGRect(
             x: bounds.origin.x * scaleX,

@@ -32,12 +32,7 @@ struct PagedCanvasContainer: UIViewRepresentable {
         pencilInteraction.delegate = c
         scrollView.addInteraction(pencilInteraction)
 
-        c.rebuildPages(pages: pages, tool: tool)
-
-        DispatchQueue.main.async {
-            scrollView.zoomScale = 1.0 / PageConstants.renderScale
-            c.layoutManager.centerContainerIfNeeded()
-        }
+        c.rebuildPages(pages: pages, tool: tool, viewport: nil)
 
         return scrollView
     }
@@ -59,7 +54,8 @@ struct PagedCanvasContainer: UIViewRepresentable {
 
         if needsRebuild {
             c.layoutManager.hasCompletedInitialLayout = scrollView.bounds.width > 0
-            c.rebuildPages(pages: pages, tool: tool)
+            let viewport = c.layoutManager.captureViewportState()
+            c.rebuildPages(pages: pages, tool: tool, viewport: viewport)
         }
         c.layoutManager.centerContainerIfNeeded()
     }
@@ -97,6 +93,8 @@ struct PagedCanvasContainer: UIViewRepresentable {
         let pullController = PullToAddController()
         let saveController = DrawingSaveController()
         var pendingScroll: ScrollAfterRebuild = .none
+        var isUsingTool = false
+        var pendingPresentationBand: PresentationZoomBand?
 
         init(
             pages: [Page],
@@ -137,15 +135,38 @@ struct PagedCanvasContainer: UIViewRepresentable {
 
         deinit { NotificationCenter.default.removeObserver(self) }
 
-        func rebuildPages(pages: [Page], tool: PKTool) {
+        func rebuildPages(pages: [Page], tool: PKTool, viewport: PageLayoutManager.ViewportState?) {
             layoutManager.rebuildPages(
                 pages: pages,
                 tool: tool,
                 delegate: self,
                 pullController: pullController,
                 pendingScroll: &pendingScroll,
+                presentationBand: pendingPresentationBand ?? layoutManager.presentationBand,
+                viewport: viewport,
                 onUndoManagerReady: onUndoManagerReady
             )
+            pendingPresentationBand = nil
+        }
+
+        private func flushDrawings() {
+            for canvas in layoutManager.canvasViews {
+                saveController.immediateSave(canvasView: canvas, pages: pages)
+            }
+        }
+
+        private func applyPresentationBandIfNeeded() {
+            let preferredBand = layoutManager.preferredPresentationBand()
+            guard preferredBand != layoutManager.presentationBand else { return }
+            guard !isUsingTool else {
+                pendingPresentationBand = preferredBand
+                return
+            }
+
+            flushDrawings()
+            pendingPresentationBand = preferredBand
+            let viewport = layoutManager.captureViewportState()
+            rebuildPages(pages: pages, tool: tool, viewport: viewport)
         }
 
         // MARK: - UIScrollViewDelegate
@@ -156,10 +177,14 @@ struct PagedCanvasContainer: UIViewRepresentable {
             pullController.update(for: scrollView)
         }
 
-        func scrollViewDidZoom(_ scrollView: UIScrollView) { layoutManager.centerContainerIfNeeded() }
+        func scrollViewDidZoom(_ scrollView: UIScrollView) {
+            layoutManager.centerContainerIfNeeded()
+            layoutManager.updateCurrentPage(pages: pages, onCurrentPageChanged: onCurrentPageChanged)
+        }
 
         func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
             layoutManager.centerContainerIfNeeded()
+            applyPresentationBandIfNeeded()
         }
 
         func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
@@ -175,11 +200,17 @@ struct PagedCanvasContainer: UIViewRepresentable {
         }
 
         func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
+            isUsingTool = true
             onUndoManagerReady(canvasView.undoManager)
         }
 
         func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
             saveController.immediateSave(canvasView: canvasView, pages: pages)
+            isUsingTool = false
+            if pendingPresentationBand != nil {
+                let viewport = layoutManager.captureViewportState()
+                rebuildPages(pages: pages, tool: tool, viewport: viewport)
+            }
         }
 
         // MARK: - UIPencilInteractionDelegate

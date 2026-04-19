@@ -66,15 +66,13 @@ final class ToolbarState {
 
     /// Converts our internal app state into a PencilKit tool that the canvas can use
     var currentPKTool: PKTool {
-        let scale = PageConstants.renderScale
-        
         switch currentlyActiveTool {
         case .pen:
-            return PKInkingTool(.pen, color: UIColor(colorSelectedByUser), width: instrumentWidth(for: .pen) * scale)
+            return PKInkingTool(.pen, color: UIColor(colorSelectedByUser), width: instrumentWidth(for: .pen))
         case .eraser:
-            return PKEraserTool(.bitmap, width: instrumentWidth(for: .eraser) * scale)
+            return PKEraserTool(.bitmap, width: instrumentWidth(for: .eraser))
         case .highlighter:
-            return PKInkingTool(.marker, color: UIColor(colorSelectedByUser), width: instrumentWidth(for: .highlighter) * scale)
+            return PKInkingTool(.marker, color: UIColor(colorSelectedByUser), width: instrumentWidth(for: .highlighter))
         case .lasso:
             return PKLassoTool()
         }

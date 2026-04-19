@@ -6,6 +6,7 @@ final class Page {
     var id: UUID
     var orderIndex: Int
     @Attribute(.externalStorage) var drawingData: Data
+    // Legacy compatibility for drawings saved before fixed page coordinates.
     var drawingScale: Double?
     @Attribute(.externalStorage) var backgroundImageData: Data?
     var pdfPageNumber: Int?
@@ -22,7 +23,7 @@ final class Page {
         self.id = UUID()
         self.orderIndex = orderIndex
         self.drawingData = drawingData
-        self.drawingScale = Double(PageConstants.renderScale)
+        self.drawingScale = 1.0
         self.templateRaw = template.rawValue
     }
 }
