@@ -166,7 +166,11 @@ struct PagedCanvasContainer: UIViewRepresentable {
 
             flushDrawings()
             pendingPresentationBand = preferredBand
-            let viewport = layoutManager.captureViewportState(pages: pages, anchorInScrollView: zoomAnchorInScrollView())
+            let viewport = layoutManager.captureViewportState(
+                pages: pages,
+                anchorInScrollView: zoomAnchorInScrollView(),
+                allowOutsidePageAnchor: true
+            )
             rebuildPages(pages: pages, tool: tool, viewport: viewport)
         }
 
@@ -221,7 +225,11 @@ struct PagedCanvasContainer: UIViewRepresentable {
             saveController.immediateSave(canvasView: canvasView, pages: pages)
             isUsingTool = false
             if pendingPresentationBand != nil {
-                let viewport = layoutManager.captureViewportState(pages: pages, anchorInScrollView: zoomAnchorInScrollView())
+                let viewport = layoutManager.captureViewportState(
+                    pages: pages,
+                    anchorInScrollView: zoomAnchorInScrollView(),
+                    allowOutsidePageAnchor: true
+                )
                 rebuildPages(pages: pages, tool: tool, viewport: viewport)
             }
         }

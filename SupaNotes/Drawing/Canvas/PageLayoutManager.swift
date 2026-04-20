@@ -158,7 +158,11 @@ class PageLayoutManager {
         )
     }
 
-    func captureViewportState(pages: [Page], anchorInScrollView: CGPoint? = nil) -> ViewportState? {
+    func captureViewportState(
+        pages: [Page],
+        anchorInScrollView: CGPoint? = nil,
+        allowOutsidePageAnchor: Bool = false
+    ) -> ViewportState? {
         guard let scrollView = scrollView, let containerView = containerView else { return nil }
         guard !pages.isEmpty else { return nil }
         let zoomScale = max(scrollView.zoomScale, 0.001)
@@ -183,8 +187,12 @@ class PageLayoutManager {
             .offset ?? 0
         let frame = frames[pageIndex]
         let anchorWithinPage = CGPoint(
-            x: anchorInContainer.x - frame.minX,
-            y: anchorInContainer.y - frame.minY
+            x: allowOutsidePageAnchor
+                ? anchorInContainer.x - frame.minX
+                : frame.width / 2,
+            y: allowOutsidePageAnchor
+                ? anchorInContainer.y - frame.minY
+                : min(max(0, anchorInContainer.y - frame.minY), frame.height)
         )
         let pageAnchor = CGPoint(
             x: anchorWithinPage.x / max(presentationBand.scale, 0.001),
@@ -257,17 +265,21 @@ class PageLayoutManager {
         guard let scrollView = scrollView, let containerView = containerView else { return }
         let action = pendingScroll
         pendingScroll = .none
+        let preservedX = min(
+            max(0, scrollView.contentOffset.x),
+            max(0, scrollView.contentSize.width - scrollView.bounds.width)
+        )
 
         let target: CGPoint
         switch action {
         case .none: return
         case .scrollToFirst:
-            target = .zero
+            target = CGPoint(x: preservedX, y: 0)
         case .scrollToLast:
             let lastPageY = gap + CGFloat(pageCount - 1) * (pageH + gap)
             let targetY = max(0, (containerView.frame.minY + lastPageY) * scrollView.zoomScale - 20)
             let maxY = max(0, scrollView.contentSize.height - scrollView.bounds.height)
-            target = CGPoint(x: 0, y: min(targetY, maxY))
+            target = CGPoint(x: preservedX, y: min(targetY, maxY))
         }
 
         UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut) {
