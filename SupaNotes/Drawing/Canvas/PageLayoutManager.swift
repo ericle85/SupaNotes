@@ -3,7 +3,9 @@ import PencilKit
 
 class PageLayoutManager {
     struct ViewportState {
-        let logicalCenter: CGPoint
+        let pageIndex: Int
+        let pageAnchor: CGPoint
+        let anchorInScrollView: CGPoint
         let effectiveZoom: CGFloat
     }
 
@@ -16,6 +18,25 @@ class PageLayoutManager {
     private var pageWidth: CGFloat { PageConstants.pageWidth * presentationBand.scale }
     private var pageHeight: CGFloat { PageConstants.pageHeight * presentationBand.scale }
     private var pageGap: CGFloat { PageConstants.pageGap * presentationBand.scale }
+    private var maxPresentationScale: CGFloat {
+        PresentationZoomBand.allCases.map(\.scale).max() ?? 1.0
+    }
+
+    private func stableContainerWidth(scrollWidth: CGFloat) -> CGFloat {
+        let maxPageWidth = PageConstants.pageWidth * maxPresentationScale
+        let maxGap = PageConstants.pageGap * maxPresentationScale
+        return PageLayout.containerWidth(pageW: maxPageWidth, gap: maxGap, scrollWidth: scrollWidth)
+    }
+
+    private func pageFrame(for index: Int, containerWidth: CGFloat) -> CGRect {
+        PageLayout.pageFrame(
+            index: index,
+            pageW: pageWidth,
+            pageH: pageHeight,
+            gap: pageGap,
+            containerWidth: containerWidth
+        )
+    }
 
     /// This method completely recreates all page views.
     ///
@@ -36,52 +57,65 @@ class PageLayoutManager {
         guard let containerView = containerView, let scrollView = scrollView else { return }
         self.presentationBand = presentationBand
 
-        // Clean up old views
-        canvasViews.forEach { $0.removeFromSuperview() }
-        canvasViews.removeAll()
-
-        // Calculate layout
         let sortedPages = pages.sorted { $0.orderIndex < $1.orderIndex }
         let width = pageWidth
         let height = pageHeight
         let spacing = pageGap
 
-        let totalSize = PageLayout.containerSize(
-            pageCount: sortedPages.count,
+        let containerWidth = stableContainerWidth(scrollWidth: scrollView.bounds.width)
+        let totalSize = CGSize(
+            width: containerWidth,
+            height: CGFloat(sortedPages.count) * height + CGFloat(max(0, sortedPages.count - 1)) * spacing + spacing * 2
+        )
+
+        let pageFrames = PageLayout.pageFrames(
+            count: sortedPages.count,
             pageW: width,
             pageH: height,
             gap: spacing,
-            scrollWidth: scrollView.bounds.width
+            containerWidth: containerWidth
         )
 
-        // Set bounds.size (not frame) so we don't clobber a live zoom transform.
-        containerView.bounds.size = totalSize
+        let restoredViewport = viewport != nil
+        UIView.performWithoutAnimation {
+            // Clean up old views
+            canvasViews.forEach { $0.removeFromSuperview() }
+            canvasViews.removeAll()
 
-        // Create and add new canvas views for each page
-        canvasViews = PageLayout.pageFrames(count: sortedPages.count, pageW: width, pageH: height, gap: spacing, containerWidth: totalSize.width)
-            .enumerated()
-            .map { index, frame in
-                let canvas = Self.makeCanvasView(
-                    page: sortedPages[index],
-                    index: index,
-                    frame: frame,
-                    tool: tool,
-                    delegate: delegate,
-                    presentationScale: presentationBand.scale
-                )
-                containerView.addSubview(canvas)
-                return canvas
+            // Set bounds.size (not frame) so we don't clobber a live zoom transform.
+            containerView.bounds.size = totalSize
+
+            // Create and add new canvas views for each page.
+            canvasViews = pageFrames
+                .enumerated()
+                .map { index, frame in
+                    let canvas = Self.makeCanvasView(
+                        page: sortedPages[index],
+                        index: index,
+                        frame: frame,
+                        tool: tool,
+                        delegate: delegate,
+                        presentationScale: presentationBand.scale
+                    )
+                    containerView.addSubview(canvas)
+                    return canvas
+                }
+
+            if let viewport {
+                restoreViewport(viewport, containerSize: totalSize)
+            } else {
+                scrollView.contentSize = PageLayout.scrollContentSize(containerSize: totalSize, zoomScale: scrollView.zoomScale)
+                centerContainerIfNeeded()
             }
-
-        if let viewport {
-            restoreViewport(viewport, containerSize: totalSize)
-        } else {
-            scrollView.contentSize = PageLayout.scrollContentSize(containerSize: totalSize, zoomScale: scrollView.zoomScale)
+            containerView.layoutIfNeeded()
+            scrollView.layoutIfNeeded()
         }
 
-        centerContainerIfNeeded()
         pullController.setupIndicators(in: scrollView)
         applyPendingScroll(&pendingScroll, pageH: height, gap: spacing, pageCount: sortedPages.count)
+        if !restoredViewport {
+            centerContainerIfNeeded()
+        }
 
         if let firstCanvas = canvasViews.first {
             DispatchQueue.main.async {
@@ -97,13 +131,14 @@ class PageLayoutManager {
         scrollView.contentSize = PageLayout.scrollContentSize(containerSize: containerSize, zoomScale: zoomScale)
         centerContainerIfNeeded()
 
-        let centerInContainer = CGPoint(
-            x: viewport.logicalCenter.x * presentationBand.scale,
-            y: viewport.logicalCenter.y * presentationBand.scale
+        let pageFrame = pageFrame(for: viewport.pageIndex, containerWidth: containerSize.width)
+        let anchorInContainer = CGPoint(
+            x: pageFrame.minX + viewport.pageAnchor.x * presentationBand.scale,
+            y: pageFrame.minY + viewport.pageAnchor.y * presentationBand.scale
         )
         let targetOffset = CGPoint(
-            x: (containerView.frame.minX + centerInContainer.x) * zoomScale - scrollView.bounds.width / 2,
-            y: (containerView.frame.minY + centerInContainer.y) * zoomScale - scrollView.bounds.height / 2
+            x: containerView.frame.minX + anchorInContainer.x * zoomScale - viewport.anchorInScrollView.x,
+            y: containerView.frame.minY + anchorInContainer.y * zoomScale - viewport.anchorInScrollView.y
         )
         scrollView.contentOffset = clampedContentOffset(targetOffset)
     }
@@ -123,25 +158,50 @@ class PageLayoutManager {
         )
     }
 
-    func captureViewportState() -> ViewportState? {
+    func captureViewportState(pages: [Page], anchorInScrollView: CGPoint? = nil) -> ViewportState? {
         guard let scrollView = scrollView, let containerView = containerView else { return nil }
+        guard !pages.isEmpty else { return nil }
         let zoomScale = max(scrollView.zoomScale, 0.001)
-        let centerInScroll = CGPoint(
-            x: scrollView.contentOffset.x + scrollView.bounds.width / 2,
-            y: scrollView.contentOffset.y + scrollView.bounds.height / 2
+        let anchor = anchorInScrollView ?? CGPoint(
+            x: scrollView.bounds.width / 2,
+            y: scrollView.bounds.height / 2
         )
-        let centerInContainer = CGPoint(
-            x: centerInScroll.x / zoomScale - containerView.frame.minX,
-            y: centerInScroll.y / zoomScale - containerView.frame.minY
+        let anchorInScrollContent = CGPoint(
+            x: scrollView.contentOffset.x + anchor.x,
+            y: scrollView.contentOffset.y + anchor.y
         )
-        let logicalCenter = CGPoint(
-            x: centerInContainer.x / max(presentationBand.scale, 0.001),
-            y: centerInContainer.y / max(presentationBand.scale, 0.001)
+        let anchorInContainer = CGPoint(
+            x: (anchorInScrollContent.x - containerView.frame.minX) / zoomScale,
+            y: (anchorInScrollContent.y - containerView.frame.minY) / zoomScale
+        )
+        let containerWidth = containerView.bounds.width
+        let frames = (0..<pages.count).map { pageFrame(for: $0, containerWidth: containerWidth) }
+        let pageIndex = frames.enumerated()
+            .min { lhs, rhs in
+                distanceToFrame(anchorInContainer, frame: lhs.element) < distanceToFrame(anchorInContainer, frame: rhs.element)
+            }?
+            .offset ?? 0
+        let frame = frames[pageIndex]
+        let anchorWithinPage = CGPoint(
+            x: anchorInContainer.x - frame.minX,
+            y: anchorInContainer.y - frame.minY
+        )
+        let pageAnchor = CGPoint(
+            x: anchorWithinPage.x / max(presentationBand.scale, 0.001),
+            y: anchorWithinPage.y / max(presentationBand.scale, 0.001)
         )
         return ViewportState(
-            logicalCenter: logicalCenter,
+            pageIndex: pageIndex,
+            pageAnchor: pageAnchor,
+            anchorInScrollView: anchor,
             effectiveZoom: presentationBand.scale * zoomScale
         )
+    }
+
+    private func distanceToFrame(_ point: CGPoint, frame: CGRect) -> CGFloat {
+        let dx = max(frame.minX - point.x, 0, point.x - frame.maxX)
+        let dy = max(frame.minY - point.y, 0, point.y - frame.maxY)
+        return dx * dx + dy * dy
     }
 
     func effectiveZoom() -> CGFloat {

@@ -54,7 +54,7 @@ struct PagedCanvasContainer: UIViewRepresentable {
 
         if needsRebuild {
             c.layoutManager.hasCompletedInitialLayout = scrollView.bounds.width > 0
-            let viewport = c.layoutManager.captureViewportState()
+            let viewport = c.layoutManager.captureViewportState(pages: pages)
             c.rebuildPages(pages: pages, tool: tool, viewport: viewport)
         }
         c.layoutManager.centerContainerIfNeeded()
@@ -95,6 +95,7 @@ struct PagedCanvasContainer: UIViewRepresentable {
         var pendingScroll: ScrollAfterRebuild = .none
         var isUsingTool = false
         var pendingPresentationBand: PresentationZoomBand?
+        var lastZoomAnchorInScrollView: CGPoint?
 
         init(
             pages: [Page],
@@ -165,8 +166,16 @@ struct PagedCanvasContainer: UIViewRepresentable {
 
             flushDrawings()
             pendingPresentationBand = preferredBand
-            let viewport = layoutManager.captureViewportState()
+            let viewport = layoutManager.captureViewportState(pages: pages, anchorInScrollView: zoomAnchorInScrollView())
             rebuildPages(pages: pages, tool: tool, viewport: viewport)
+        }
+
+        private func zoomAnchorInScrollView() -> CGPoint? {
+            if let lastZoomAnchorInScrollView {
+                return lastZoomAnchorInScrollView
+            }
+            guard let scrollView = layoutManager.scrollView else { return nil }
+            return scrollView.pinchGestureRecognizer?.location(in: scrollView)
         }
 
         // MARK: - UIScrollViewDelegate
@@ -178,6 +187,9 @@ struct PagedCanvasContainer: UIViewRepresentable {
         }
 
         func scrollViewDidZoom(_ scrollView: UIScrollView) {
+            if let pinch = scrollView.pinchGestureRecognizer {
+                lastZoomAnchorInScrollView = pinch.location(in: scrollView)
+            }
             layoutManager.centerContainerIfNeeded()
             layoutManager.updateCurrentPage(pages: pages, onCurrentPageChanged: onCurrentPageChanged)
         }
@@ -185,6 +197,7 @@ struct PagedCanvasContainer: UIViewRepresentable {
         func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
             layoutManager.centerContainerIfNeeded()
             applyPresentationBandIfNeeded()
+            lastZoomAnchorInScrollView = nil
         }
 
         func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
@@ -208,7 +221,7 @@ struct PagedCanvasContainer: UIViewRepresentable {
             saveController.immediateSave(canvasView: canvasView, pages: pages)
             isUsingTool = false
             if pendingPresentationBand != nil {
-                let viewport = layoutManager.captureViewportState()
+                let viewport = layoutManager.captureViewportState(pages: pages, anchorInScrollView: zoomAnchorInScrollView())
                 rebuildPages(pages: pages, tool: tool, viewport: viewport)
             }
         }
