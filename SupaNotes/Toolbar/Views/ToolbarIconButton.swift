@@ -37,7 +37,7 @@ struct ToolbarIconButton: View {
     }
 
     private func colorIconView(color: Color) -> some View {
-        let isDrawingTool = currentlyActiveTool == .pen || currentlyActiveTool == .highlighter
+        let isDrawingTool = currentlyActiveTool == .pen
         return ColorSwatchView(
             color: color,
             showCheckmark: isDrawingTool && colorSelectedByUser.isSimilar(to: color, colorScheme: colorScheme)
@@ -57,7 +57,7 @@ struct ToolbarIconButton: View {
     private func toolForeground(for type: ToolType, isActive: Bool) -> some ShapeStyle {
         if !isActive { return AnyShapeStyle(.secondary) }
         switch type {
-        case .pen, .highlighter:
+        case .pen:
             // Use the user's selected color for drawing tools
             return AnyShapeStyle(colorSelectedByUser)
         default:
@@ -69,8 +69,6 @@ struct ToolbarIconButton: View {
         switch type {
         case .pen: return currentlyActiveTool == .pen
         case .eraser: return currentlyActiveTool == .eraser
-        case .highlighter: return currentlyActiveTool == .highlighter
-        case .lasso: return currentlyActiveTool == .lasso
         default: return false
         }
     }
@@ -79,8 +77,6 @@ struct ToolbarIconButton: View {
         switch type {
         case .pen: return .pen
         case .eraser: return .eraser
-        case .highlighter: return .highlighter
-        case .lasso: return .lasso
         default: return .pen
         }
     }
@@ -94,7 +90,8 @@ struct ToolbarIconButton: View {
                 colorSelectedByUser: $colorSelectedByUser
             )
         } else if icon.type.isWritingInstrument,
-                  let index = toolbarIcons.firstIndex(where: { $0.id == icon.id }) {
+                  let index = toolbarIcons.firstIndex(where: { $0.id == icon.id })
+        {
             let range = sliderRange(for: icon.type)
             let opacity: Double = icon.type == .highlighter ? 0.4 : 1.0
             let color = icon.type == .eraser ? Color.primary : colorSelectedByUser
@@ -111,7 +108,6 @@ struct ToolbarIconButton: View {
         switch type {
         case .pen: return Design.SliderRange.pen
         case .eraser: return Design.SliderRange.eraser
-        case .highlighter: return Design.SliderRange.highlighter
         default: return Design.SliderRange.pen
         }
     }
@@ -121,17 +117,17 @@ struct ToolbarIconButton: View {
         case .color:
             if let color = icon.color {
                 // If this color is already selected, open the editor. Otherwise, select it.
-                if (currentlyActiveTool == .pen || currentlyActiveTool == .highlighter) && colorSelectedByUser.isSimilar(to: color, colorScheme: colorScheme) {
+                if currentlyActiveTool == .pen, colorSelectedByUser.isSimilar(to: color, colorScheme: colorScheme) {
                     iconIDBeingEdited.wrappedValue = icon.id
                 } else {
                     colorSelectedByUser = color
                     // Auto-switch to pen if the user picks a color while using the eraser
-                    if currentlyActiveTool == .eraser || currentlyActiveTool == .lasso {
+                    if currentlyActiveTool == .eraser {
                         currentlyActiveTool = .pen
                     }
                 }
             }
-        case .pen, .eraser, .highlighter:
+        case .pen, .eraser:
             let targetTool = toolFor(icon.type)
             // If the tool is already active, open its settings. Otherwise, switch to it.
             if currentlyActiveTool == targetTool {
@@ -139,8 +135,8 @@ struct ToolbarIconButton: View {
             } else {
                 currentlyActiveTool = targetTool
             }
-        case .lasso:
-            currentlyActiveTool = .lasso
+        case .highlighter, .lasso:
+            currentlyActiveTool = .pen
         }
     }
 }

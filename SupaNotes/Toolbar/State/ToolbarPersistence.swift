@@ -11,13 +11,29 @@ enum ToolbarPersistence {
         [
             ToolbarIcon.toolIcon(.pen),
             ToolbarIcon.toolIcon(.eraser),
-            ToolbarIcon.toolIcon(.highlighter),
-            ToolbarIcon.toolIcon(.lasso),
             ToolbarIcon.colorIcon(.black, name: "Black", colorScheme: colorScheme),
             ToolbarIcon.colorIcon(.red, name: "Red", colorScheme: colorScheme),
             ToolbarIcon.colorIcon(.blue, name: "Blue", colorScheme: colorScheme),
             ToolbarIcon.colorIcon(.green, name: "Green", colorScheme: colorScheme),
         ]
+    }
+
+    private static let supportedTools: Set<ToolType> = [.pen, .eraser]
+
+    private static func sanitizedIcons(from icons: [ToolbarIcon], colorScheme: ColorScheme) -> [ToolbarIcon] {
+        let filtered = icons.filter { icon in
+            icon.type == .color || supportedTools.contains(icon.type)
+        }
+        return filtered.isEmpty ? defaultIcons(colorScheme: colorScheme) : filtered
+    }
+
+    private static func supportedActiveTool(_ tool: ActiveTool) -> ActiveTool {
+        switch tool {
+        case .pen, .eraser:
+            return tool
+        case .highlighter, .lasso:
+            return .pen
+        }
     }
 
     static func load(into state: ToolbarState) {
@@ -26,8 +42,9 @@ enum ToolbarPersistence {
         // 1. Load the icons (tools and colors)
         if let data = defaults.data(forKey: toolbarIconsKey),
            let icons = try? JSONDecoder().decode([ToolbarIcon].self, from: data),
-           !icons.isEmpty {
-            state.toolbarIcons = icons
+           !icons.isEmpty
+        {
+            state.toolbarIcons = sanitizedIcons(from: icons, colorScheme: .light)
         } else {
             // If no icons are saved, use the defaults
             state.toolbarIcons = defaultIcons(colorScheme: .light)
@@ -35,20 +52,23 @@ enum ToolbarPersistence {
 
         // 2. Load the color the user was using
         if let data = defaults.data(forKey: selectedColorKey),
-           let codable = try? JSONDecoder().decode(CodableColor.self, from: data) {
+           let codable = try? JSONDecoder().decode(CodableColor.self, from: data)
+        {
             state.colorSelectedByUser = codable.toColor()
         }
 
         // 3. Load the tool the user was using (Pen, Eraser, etc.)
         if let rawTool = defaults.string(forKey: activeToolKey),
-           let tool = ActiveTool(rawValue: rawTool) {
-            state.currentlyActiveTool = tool
+           let tool = ActiveTool(rawValue: rawTool)
+        {
+            state.currentlyActiveTool = supportedActiveTool(tool)
         }
 
         // 4. Load the order of the toolbar sections
         if let data = defaults.data(forKey: sectionOrderKey),
            let order = try? JSONDecoder().decode([ToolbarSection].self, from: data),
-           Set(order) == Set(ToolbarSection.allCases) {
+           Set(order) == Set(ToolbarSection.allCases)
+        {
             state.sectionOrder = order
         }
 
@@ -79,7 +99,7 @@ enum ToolbarPersistence {
         if let data = try? JSONEncoder().encode(state.sectionOrder) {
             defaults.set(data, forKey: sectionOrderKey)
         }
-        
+
         // Save the Undo/Redo visibility
         defaults.set(state.showUndoRedo, forKey: showUndoRedoKey)
     }

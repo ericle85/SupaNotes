@@ -1,6 +1,5 @@
 import Foundation
 import PDFKit
-import PencilKit
 import SwiftData
 import UIKit
 
@@ -9,6 +8,7 @@ enum PDFService {
     private static let bgRenderScale: CGFloat = 2.0
 
     // MARK: - Import
+
     static func importPDF(url: URL, into note: Note, modelContext: ModelContext) {
         guard let data = try? Data(contentsOf: url) else { return }
         importPDF(data: data, into: note, modelContext: modelContext)
@@ -21,16 +21,17 @@ enum PDFService {
         note.originalPdfData = data
 
         // Remove the default blank page if it's there and empty
-        if note.pages.count == 1, 
-           let first = note.pages.first, 
-           first.drawingData.isEmpty, 
-           first.backgroundImageData == nil {
+        if note.pages.count == 1,
+           let first = note.pages.first,
+           first.drawingData.isEmpty,
+           first.backgroundImageData == nil
+        {
             modelContext.delete(first)
             note.pages = []
         }
 
         let startIndex = note.pages.count
-        for i in 0..<doc.pageCount {
+        for i in 0 ..< doc.pageCount {
             // Create a placeholder page that references the PDF
             let page = Page(orderIndex: startIndex + i, template: .white)
             page.note = note
@@ -43,6 +44,7 @@ enum PDFService {
     }
 
     // MARK: - Rendering Helpers
+
     static func imageForPage(_ page: Page) -> UIImage? {
         // 1. If PDF placeholder, render the PDF page to a bitmap for the UI
         if let note = page.note, let pdfData = note.originalPdfData, let pageNum = page.pdfPageNumber {
@@ -63,12 +65,12 @@ enum PDFService {
                 }
             }
         }
-        
+
         // 2. Fallback to bitmap
         if let data = page.backgroundImageData {
             return UIImage(data: data)
         }
-        
+
         return nil
     }
 
@@ -89,6 +91,7 @@ enum PDFService {
     }
 
     // MARK: - Export
+
     static func exportNote(_ note: Note, pages: [Page]?) -> Data? {
         let targetPages = pages ?? note.sortedPages
         guard !targetPages.isEmpty else { return nil }
@@ -104,7 +107,7 @@ enum PDFService {
         let pdfSize = note.originalPdfData?.count ?? 0
         var totalBgSize = 0
         var totalDrawingSize = 0
-        
+
         for (index, page) in targetPages.enumerated() {
             let bgSize = page.backgroundImageData?.count ?? 0
             let drSize = page.drawingData.count
@@ -112,7 +115,7 @@ enum PDFService {
             totalDrawingSize += drSize
             print("Page \(index + 1): Raster BG \(bgSize / 1024) KB, Drawing \(drSize / 1024) KB")
         }
-        
+
         let totalKb = (pdfSize + totalBgSize + totalDrawingSize) / 1024
         print("PDF Source: \(pdfSize / 1024) KB")
         print("Raster BGs: \(totalBgSize / 1024) KB")
@@ -136,7 +139,7 @@ enum PDFService {
     private static func drawPage(_ page: Page, in ctx: CGContext, rect: CGRect) {
         ctx.setFillColor(page.template.backgroundColor.cgColor)
         ctx.fill(rect)
-        
+
         // 1. If this is a PDF placeholder page, draw the PDF on-the-fly
         if let note = page.note, let pdfData = note.originalPdfData, let pageNum = page.pdfPageNumber {
             if let doc = PDFDocument(data: pdfData), let pdfPage = doc.page(at: pageNum) {
@@ -144,7 +147,7 @@ enum PDFService {
                 // Flip coordinate system for PDF drawing
                 ctx.translateBy(x: 0, y: rect.height)
                 ctx.scaleBy(x: 1, y: -1)
-                
+
                 let pageRect = pdfPage.bounds(for: .mediaBox)
                 ctx.scaleBy(x: rect.width / pageRect.width, y: rect.height / pageRect.height)
                 pdfPage.draw(with: .mediaBox, to: ctx)
@@ -154,35 +157,47 @@ enum PDFService {
             // 2. Fallback to old bitmap background
             bg.draw(in: rect)
         }
-        
-        // 3. Draw PencilKit strokes
-        guard let drawing = DrawingCoordinateSpace.logicalDrawing(for: page) else { return }
-        
-        // Optimize: Only rasterize the area that actually has ink
-        let bounds = drawing.bounds
-        guard !bounds.isEmpty else { return }
-        
-        var image: UIImage = UIImage()
-        UITraitCollection(userInterfaceStyle: .light).performAsCurrent {
-            // Render only the ink's bounding box at 1x scale for the PDF
-            image = drawing.image(from: bounds, scale: 1.0)
-        }
-        
-        // Calculate where the ink should sit relative to the logical page space.
+
+        drawMaLiangStrokes(for: page, in: ctx, rect: rect)
+    }
+
+    private static func drawMaLiangStrokes(for page: Page, in ctx: CGContext, rect: CGRect) {
+        guard let content = MaLiangDrawingCodec.decodeContent(page.drawingData) else { return }
+
         let scaleX = rect.width / PageConstants.pageWidth
         let scaleY = rect.height / PageConstants.pageHeight
-        
-        let targetRect = CGRect(
-            x: bounds.origin.x * scaleX,
-            y: bounds.origin.y * scaleY,
-            width: bounds.width * scaleX,
-            height: bounds.height * scaleY
-        )
-        
-        image.draw(in: targetRect)
+
+        for strip in content.lineStrips {
+            let isEraser = strip.brushName == SupaCanvasView.eraserBrushName
+            let fallbackColor = strip.color.uiColor
+
+            for line in strip.lines {
+                let color = line.color?.uiColor ?? fallbackColor
+                let begin = CGPoint(x: line.begin.x * scaleX, y: line.begin.y * scaleY)
+                let end = CGPoint(x: line.end.x * scaleX, y: line.end.y * scaleY)
+                let width = max(0.5, line.pointSize * ((scaleX + scaleY) / 2))
+
+                ctx.saveGState()
+                ctx.setLineCap(.round)
+                ctx.setLineJoin(.round)
+                ctx.setLineWidth(width)
+                if isEraser {
+                    ctx.setBlendMode(.clear)
+                    ctx.setStrokeColor(UIColor.clear.cgColor)
+                } else {
+                    ctx.setBlendMode(.normal)
+                    ctx.setStrokeColor(color.cgColor)
+                }
+                ctx.move(to: begin)
+                ctx.addLine(to: end)
+                ctx.strokePath()
+                ctx.restoreGState()
+            }
+        }
     }
 
     // MARK: - Thumbnail
+
     static func thumbnail(for page: Page, width: CGFloat) -> UIImage {
         let height = width * (pageSize.height / pageSize.width)
         let size = CGSize(width: width, height: height)

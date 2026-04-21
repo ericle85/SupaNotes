@@ -28,18 +28,6 @@ struct AddToolMenuView: View {
                 toolRow(icon: "paintpalette.fill", color: .blue, label: "Color", showChevron: true) {
                     showColorPage = true
                 }
-
-                toolRow(icon: "highlighter", color: .orange, label: "Highlighter") {
-                    addToolIfNeeded(.highlighter)
-                    currentlyActiveTool = .highlighter
-                    dismiss()
-                }
-
-                toolRow(icon: "lasso", color: .purple, label: "Lasso") {
-                    addToolIfNeeded(.lasso)
-                    currentlyActiveTool = .lasso
-                    dismiss()
-                }
             }
             .buttonStyle(.plain)
             .padding(16)
@@ -48,7 +36,6 @@ struct AddToolMenuView: View {
         }
     }
 
-    @ViewBuilder
     private func toolRow(icon: String, color: Color, label: String, showChevron: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack {
@@ -80,6 +67,7 @@ struct AddToolMenuView: View {
 }
 
 // MARK: - Add Color View
+
 struct AddColorView: View {
     @Binding var toolbarIcons: [ToolbarIcon]
     @Binding var colorSelectedByUser: Color
@@ -145,7 +133,7 @@ struct AddColorView: View {
             }
             colorSelectedByUser = color
         }
-        if currentlyActiveTool == .eraser || currentlyActiveTool == .lasso {
+        if currentlyActiveTool == .eraser {
             currentlyActiveTool = .pen
         }
         dismiss()

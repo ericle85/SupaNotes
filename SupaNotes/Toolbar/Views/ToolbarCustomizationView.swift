@@ -9,8 +9,13 @@ struct ToolbarCustomizationView: View {
     @State private var isRearranging = false
     @State private var positioning = ToolbarPositioning()
 
-    private var toolRows: [ToolbarIcon] { toolbar.toolbarIcons.filter { $0.type != .color } }
-    private var colorRows: [ToolbarIcon] { toolbar.toolbarIcons.filter { $0.type == .color } }
+    private var toolRows: [ToolbarIcon] {
+        toolbar.toolbarIcons.filter { $0.type != .color }
+    }
+
+    private var colorRows: [ToolbarIcon] {
+        toolbar.toolbarIcons.filter { $0.type == .color }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -166,7 +171,7 @@ struct ToolbarCustomizationView: View {
                 }
             } else {
                 VStack(spacing: 6) {
-                    ForEach([ToolType.pen, .eraser, .highlighter, .lasso], id: \.self) { type in
+                    ForEach([ToolType.pen, .eraser], id: \.self) { type in
                         toolToggleRow(type: type)
                     }
                 }

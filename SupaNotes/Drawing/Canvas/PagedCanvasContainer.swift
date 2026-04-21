@@ -1,9 +1,8 @@
 import SwiftUI
-import PencilKit
 
 struct PagedCanvasContainer: UIViewRepresentable {
     @Binding var pages: [Page]
-    var tool: PKTool
+    var tool: DrawingTool
     var onUndoManagerReady: (UndoManager?) -> Void
     var onPencilDoubleTap: (() -> Void)?
     var onCurrentPageChanged: ((Int) -> Void)?
@@ -24,40 +23,42 @@ struct PagedCanvasContainer: UIViewRepresentable {
         containerView.tag = 999
         scrollView.addSubview(containerView)
 
-        let c = context.coordinator
-        c.layoutManager.scrollView = scrollView
-        c.layoutManager.containerView = containerView
+        let coordinator = context.coordinator
+        coordinator.layoutManager.scrollView = scrollView
+        coordinator.layoutManager.containerView = containerView
 
         let pencilInteraction = UIPencilInteraction()
-        pencilInteraction.delegate = c
+        pencilInteraction.delegate = coordinator
         scrollView.addInteraction(pencilInteraction)
 
-        c.rebuildPages(pages: pages, tool: tool, viewport: nil)
-
+        coordinator.rebuildPages(pages: pages, tool: tool, viewport: nil)
         return scrollView
     }
 
     func updateUIView(_ scrollView: UIScrollView, context: Context) {
-        let c = context.coordinator
-        c.pages = pages
-        c.tool = tool
-        c.onPencilDoubleTap = onPencilDoubleTap
-        c.onCurrentPageChanged = onCurrentPageChanged
-        c.addPage = addPage
-        c.addPageAbove = addPageAbove
+        let coordinator = context.coordinator
+        coordinator.pages = pages
+        coordinator.tool = tool
+        coordinator.onPencilDoubleTap = onPencilDoubleTap
+        coordinator.onCurrentPageChanged = onCurrentPageChanged
+        coordinator.addPage = addPage
+        coordinator.addPageAbove = addPageAbove
 
-        c.layoutManager.canvasViews.forEach { $0.tool = tool }
+        coordinator.layoutManager.canvasViews.forEach { tool.apply(to: $0) }
 
-        let containerWidth = c.layoutManager.containerView?.frame.width ?? 0
-        let needsRebuild = c.layoutManager.canvasViews.count != pages.count
-            || (!c.layoutManager.hasCompletedInitialLayout && scrollView.bounds.width > 0 && abs(containerWidth - scrollView.bounds.width) > 1)
+        let containerWidth = coordinator.layoutManager.containerView?.frame.width ?? 0
+        let needsRebuild = coordinator.layoutManager.canvasViews.count != pages.count
+            || (!coordinator.layoutManager.hasCompletedInitialLayout
+                && scrollView.bounds.width > 0
+                && abs(containerWidth - scrollView.bounds.width) > 1)
 
         if needsRebuild {
-            c.layoutManager.hasCompletedInitialLayout = scrollView.bounds.width > 0
-            let viewport = c.layoutManager.captureViewportState(pages: pages)
-            c.rebuildPages(pages: pages, tool: tool, viewport: viewport)
+            coordinator.layoutManager.hasCompletedInitialLayout = scrollView.bounds.width > 0
+            let viewport = coordinator.layoutManager.captureViewportState(pages: pages)
+            coordinator.rebuildPages(pages: pages, tool: tool, viewport: viewport)
         }
-        c.layoutManager.centerContainerIfNeeded()
+
+        coordinator.layoutManager.centerContainerIfNeeded()
     }
 
     func makeCoordinator() -> Coordinator {
@@ -72,17 +73,15 @@ struct PagedCanvasContainer: UIViewRepresentable {
         )
     }
 
-    // MARK: - Scroll Action
     enum ScrollAfterRebuild: Equatable {
         case none
         case scrollToFirst
         case scrollToLast
     }
 
-    // MARK: - Coordinator
-    class Coordinator: NSObject, UIScrollViewDelegate, PKCanvasViewDelegate, UIPencilInteractionDelegate {
+    final class Coordinator: NSObject, UIScrollViewDelegate, UIPencilInteractionDelegate, ActionObserver {
         var pages: [Page]
-        var tool: PKTool
+        var tool: DrawingTool
         var onUndoManagerReady: (UndoManager?) -> Void
         var onPencilDoubleTap: (() -> Void)?
         var onCurrentPageChanged: ((Int) -> Void)?
@@ -94,12 +93,10 @@ struct PagedCanvasContainer: UIViewRepresentable {
         let saveController = DrawingSaveController()
         var pendingScroll: ScrollAfterRebuild = .none
         var isUsingTool = false
-        var pendingPresentationBand: PresentationZoomBand?
-        var lastZoomAnchorInScrollView: CGPoint?
 
         init(
             pages: [Page],
-            tool: PKTool,
+            tool: DrawingTool,
             onUndoManagerReady: @escaping (UndoManager?) -> Void,
             onPencilDoubleTap: (() -> Void)?,
             onCurrentPageChanged: ((Int) -> Void)?,
@@ -114,14 +111,16 @@ struct PagedCanvasContainer: UIViewRepresentable {
             self.addPage = addPage
             self.addPageAbove = addPageAbove
             super.init()
+
             NotificationCenter.default.addObserver(
                 forName: Notification.Name("SupaNotes.scrollToPage"),
                 object: nil,
                 queue: .main
             ) { [weak self] note in
-                guard let idx = note.object as? Int else { return }
-                self?.layoutManager.scrollToPage(index: idx)
+                guard let index = note.object as? Int else { return }
+                self?.layoutManager.scrollToPage(index: index)
             }
+
             NotificationCenter.default.addObserver(
                 forName: Notification.Name("SupaNotes.flushDrawings"),
                 object: nil,
@@ -134,56 +133,25 @@ struct PagedCanvasContainer: UIViewRepresentable {
             }
         }
 
-        deinit { NotificationCenter.default.removeObserver(self) }
+        deinit {
+            NotificationCenter.default.removeObserver(self)
+        }
 
-        func rebuildPages(pages: [Page], tool: PKTool, viewport: PageLayoutManager.ViewportState?) {
+        func rebuildPages(pages: [Page], tool: DrawingTool, viewport: PageLayoutManager.ViewportState?) {
             layoutManager.rebuildPages(
                 pages: pages,
                 tool: tool,
-                delegate: self,
+                observer: self,
                 pullController: pullController,
                 pendingScroll: &pendingScroll,
-                presentationBand: pendingPresentationBand ?? layoutManager.presentationBand,
                 viewport: viewport,
                 onUndoManagerReady: onUndoManagerReady
             )
-            pendingPresentationBand = nil
         }
 
-        private func flushDrawings() {
-            for canvas in layoutManager.canvasViews {
-                saveController.immediateSave(canvasView: canvas, pages: pages)
-            }
+        func viewForZooming(in _: UIScrollView) -> UIView? {
+            layoutManager.containerView
         }
-
-        private func applyPresentationBandIfNeeded() {
-            let preferredBand = layoutManager.preferredPresentationBand()
-            guard preferredBand != layoutManager.presentationBand else { return }
-            guard !isUsingTool else {
-                pendingPresentationBand = preferredBand
-                return
-            }
-
-            flushDrawings()
-            pendingPresentationBand = preferredBand
-            let viewport = layoutManager.captureViewportState(
-                pages: pages,
-                anchorInScrollView: zoomAnchorInScrollView(),
-                allowOutsidePageAnchor: true
-            )
-            rebuildPages(pages: pages, tool: tool, viewport: viewport)
-        }
-
-        private func zoomAnchorInScrollView() -> CGPoint? {
-            if let lastZoomAnchorInScrollView {
-                return lastZoomAnchorInScrollView
-            }
-            guard let scrollView = layoutManager.scrollView else { return nil }
-            return scrollView.pinchGestureRecognizer?.location(in: scrollView)
-        }
-
-        // MARK: - UIScrollViewDelegate
-        func viewForZooming(in scrollView: UIScrollView) -> UIView? { layoutManager.containerView }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             layoutManager.updateCurrentPage(pages: pages, onCurrentPageChanged: onCurrentPageChanged)
@@ -191,51 +159,45 @@ struct PagedCanvasContainer: UIViewRepresentable {
         }
 
         func scrollViewDidZoom(_ scrollView: UIScrollView) {
-            if let pinch = scrollView.pinchGestureRecognizer {
-                lastZoomAnchorInScrollView = pinch.location(in: scrollView)
-            }
             layoutManager.centerContainerIfNeeded()
             layoutManager.updateCurrentPage(pages: pages, onCurrentPageChanged: onCurrentPageChanged)
+
+            let scale = min(UIScreen.main.scale * max(scrollView.zoomScale, 1), 8)
+            for canvasView in layoutManager.canvasViews {
+                canvasView.contentScaleFactor = scale
+                canvasView.redraw()
+            }
         }
 
-        func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
-            layoutManager.centerContainerIfNeeded()
-            applyPresentationBandIfNeeded()
-            lastZoomAnchorInScrollView = nil
-        }
-
-        func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        func scrollViewDidEndDragging(_: UIScrollView, willDecelerate _: Bool) {
             let scroll = pullController.handleEndDragging(addPage: addPage, addPageAbove: addPageAbove)
             if scroll != .none {
                 pendingScroll = scroll
             }
         }
 
-        // MARK: - PKCanvasViewDelegate
-        func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
-            saveController.debouncedSave(canvasView: canvasView, pages: pages)
-        }
-
-        func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
+        func canvas(_ canvas: Canvas, didBeginLineAt _: CGPoint, force _: CGFloat) {
             isUsingTool = true
-            onUndoManagerReady(canvasView.undoManager)
-        }
-
-        func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
-            saveController.immediateSave(canvasView: canvasView, pages: pages)
-            isUsingTool = false
-            if pendingPresentationBand != nil {
-                let viewport = layoutManager.captureViewportState(
-                    pages: pages,
-                    anchorInScrollView: zoomAnchorInScrollView(),
-                    allowOutsidePageAnchor: true
-                )
-                rebuildPages(pages: pages, tool: tool, viewport: viewport)
+            onUndoManagerReady(nil)
+            if let view = canvas as? SupaCanvasView {
+                saveController.debouncedSave(canvasView: view, pages: pages)
             }
         }
 
-        // MARK: - UIPencilInteractionDelegate
-        func pencilInteractionDidTap(_ interaction: UIPencilInteraction) {
+        func canvas(_ canvas: Canvas, didMoveLineTo _: CGPoint, force _: CGFloat) {
+            if let view = canvas as? SupaCanvasView {
+                saveController.debouncedSave(canvasView: view, pages: pages)
+            }
+        }
+
+        func canvas(_ canvas: Canvas, didFinishLineAt _: CGPoint, force _: CGFloat) {
+            if let view = canvas as? SupaCanvasView {
+                saveController.immediateSave(canvasView: view, pages: pages)
+            }
+            isUsingTool = false
+        }
+
+        func pencilInteractionDidTap(_: UIPencilInteraction) {
             onPencilDoubleTap?()
         }
     }

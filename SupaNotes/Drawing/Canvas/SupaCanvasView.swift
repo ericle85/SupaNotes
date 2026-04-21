@@ -1,72 +1,63 @@
 import UIKit
-import PencilKit
 
-/// PKCanvasView subclass that removes the "Insert Space Above" menu item
-/// from the lasso selection context menu via swizzling PKTiledView's
-/// UIEditMenuInteraction delegate method.
-class SupaCanvasView: PKCanvasView {
-    var presentationScale: CGFloat = 1.0
+final class SupaCanvasView: Canvas {
+    static let penBrushName = "supanotes.pen"
+    static let eraserBrushName = "supanotes.eraser"
 
-    private static var hasSwizzled = false
+    var pageIndex: Int = 0
 
-    override func didMoveToWindow() {
-        super.didMoveToWindow()
-        guard window != nil else { return }
-        Self.swizzleEditMenuIfNeeded(in: self)
+    private var penBrush: Brush?
+    private var eraserBrush: Eraser?
+
+    override func setup() {
+        super.setup()
+        isPencilMode = true
+        useFingersToErase = false
+        backgroundColor = .clear
+
+        do {
+            let pen: Brush = try registerBrush(name: Self.penBrushName, textureID: nil)
+            pen.opacity = 1.0
+            pen.pointStep = 1
+            pen.forceSensitive = 0
+            penBrush = pen
+
+            let eraser: Eraser = try registerBrush(name: Self.eraserBrushName, textureID: nil)
+            eraser.opacity = 1.0
+            eraser.pointStep = 1
+            eraser.forceSensitive = 0
+            eraserBrush = eraser
+        } catch {
+            penBrush = defaultBrush
+            eraserBrush = nil
+        }
     }
 
-    private static func swizzleEditMenuIfNeeded(in view: UIView) {
-        guard !hasSwizzled else { return }
-
-        // Find the PKTiledView that holds the UIEditMenuInteraction
-        guard let tiledView = findSubview(named: "PKTiledView", in: view) else { return }
-
-        // Find the UIEditMenuInteraction on it
-        guard let editMenuInteraction = tiledView.interactions.first(where: { $0 is UIEditMenuInteraction }) as? UIEditMenuInteraction else { return }
-
-        // The delegate is the PKTiledView itself — swizzle its class's delegate method
-        guard let delegate = editMenuInteraction.delegate else { return }
-        let delegateClass: AnyClass = type(of: delegate)
-
-        let selector = #selector(UIEditMenuInteractionDelegate.editMenuInteraction(_:menuFor:suggestedActions:))
-
-        guard let original = class_getInstanceMethod(delegateClass, selector) else { return }
-
-        let block: @convention(block) (AnyObject, UIEditMenuInteraction, UIEditMenuConfiguration, [UIMenuElement]) -> UIMenu? = { obj, interaction, config, suggestedActions in
-            // Call original implementation
-            typealias OriginalIMP = @convention(c) (AnyObject, Selector, UIEditMenuInteraction, UIEditMenuConfiguration, [UIMenuElement]) -> UIMenu?
-            let originalIMP = unsafeBitCast(swizzledOriginalIMP, to: OriginalIMP.self)
-            let menu = originalIMP(obj, selector, interaction, config, suggestedActions)
-
-            guard let menu = menu else { return nil }
-
-            // Filter out "Insert Space Above" from children
-            let filtered = menu.children.filter { element in
-                if let action = element as? UIAction {
-                    return !action.title.contains("Insert Space")
-                }
-                if let submenu = element as? UIMenu {
-                    return !submenu.title.contains("Insert Space")
-                }
-                return true
-            }
-
-            return menu.replacingChildren(filtered)
-        }
-
-        let newIMP = imp_implementationWithBlock(block)
-        swizzledOriginalIMP = method_setImplementation(original, newIMP)
-        hasSwizzled = true
+    func usePen(color: UIColor, width: CGFloat) {
+        guard let penBrush else { return }
+        penBrush.color = color
+        penBrush.pointSize = max(1, width)
+        penBrush.use()
     }
 
-    private static var swizzledOriginalIMP: IMP!
-
-    private static func findSubview(named className: String, in view: UIView) -> UIView? {
-        let viewClassName = String(describing: type(of: view))
-        if viewClassName == className { return view }
-        for sub in view.subviews {
-            if let found = findSubview(named: className, in: sub) { return found }
+    func useEraser(width: CGFloat) {
+        if let eraserBrush {
+            eraserBrush.pointSize = max(4, width)
+            eraserBrush.use()
+        } else {
+            defaultBrush.pointSize = max(4, width)
+            defaultBrush.color = .clear
+            defaultBrush.use()
         }
-        return nil
+    }
+
+    func brush(named name: String?) -> Brush {
+        if name == Self.eraserBrushName, let eraserBrush {
+            return eraserBrush
+        }
+        if name == Self.penBrushName, let penBrush {
+            return penBrush
+        }
+        return defaultBrush
     }
 }

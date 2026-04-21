@@ -1,6 +1,5 @@
-import SwiftUI
 import SwiftData
-import PencilKit
+import SwiftUI
 import UniformTypeIdentifiers
 
 struct NoteEditorView: View {
@@ -12,7 +11,9 @@ struct NoteEditorView: View {
     @State private var canvasUndoManager: UndoManager?
     @State private var currentPageIndex: Int = 0
 
-    private var note: Note? { notes.first }
+    private var note: Note? {
+        notes.first
+    }
 
     init(noteID: UUID) {
         _notes = Query(filter: #Predicate<Note> { note in
@@ -39,7 +40,7 @@ struct NoteEditorView: View {
                     get: { note.sortedPages },
                     set: { _ in }
                 ),
-                tool: toolbar.currentPKTool,
+                tool: toolbar.currentDrawingTool,
                 onUndoManagerReady: { canvasUndoManager = $0 },
                 onPencilDoubleTap: { toolbar.switchToPreviousTool() },
                 onCurrentPageChanged: { currentPageIndex = $0 },
@@ -83,12 +84,11 @@ struct NoteEditorView: View {
             }
         }
         .navigationBarHidden(true)
-        
         // Save whenever the user changes the color
         .onChange(of: toolbar.colorSelectedByUser) {
             toolbar.save(colorScheme: colorScheme)
         }
-        
+
         // Save whenever the user switches tools (and remember the old one)
         .onChange(of: toolbar.currentlyActiveTool) { oldValue, newValue in
             if oldValue != newValue {
@@ -96,7 +96,7 @@ struct NoteEditorView: View {
             }
             toolbar.save(colorScheme: colorScheme)
         }
-        
+
         // Save whenever the user rearranges the toolbar icons
         .onChange(of: toolbar.toolbarIcons) {
             toolbar.save(colorScheme: colorScheme)
@@ -123,8 +123,7 @@ struct NoteEditorView: View {
         return sorted[currentPageIndex]
     }
 
-    @ViewBuilder
-    private func editorTopActions(note: Note, pageManager: PageManager) -> some View {
+    private func editorTopActions(note: Note, pageManager _: PageManager) -> some View {
         HStack(spacing: 10) {
             Button {
                 if let page = currentPage {
@@ -166,7 +165,7 @@ struct NoteEditorView: View {
     }
 
     private func handleImport(result: Result<URL, Error>, note: Note) {
-        guard case .success(let url) = result else { return }
+        guard case let .success(url) = result else { return }
         let didAccess = url.startAccessingSecurityScopedResource()
         defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
         PDFService.importPDF(url: url, into: note, modelContext: modelContext)
