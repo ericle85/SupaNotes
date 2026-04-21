@@ -37,7 +37,8 @@ struct ToolbarIconButton: View {
     }
 
     private func colorIconView(color: Color) -> some View {
-        let isDrawingTool = currentlyActiveTool == .pen
+        // Show selected state for both pen and highlighter since both use color.
+        let isDrawingTool = currentlyActiveTool == .pen || currentlyActiveTool == .highlighter
         return ColorSwatchView(
             color: color,
             showCheckmark: isDrawingTool && colorSelectedByUser.isSimilar(to: color, colorScheme: colorScheme)
@@ -69,6 +70,10 @@ struct ToolbarIconButton: View {
         switch type {
         case .pen: return currentlyActiveTool == .pen
         case .eraser: return currentlyActiveTool == .eraser
+        // Keep highlighter icon visibly active when highlighter is selected.
+        case .highlighter: return currentlyActiveTool == .highlighter
+        // Keep lasso icon visibly active when lasso is selected.
+        case .lasso: return currentlyActiveTool == .lasso
         default: return false
         }
     }
@@ -77,6 +82,10 @@ struct ToolbarIconButton: View {
         switch type {
         case .pen: return .pen
         case .eraser: return .eraser
+        // Let highlighter icon switch to highlighter mode directly.
+        case .highlighter: return .highlighter
+        // Let lasso icon switch to lasso mode directly.
+        case .lasso: return .lasso
         default: return .pen
         }
     }
@@ -108,6 +117,7 @@ struct ToolbarIconButton: View {
         switch type {
         case .pen: return Design.SliderRange.pen
         case .eraser: return Design.SliderRange.eraser
+        case .highlighter: return Design.SliderRange.highlighter
         default: return Design.SliderRange.pen
         }
     }
@@ -121,13 +131,13 @@ struct ToolbarIconButton: View {
                     iconIDBeingEdited.wrappedValue = icon.id
                 } else {
                     colorSelectedByUser = color
-                    // Auto-switch to pen if the user picks a color while using the eraser
-                    if currentlyActiveTool == .eraser {
+                    // Color picking implies drawing, so move from erase/lasso to pen.
+                    if currentlyActiveTool == .eraser || currentlyActiveTool == .lasso {
                         currentlyActiveTool = .pen
                     }
                 }
             }
-        case .pen, .eraser:
+        case .pen, .eraser, .highlighter, .lasso:
             let targetTool = toolFor(icon.type)
             // If the tool is already active, open its settings. Otherwise, switch to it.
             if currentlyActiveTool == targetTool {
@@ -135,8 +145,6 @@ struct ToolbarIconButton: View {
             } else {
                 currentlyActiveTool = targetTool
             }
-        case .highlighter, .lasso:
-            currentlyActiveTool = .pen
         }
     }
 }
