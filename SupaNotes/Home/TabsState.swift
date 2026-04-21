@@ -11,8 +11,8 @@ final class TabsState {
     init() {
         let raw = UserDefaults.standard.stringArray(forKey: Self.storeKey) ?? []
         let ids = raw.compactMap(UUID.init(uuidString:))
-        self.openTabIDs = ids
-        self.activeTabID = ids.first
+        openTabIDs = ids
+        activeTabID = ids.first
     }
 
     func open(noteID: UUID) {

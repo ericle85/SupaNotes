@@ -6,7 +6,7 @@ struct ColorSwatchGrid: View {
 
     var body: some View {
         LazyVGrid(columns: [
-            GridItem(.adaptive(minimum: Design.Layout.colorSwatchLargeSize), spacing: 12)
+            GridItem(.adaptive(minimum: Design.Layout.colorSwatchLargeSize), spacing: 12),
         ], spacing: 12) {
             ForEach(colors, id: \.self) { color in
                 Button {

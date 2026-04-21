@@ -2,7 +2,7 @@ import Foundation
 
 struct WritingInstrumentSettings: Codable, Equatable {
     var width: CGFloat
-    var presets: [CGFloat]  // 3 elements
+    var presets: [CGFloat] // 3 elements
 
     static func pen() -> WritingInstrumentSettings {
         .init(width: 3, presets: [1, 3, 8])

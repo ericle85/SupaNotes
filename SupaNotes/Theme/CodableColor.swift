@@ -11,10 +11,10 @@ struct CodableColor: Codable, Equatable {
     /// Create from a SwiftUI Color
     init(color: Color, colorScheme: ColorScheme) {
         let (r, g, b) = color.resolveRGB(colorScheme: colorScheme)
-        self.red = Double(r)
-        self.green = Double(g)
-        self.blue = Double(b)
-        self.opacity = 1.0
+        red = Double(r)
+        green = Double(g)
+        blue = Double(b)
+        opacity = 1.0
     }
 
     /// Convert back to SwiftUI Color

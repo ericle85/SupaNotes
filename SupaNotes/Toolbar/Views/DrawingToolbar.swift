@@ -13,8 +13,13 @@ struct DrawingToolbar: View {
     @State private var isDraggingToolbar = false
     @State private var didRepositionToolbar = false
 
-    private var toolIcons: [ToolbarIcon] { toolbar.toolbarIcons.filter { $0.type != .color } }
-    private var colorIcons: [ToolbarIcon] { toolbar.toolbarIcons.filter { $0.type == .color } }
+    private var toolIcons: [ToolbarIcon] {
+        toolbar.toolbarIcons.filter { $0.type != .color }
+    }
+
+    private var colorIcons: [ToolbarIcon] {
+        toolbar.toolbarIcons.filter { $0.type == .color }
+    }
 
     var body: some View {
         GeometryReader { geometry in

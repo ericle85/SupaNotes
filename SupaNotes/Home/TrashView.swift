@@ -1,9 +1,9 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct TrashView: View {
     @Environment(\.modelContext) private var modelContext
-    
+
     /// A list of all notes that have been moved to the trash (isDeleted == true)
     @Query(
         filter: #Predicate<Note> { $0.isDeleted == true },
@@ -13,10 +13,10 @@ struct TrashView: View {
 
     /// Tracks if the user is currently picking multiple notes to delete or restore
     @State private var userIsCurrentlySelectingNotes = false
-    
+
     /// A set of note IDs that the user has selected while in selection mode
     @State private var notesSelectedForAction: Set<UUID> = []
-    
+
     @State private var showEmptyTrashConfirmationAlert = false
     @State private var showDeleteSelectedConfirmationAlert = false
 
@@ -24,7 +24,7 @@ struct TrashView: View {
         VStack(spacing: 0) {
             // The bar at the top with "Select" and "Empty Trash" buttons
             trashHeaderToolbar
-            
+
             Divider()
 
             if notesCurrentlyInTrash.isEmpty {
@@ -34,7 +34,7 @@ struct TrashView: View {
             }
         }
         .alert("Empty Trash?", isPresented: $showEmptyTrashConfirmationAlert) {
-            Button("Cancel", role: .cancel) { }
+            Button("Cancel", role: .cancel) {}
             Button("Empty Trash", role: .destructive) {
                 permanentlyDeleteAllNotesInTrash()
             }
@@ -43,7 +43,7 @@ struct TrashView: View {
             Text("This will permanently delete all \(noteCount) " + (noteCount == 1 ? "note" : "notes") + ". This action cannot be undone.")
         }
         .alert(notesSelectedForAction.count == 1 ? "Delete 1 note?" : "Delete \(notesSelectedForAction.count) notes?", isPresented: $showDeleteSelectedConfirmationAlert) {
-            Button("Cancel", role: .cancel) { }
+            Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
                 permanentlyDeleteSelectedNotes()
             }
@@ -94,7 +94,6 @@ struct TrashView: View {
 
     // MARK: - Subviews (The "UI Parts")
 
-    @ViewBuilder
     private var emptyTrashPlaceholderView: some View {
         ContentUnavailableView(
             "Trash is Empty",
@@ -103,7 +102,6 @@ struct TrashView: View {
         )
     }
 
-    @ViewBuilder
     private var listOfTrashedNotes: some View {
         List {
             ForEach(notesCurrentlyInTrash) { note in
@@ -114,7 +112,6 @@ struct TrashView: View {
         .overlay(selectionModeBottomActionBar, alignment: .bottom)
     }
 
-    @ViewBuilder
     private func trashedNoteRow(for note: Note) -> some View {
         HStack {
             NoteRowView(
@@ -152,13 +149,11 @@ struct TrashView: View {
         }
     }
 
-    @ViewBuilder
     private func selectionIndicatorIcon(isNoteSelected: Bool) -> some View {
         Image(systemName: isNoteSelected ? "checkmark.circle.fill" : "circle")
             .foregroundStyle(isNoteSelected ? .blue : .secondary)
     }
 
-    @ViewBuilder
     private var trashHeaderToolbar: some View {
         HStack {
             if userIsCurrentlySelectingNotes {

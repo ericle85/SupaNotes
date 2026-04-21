@@ -4,8 +4,13 @@ struct ToolbarCustomizationPreview: View {
     @Bindable var toolbar: ToolbarState
     @State private var positioning = ToolbarPositioning()
 
-    private var toolIcons: [ToolbarIcon] { toolbar.toolbarIcons.filter { $0.type != .color } }
-    private var colorIcons: [ToolbarIcon] { toolbar.toolbarIcons.filter { $0.type == .color } }
+    private var toolIcons: [ToolbarIcon] {
+        toolbar.toolbarIcons.filter { $0.type != .color }
+    }
+
+    private var colorIcons: [ToolbarIcon] {
+        toolbar.toolbarIcons.filter { $0.type == .color }
+    }
 
     @State private var intrinsicSize: CGSize = .zero
 

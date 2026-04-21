@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct NoteTabsBar: View {
     @Environment(TabsState.self) private var tabs

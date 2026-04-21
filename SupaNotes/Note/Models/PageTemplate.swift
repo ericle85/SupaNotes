@@ -1,6 +1,6 @@
 import UIKit
 
-enum PageTemplate: String, CaseIterable, Codable, Sendable {
+enum PageTemplate: String, CaseIterable, Codable {
     case white
     case dark
 

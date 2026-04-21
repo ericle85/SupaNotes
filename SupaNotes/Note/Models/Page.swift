@@ -20,10 +20,10 @@ final class Page {
     }
 
     init(orderIndex: Int = 0, drawingData: Data = Data(), template: PageTemplate = .white) {
-        self.id = UUID()
+        id = UUID()
         self.orderIndex = orderIndex
         self.drawingData = drawingData
-        self.drawingScale = 1.0
-        self.templateRaw = template.rawValue
+        drawingScale = 1.0
+        templateRaw = template.rawValue
     }
 }

@@ -4,7 +4,7 @@ import SwiftData
 import UIKit
 
 enum PDFService {
-    static let pageSize = CGSize(width: PageConstants.pageWidth, height: PageConstants.pageHeight)
+    static let pageSize = CGSize(width: 612, height: 792)
     private static let bgRenderScale: CGFloat = 2.0
 
     // MARK: - Import
@@ -156,43 +156,6 @@ enum PDFService {
         } else if let data = page.backgroundImageData, let bg = UIImage(data: data) {
             // 2. Fallback to old bitmap background
             bg.draw(in: rect)
-        }
-
-        drawMaLiangStrokes(for: page, in: ctx, rect: rect)
-    }
-
-    private static func drawMaLiangStrokes(for page: Page, in ctx: CGContext, rect: CGRect) {
-        guard let content = MaLiangDrawingCodec.decodeContent(page.drawingData) else { return }
-
-        let scaleX = rect.width / PageConstants.pageWidth
-        let scaleY = rect.height / PageConstants.pageHeight
-
-        for strip in content.lineStrips {
-            let isEraser = strip.brushName == SupaCanvasView.eraserBrushName
-            let fallbackColor = strip.color.uiColor
-
-            for line in strip.lines {
-                let color = line.color?.uiColor ?? fallbackColor
-                let begin = CGPoint(x: line.begin.x * scaleX, y: line.begin.y * scaleY)
-                let end = CGPoint(x: line.end.x * scaleX, y: line.end.y * scaleY)
-                let width = max(0.5, line.pointSize * ((scaleX + scaleY) / 2))
-
-                ctx.saveGState()
-                ctx.setLineCap(.round)
-                ctx.setLineJoin(.round)
-                ctx.setLineWidth(width)
-                if isEraser {
-                    ctx.setBlendMode(.clear)
-                    ctx.setStrokeColor(UIColor.clear.cgColor)
-                } else {
-                    ctx.setBlendMode(.normal)
-                    ctx.setStrokeColor(color.cgColor)
-                }
-                ctx.move(to: begin)
-                ctx.addLine(to: end)
-                ctx.strokePath()
-                ctx.restoreGState()
-            }
         }
     }
 

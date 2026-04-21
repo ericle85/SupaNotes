@@ -22,7 +22,8 @@ struct EditColorView: View {
             ColorPicker("Custom Color", selection: Binding(
                 get: {
                     if let index = toolbarIcons.firstIndex(where: { $0.id == icon.id }),
-                       let color = toolbarIcons[index].color {
+                       let color = toolbarIcons[index].color
+                    {
                         return color
                     }
                     return .blue

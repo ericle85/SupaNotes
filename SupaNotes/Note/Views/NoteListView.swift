@@ -1,25 +1,25 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct NoteListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(TabsState.self) private var tabs
-    
+
     /// A list of all notes, sorted and filtered by the database (SwiftData)
     @Query private var allNotesFromDatabase: [Note]
-    
+
     /// A list of all folders, sorted to match the user's preference
     @Query private var allFoldersFromDatabase: [Folder]
-    
+
     /// The specific folder the user is looking at. If this is nil, we are at the "All Notes" root.
     var userSelectedFolder: Folder?
-    
+
     /// How the notes should be ordered in the list
     var currentNoteSortOrder: NoteSortOrder
-    
+
     /// A function (closure) to call when the user taps on a note
     var handleOpeningNote: (UUID) -> Void
-    
+
     /// A function (closure) to call when the user taps on a folder
     var handleOpeningFolder: (Folder) -> Void
 
@@ -33,10 +33,10 @@ struct NoteListView: View {
         onOpenNote: @escaping (UUID) -> Void,
         onOpenFolder: @escaping (Folder) -> Void
     ) {
-        self.userSelectedFolder = folder
-        self.currentNoteSortOrder = sortOrder
-        self.handleOpeningNote = onOpenNote
-        self.handleOpeningFolder = onOpenFolder
+        userSelectedFolder = folder
+        currentNoteSortOrder = sortOrder
+        handleOpeningNote = onOpenNote
+        handleOpeningFolder = onOpenFolder
 
         // Decide how to sort notes based on the user's preference
         let noteSortDescriptor: SortDescriptor<Note> = switch sortOrder {
@@ -52,14 +52,14 @@ struct NoteListView: View {
             },
             sort: [noteSortDescriptor]
         )
-        
+
         // Decide how to sort folders to match. Since folders don't have a "last edited"
         // property, we fall back to "date created" for that case.
         let folderSortDescriptor: SortDescriptor<Folder> = switch sortOrder {
         case .name: SortDescriptor(\Folder.name)
         case .lastEdited, .dateCreated: SortDescriptor(\Folder.createdAt, order: .reverse)
         }
-        
+
         _allFoldersFromDatabase = Query(sort: [folderSortDescriptor])
     }
 
@@ -77,7 +77,9 @@ struct NoteListView: View {
     }
 
     /// Helper to check if we are at the top level (not inside any folder)
-    private var isAtRootLevel: Bool { userSelectedFolder == nil }
+    private var isAtRootLevel: Bool {
+        userSelectedFolder == nil
+    }
 
     var body: some View {
         if notesInSelectedFolder.isEmpty && (!isAtRootLevel || allFoldersFromDatabase.isEmpty) {
@@ -87,7 +89,6 @@ struct NoteListView: View {
         }
     }
 
-    @ViewBuilder
     private var emptyStatePlaceholderView: some View {
         ContentUnavailableView(
             "No Notes",
@@ -96,7 +97,6 @@ struct NoteListView: View {
         )
     }
 
-    @ViewBuilder
     private var notesAndFoldersList: some View {
         List {
             // Show the notes for the current view first
@@ -133,7 +133,6 @@ struct NoteListView: View {
         )
     }
 
-    @ViewBuilder
     private func noteRow(for note: Note) -> some View {
         Button {
             handleOpeningNote(note.id)
@@ -166,7 +165,6 @@ struct NoteListView: View {
         }
     }
 
-    @ViewBuilder
     private func folderEditingRow(for folder: Folder) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "folder")
@@ -180,7 +178,6 @@ struct NoteListView: View {
         }
     }
 
-    @ViewBuilder
     private func folderNormalRow(for folder: Folder) -> some View {
         Button {
             handleOpeningFolder(folder)

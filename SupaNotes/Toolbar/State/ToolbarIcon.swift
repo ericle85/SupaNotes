@@ -1,11 +1,13 @@
 import SwiftUI
 
 // MARK: - Toolbar Layout Constants
+
 enum ToolbarConstants {
     static let tapTargetSize: CGFloat = 38
 }
 
 // MARK: - Tool Type Enum
+
 enum ToolType: String, Codable, CaseIterable {
     case color
     case pen = "pencil" // Raw value preserved for backwards compatibility
@@ -39,6 +41,7 @@ enum ToolType: String, Codable, CaseIterable {
 }
 
 // MARK: - Toolbar Icon Model
+
 struct ToolbarIcon: Identifiable, Equatable, Codable {
     let id: UUID
     let type: ToolType
@@ -95,6 +98,7 @@ struct ToolbarIcon: Identifiable, Equatable, Codable {
 }
 
 // MARK: - Zone-aware insertion
+
 extension Array where Element == ToolbarIcon {
     mutating func appendToZone(_ icon: ToolbarIcon) {
         if icon.type == .color {

@@ -2,6 +2,7 @@ import Foundation
 
 enum Design {
     // MARK: - Layout
+
     enum Layout {
         static let sidebarWidth: CGFloat = 260
         static let headerButtonSize: CGFloat = 36
@@ -13,12 +14,14 @@ enum Design {
     }
 
     // MARK: - Zoom
+
     enum Zoom {
         static let min: CGFloat = 0.125
         static let max: CGFloat = 3.0
     }
 
     // MARK: - Pull to Add
+
     enum PullToAdd {
         /// How far you drag before the indicator starts filling up
         static let activationThreshold: CGFloat = 80
@@ -33,6 +36,7 @@ enum Design {
     }
 
     // MARK: - Corner Radii
+
     enum CornerRadius {
         static let small: CGFloat = 8
         static let medium: CGFloat = 10
@@ -40,6 +44,7 @@ enum Design {
     }
 
     // MARK: - Shadow
+
     struct Shadow {
         let color: CGFloat // opacity
         let radius: CGFloat
@@ -53,6 +58,7 @@ enum Design {
     }
 
     // MARK: - Animation
+
     enum Animation {
         static let sidebarDuration: Double = 0.25
         static let springResponse: Double = 0.35
@@ -60,6 +66,7 @@ enum Design {
     }
 
     // MARK: - Spacing
+
     enum Spacing {
         static let toolbarPadding: CGFloat = 8
         static let toolbarEdgePadding: CGFloat = 18
@@ -70,6 +77,7 @@ enum Design {
     }
 
     // MARK: - Font Sizes
+
     enum FontSize {
         static let headerIcon: CGFloat = 18
         static let toolIcon: CGFloat = 16
@@ -77,6 +85,7 @@ enum Design {
     }
 
     // MARK: - Drag
+
     enum Drag {
         static let deleteThreshold: CGFloat = 50
         static let reorderMinDistance: CGFloat = 2
@@ -86,13 +95,15 @@ enum Design {
     }
 
     // MARK: - Slider Ranges
+
     enum SliderRange {
-        static let pen: ClosedRange<CGFloat> = 1...50
-        static let eraser: ClosedRange<CGFloat> = 10...150
-        static let highlighter: ClosedRange<CGFloat> = 5...40
+        static let pen: ClosedRange<CGFloat> = 1 ... 50
+        static let eraser: ClosedRange<CGFloat> = 10 ... 150
+        static let highlighter: ClosedRange<CGFloat> = 5 ... 40
     }
 
     // MARK: - Debounce
+
     enum Debounce {
         static let drawingSave: Double = 0.3
         static let pullReset: Double = 0.3

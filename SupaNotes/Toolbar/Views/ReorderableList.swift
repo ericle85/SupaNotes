@@ -14,7 +14,9 @@ struct ReorderableList<Item: Identifiable, Row: View>: View {
     @State private var startIndex: Int?
     @State private var proposedIndex: Int?
 
-    private var pitch: CGFloat { rowHeight + spacing }
+    private var pitch: CGFloat {
+        rowHeight + spacing
+    }
 
     var body: some View {
         VStack(spacing: spacing) {

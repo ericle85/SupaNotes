@@ -47,18 +47,6 @@ final class ToolbarState {
         return matchingIcon?.instrumentSettings?.width ?? WritingInstrumentSettings.pen().width
     }
 
-    var currentDrawingTool: DrawingTool {
-        switch currentlyActiveTool {
-        case .pen, .highlighter, .lasso:
-            return .pen(
-                color: UIColor(colorSelectedByUser),
-                width: instrumentWidth(for: .pen)
-            )
-        case .eraser:
-            return .eraser(width: instrumentWidth(for: .eraser))
-        }
-    }
-
     func save(colorScheme: ColorScheme) {
         ToolbarPersistence.save(self, colorScheme: colorScheme)
     }

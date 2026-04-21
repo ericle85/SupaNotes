@@ -1,6 +1,7 @@
 import SwiftUI
 
 // MARK: - Drag-to-Reorder State
+
 @Observable
 final class IconDragState {
     var draggedIconID: UUID?
@@ -50,6 +51,7 @@ final class IconDragState {
 }
 
 // MARK: - Reorder Commit
+
 extension Array where Element == ToolbarIcon {
     mutating func moveIconInZone(id: UUID, toZoneIndex target: Int, isColor: Bool) {
         guard let currentFlatIndex = firstIndex(where: { $0.id == id }) else { return }

@@ -133,13 +133,16 @@ private struct PageThumbnail: View {
 }
 
 extension URL: @retroactive Identifiable {
-    public var id: String { absoluteString }
+    public var id: String {
+        absoluteString
+    }
 }
 
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
-    func makeUIViewController(context: Context) -> UIActivityViewController {
+    func makeUIViewController(context _: Context) -> UIActivityViewController {
         UIActivityViewController(activityItems: items, applicationActivities: nil)
     }
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+
+    func updateUIViewController(_: UIActivityViewController, context _: Context) {}
 }

@@ -1,6 +1,7 @@
 import SwiftUI
 
 // MARK: - Edge Snapping & Axis Helpers
+
 struct ToolbarPositioning {
     @AppStorage("toolbarEdge") var toolbarEdge: String = "bottom"
 
@@ -39,6 +40,7 @@ struct ToolbarPositioning {
     }
 
     // MARK: - Repositioning Gesture
+
     static func repositionGesture(
         draggedIconID: UUID?,
         isDraggingToolbar: Binding<Bool>,
@@ -58,7 +60,7 @@ struct ToolbarPositioning {
                 guard isDraggingToolbar.wrappedValue else { return }
                 isDraggingToolbar.wrappedValue = false
                 toolbarDragOffset.wrappedValue = .zero
-                
+
                 // Briefly disable interactions while the toolbar animates
                 DispatchQueue.main.asyncAfter(deadline: .now() + Design.Drag.repositionDelay) {
                     didRepositionToolbar.wrappedValue = false
@@ -70,7 +72,7 @@ struct ToolbarPositioning {
                     "top": loc.y,
                     "bottom": screenSize.height - loc.y,
                     "left": loc.x,
-                    "right": screenSize.width - loc.x
+                    "right": screenSize.width - loc.x,
                 ]
 
                 // Find the edge with the minimum distance

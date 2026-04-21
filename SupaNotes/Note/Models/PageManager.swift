@@ -26,5 +26,4 @@ struct PageManager {
         modelContext.insert(page)
         note.updatedAt = .now
     }
-
 }

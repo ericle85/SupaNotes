@@ -18,11 +18,11 @@ final class Note {
     }
 
     init(title: String = "Untitled Note") {
-        self.id = UUID()
+        id = UUID()
         self.title = title
-        self.createdAt = .now
-        self.updatedAt = .now
-        self.pages = [Page(orderIndex: 0)]
+        createdAt = .now
+        updatedAt = .now
+        pages = [Page(orderIndex: 0)]
     }
 
     func moveToTrash() {
