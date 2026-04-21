@@ -253,6 +253,17 @@ open class Canvas: MetalView {
         actionObservers.canvas(self, didRedrawOn: target)
     }
 
+    open func invalidateElementRenderBuffers() {
+        data.finishCurrentElement()
+        for element in data.elements {
+            if let lineStrip = element as? LineStrip {
+                lineStrip.invalidateBufferCache()
+            } else if let lineStripGroup = element as? ElementGroup<LineStrip> {
+                lineStripGroup.elements.forEach { $0.invalidateBufferCache() }
+            }
+        }
+    }
+
     // MARK: - Rendering
 
     open func render(lines: [MLLine]) {

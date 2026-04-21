@@ -16,9 +16,10 @@ final class SupaCanvasView: Canvas {
         backgroundColor = .clear
 
         do {
-            let pen: Brush = try registerBrush(name: Self.penBrushName, textureID: nil)
+            let penTextureData = Self.makeSoftBrushTextureData()
+            let pen: Brush = try registerBrush(name: Self.penBrushName, from: penTextureData)
             pen.opacity = 1.0
-            pen.pointStep = 1
+            pen.pointStep = 0.35
             pen.forceSensitive = 0
             penBrush = pen
 
@@ -59,5 +60,42 @@ final class SupaCanvasView: Canvas {
             return penBrush
         }
         return defaultBrush
+    }
+
+    private static func makeSoftBrushTextureData(
+        diameter: Int = 64,
+        innerRadiusRatio: CGFloat = 0.82
+    ) -> Data {
+        let size = CGSize(width: diameter, height: diameter)
+        let format = UIGraphicsImageRendererFormat.default()
+        format.opaque = false
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+        let image = renderer.image { context in
+            let cgContext = context.cgContext
+            let center = CGPoint(x: size.width / 2, y: size.height / 2)
+            let radius = min(size.width, size.height) / 2
+
+            let colorSpace = CGColorSpaceCreateDeviceRGB()
+            let colors = [
+                UIColor.white.withAlphaComponent(1).cgColor,
+                UIColor.white.withAlphaComponent(1).cgColor,
+                UIColor.white.withAlphaComponent(0).cgColor
+            ] as CFArray
+            let locations: [CGFloat] = [0, innerRadiusRatio, 1]
+            guard let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: locations) else {
+                return
+            }
+
+            cgContext.drawRadialGradient(
+                gradient,
+                startCenter: center,
+                startRadius: 0,
+                endCenter: center,
+                endRadius: radius,
+                options: [.drawsAfterEndLocation]
+            )
+        }
+        return image.pngData() ?? Data()
     }
 }

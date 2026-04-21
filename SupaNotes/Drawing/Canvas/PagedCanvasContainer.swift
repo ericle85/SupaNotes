@@ -1,3 +1,4 @@
+import MetalKit
 import SwiftUI
 
 struct PagedCanvasContainer: UIViewRepresentable {
@@ -18,6 +19,13 @@ struct PagedCanvasContainer: UIViewRepresentable {
         scrollView.delegate = context.coordinator
         scrollView.minimumZoomScale = Design.Zoom.min
         scrollView.maximumZoomScale = Design.Zoom.max
+        scrollView.delaysContentTouches = false
+
+        if #available(iOS 9.1, *) {
+            let fingerTouchType = NSNumber(value: UITouch.TouchType.direct.rawValue)
+            scrollView.panGestureRecognizer.allowedTouchTypes = [fingerTouchType]
+            scrollView.pinchGestureRecognizer?.allowedTouchTypes = [fingerTouchType]
+        }
 
         let containerView = UIView()
         containerView.tag = 999
@@ -147,6 +155,9 @@ struct PagedCanvasContainer: UIViewRepresentable {
                 viewport: viewport,
                 onUndoManagerReady: onUndoManagerReady
             )
+            if let scrollView = layoutManager.scrollView {
+                updateCanvasRenderingScale(for: scrollView)
+            }
         }
 
         func viewForZooming(in _: UIScrollView) -> UIView? {
@@ -156,17 +167,13 @@ struct PagedCanvasContainer: UIViewRepresentable {
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             layoutManager.updateCurrentPage(pages: pages, onCurrentPageChanged: onCurrentPageChanged)
             pullController.update(for: scrollView)
+            updateCanvasRenderingScale(for: scrollView)
         }
 
         func scrollViewDidZoom(_ scrollView: UIScrollView) {
             layoutManager.centerContainerIfNeeded()
             layoutManager.updateCurrentPage(pages: pages, onCurrentPageChanged: onCurrentPageChanged)
-
-            let scale = min(UIScreen.main.scale * max(scrollView.zoomScale, 1), 8)
-            for canvasView in layoutManager.canvasViews {
-                canvasView.contentScaleFactor = scale
-                canvasView.redraw()
-            }
+            updateCanvasRenderingScale(for: scrollView)
         }
 
         func scrollViewDidEndDragging(_: UIScrollView, willDecelerate _: Bool) {
@@ -199,6 +206,34 @@ struct PagedCanvasContainer: UIViewRepresentable {
 
         func pencilInteractionDidTap(_: UIPencilInteraction) {
             onPencilDoubleTap?()
+        }
+
+        private func updateCanvasRenderingScale(for scrollView: UIScrollView) {
+            guard let containerView = layoutManager.containerView else { return }
+
+            let zoom = max(scrollView.zoomScale, 0.001)
+            let visibleInContainer = CGRect(
+                x: (scrollView.contentOffset.x - containerView.frame.minX) / zoom,
+                y: (scrollView.contentOffset.y - containerView.frame.minY) / zoom,
+                width: scrollView.bounds.width / zoom,
+                height: scrollView.bounds.height / zoom
+            ).insetBy(dx: -PageConstants.pageWidth * 0.5, dy: -PageConstants.pageHeight * 0.5)
+
+            let baseScale = UIScreen.main.scale
+            let boostedScale = min(baseScale * zoom, 4.0)
+
+            for canvas in layoutManager.canvasViews {
+                let targetScale = canvas.frame.intersects(visibleInContainer) ? boostedScale : baseScale
+                if abs(canvas.contentScaleFactor - targetScale) < 0.1 { continue }
+
+                canvas.contentScaleFactor = targetScale
+                canvas.drawableSize = CGSize(
+                    width: canvas.bounds.width * targetScale,
+                    height: canvas.bounds.height * targetScale
+                )
+                canvas.invalidateElementRenderBuffers()
+                canvas.redraw()
+            }
         }
     }
 }
