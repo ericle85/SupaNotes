@@ -130,6 +130,8 @@ struct ExcalidrawWritingSurface: View {
     private enum CanvasMetrics {
         /// US Letter in points (8.5 * 72 by 11 * 72).
         static let letterSize = CGSize(width: 612, height: 792)
+        /// Internal marker that separates visible subsegments in one stroke.
+        static let segmentBreakPoint = CGPoint(x: -1, y: -1)
     }
 
     /// The page model where drawing bytes are saved.
@@ -181,6 +183,9 @@ struct ExcalidrawWritingSurface: View {
                         } else {
                             handleDrawChanged(at: point)
                         }
+                    },
+                    onSegmentBreak: {
+                        handleSegmentBreak()
                     },
                     onEndedInLetterSpace: { point in
                         // Finish erase or draw gesture depending on current tool.
@@ -278,6 +283,14 @@ struct ExcalidrawWritingSurface: View {
 
     // MARK: - Drawing Actions
 
+    /// Insert a marker so re-entry does not connect bezier segments.
+    private func handleSegmentBreak() {
+        guard toolbar.currentlyActiveTool != .eraser else { return }
+        guard !activePoints.isEmpty else { return }
+        guard let last = activePoints.last, !isSegmentBreakPoint(last) else { return }
+        activePoints.append(CanvasMetrics.segmentBreakPoint)
+    }
+
     /// Update in-progress draw points as drag moves.
     private func handleDrawChanged(at point: CGPoint) {
         // If this is first point, start the stroke.
@@ -285,6 +298,11 @@ struct ExcalidrawWritingSurface: View {
             // Seed stroke with first point.
             activePoints = [point]
             // Exit after initialization.
+            return
+        }
+        // If we resumed after going off-canvas, start a new visible segment.
+        if let last = activePoints.last, isSegmentBreakPoint(last) {
+            activePoints.append(point)
             return
         }
         // Skip tiny moves to reduce noisy points.
@@ -301,6 +319,9 @@ struct ExcalidrawWritingSurface: View {
         if activePoints.isEmpty {
             // Seed point.
             activePoints = [point]
+        } else if let last = activePoints.last, isSegmentBreakPoint(last) {
+            // If we ended right after a break marker, start a new point segment.
+            activePoints.append(point)
         } else if let last = activePoints.last, distance(last, point) > 0.5 {
             // Add final point if it is meaningfully different.
             activePoints.append(point)
@@ -310,8 +331,8 @@ struct ExcalidrawWritingSurface: View {
         defer {
             activePoints = []
         }
-        // Need at least one point to create a stroke (single-point stroke = dot).
-        guard !activePoints.isEmpty else { return }
+        // Need at least one real point to create a stroke (single-point stroke = dot).
+        guard activePoints.contains(where: { !isSegmentBreakPoint($0) }) else { return }
 
         // Capture previous state for undo.
         let previous = document
@@ -422,6 +443,11 @@ struct ExcalidrawWritingSurface: View {
         hypot(lhs.x - rhs.x, lhs.y - rhs.y)
     }
 
+    /// True when this point is our internal segment break marker.
+    private func isSegmentBreakPoint(_ point: CGPoint) -> Bool {
+        point.x < 0 || point.y < 0
+    }
+
     /// Compute a centered letter frame that fits available size.
     private func letterFrame(in available: CGSize) -> CGRect {
         // Keep full page visible by taking smaller scale factor.
@@ -447,6 +473,8 @@ private struct PencilFilteredDrawingSurface: UIViewRepresentable {
     let activeStroke: ExcalidrawStroke?
     /// What to do when the pencil moves (updates the current line).
     let onChangedInLetterSpace: (CGPoint) -> Void
+    /// What to do when a gesture leaves and re-enters the canvas bounds.
+    let onSegmentBreak: () -> Void
     /// What to do when the pencil stops drawing (saves the line).
     let onEndedInLetterSpace: (CGPoint) -> Void
 
@@ -462,6 +490,7 @@ private struct PencilFilteredDrawingSurface: UIViewRepresentable {
         uiView.document = document
         uiView.activeStroke = activeStroke
         uiView.onChangedInLetterSpace = onChangedInLetterSpace
+        uiView.onSegmentBreak = onSegmentBreak
         uiView.onEndedInLetterSpace = onEndedInLetterSpace
         uiView.setNeedsDisplay()
     }
@@ -479,11 +508,17 @@ private final class PencilFilteredDrawingUIView: UIView {
     var activeStroke: ExcalidrawStroke?
     /// What to do when the pencil moves (updates the current line).
     var onChangedInLetterSpace: ((CGPoint) -> Void)?
+    /// What to do when a gesture leaves and re-enters the canvas bounds.
+    var onSegmentBreak: (() -> Void)?
     /// What to do when the pencil stops drawing (saves the line).
     var onEndedInLetterSpace: ((CGPoint) -> Void)?
 
     /// The pencil touch we're currently tracking.
     private var activePencilTouch: UITouch?
+    /// Last in-bounds point reported during the active pencil gesture.
+    private var lastInBoundsLetterPoint: CGPoint?
+    /// True once the active touch has left bounds; reset on re-entry.
+    private var didLeaveBoundsSinceLastReportedPoint = false
 
     /// Set up the drawing area when it's first created.
     /// Allow multiple touches to be detected (though only pencil will work).
@@ -501,8 +536,18 @@ private final class PencilFilteredDrawingUIView: UIView {
     /// Decide whether a touch should be recognized.
     /// Only Apple Pencil touches are allowed - finger touches are ignored.
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        // If the touch is outside the drawing area, ignore it.
-        guard bounds.contains(point) else { return nil }
+        // New touches must begin inside bounds.
+        // But if we're already tracking a pencil touch, keep handling it even when
+        // the contact drifts outside the canvas bounds.
+        if !bounds.contains(point) {
+            guard
+                let activePencilTouch,
+                event?.allTouches?.contains(activePencilTouch) == true
+            else {
+                return nil
+            }
+            return self
+        }
         guard let touches = event?.allTouches else {
             // Sometimes the system checks without telling us what touched.
             // We say yes to allow pencil touches to start.
@@ -542,6 +587,8 @@ private final class PencilFilteredDrawingUIView: UIView {
         guard let touch = touches.first(where: { $0.type == .pencil }) else { return }
         activePencilTouch = touch
         let point = toLetterSpace(touch.location(in: self))
+        lastInBoundsLetterPoint = point
+        didLeaveBoundsSinceLastReportedPoint = false
         onChangedInLetterSpace?(point)
     }
 
@@ -551,7 +598,18 @@ private final class PencilFilteredDrawingUIView: UIView {
         // Only respond if we're tracking a pencil touch.
         guard let activePencilTouch else { return }
         guard touches.contains(activePencilTouch) else { return }
-        let point = toLetterSpace(activePencilTouch.location(in: self))
+        let location = activePencilTouch.location(in: self)
+        // Keep gesture alive off-canvas, but do not draw/store off-canvas points.
+        guard bounds.contains(location) else {
+            didLeaveBoundsSinceLastReportedPoint = true
+            return
+        }
+        let point = toLetterSpace(location)
+        if didLeaveBoundsSinceLastReportedPoint {
+            onSegmentBreak?()
+            didLeaveBoundsSinceLastReportedPoint = false
+        }
+        lastInBoundsLetterPoint = point
         onChangedInLetterSpace?(point)
     }
 
@@ -561,10 +619,18 @@ private final class PencilFilteredDrawingUIView: UIView {
         // Only respond if we're tracking a pencil touch.
         guard let activePencilTouch else { return }
         guard touches.contains(activePencilTouch) else { return }
-        let point = toLetterSpace(activePencilTouch.location(in: self))
-        onEndedInLetterSpace?(point)
+        let location = activePencilTouch.location(in: self)
+        if bounds.contains(location) {
+            let point = toLetterSpace(location)
+            lastInBoundsLetterPoint = point
+            onEndedInLetterSpace?(point)
+        } else if let lastInBoundsLetterPoint {
+            onEndedInLetterSpace?(lastInBoundsLetterPoint)
+        }
         // Stop tracking this pencil touch.
         self.activePencilTouch = nil
+        lastInBoundsLetterPoint = nil
+        didLeaveBoundsSinceLastReportedPoint = false
     }
 
     /// Called if the drawing is interrupted (like a phone call).
@@ -573,10 +639,18 @@ private final class PencilFilteredDrawingUIView: UIView {
         // Only respond if we're tracking a pencil touch.
         guard let activePencilTouch else { return }
         guard touches.contains(activePencilTouch) else { return }
-        let point = toLetterSpace(activePencilTouch.location(in: self))
-        onEndedInLetterSpace?(point)
+        let location = activePencilTouch.location(in: self)
+        if bounds.contains(location) {
+            let point = toLetterSpace(location)
+            lastInBoundsLetterPoint = point
+            onEndedInLetterSpace?(point)
+        } else if let lastInBoundsLetterPoint {
+            onEndedInLetterSpace?(lastInBoundsLetterPoint)
+        }
         // Stop tracking this pencil touch.
         self.activePencilTouch = nil
+        lastInBoundsLetterPoint = nil
+        didLeaveBoundsSinceLastReportedPoint = false
     }
 
     /// Convert a screen position to a position on the standard paper size.
@@ -598,41 +672,6 @@ private final class PencilFilteredDrawingUIView: UIView {
         let points = stroke.points.map(\.cgPoint)
         guard !points.isEmpty else { return }
 
-        // Set up how the line should look.
-        let path = UIBezierPath()
-        path.lineCapStyle = .round // Rounded line ends.
-        path.lineJoinStyle = .round // Smooth line connections.
-        path.lineWidth = stroke.width
-
-        // If it's just a single dot, draw a circle.
-        if points.count == 1 {
-            let dotRect = CGRect(
-                x: points[0].x - stroke.width * 0.5,
-                y: points[0].y - stroke.width * 0.5,
-                width: stroke.width,
-                height: stroke.width
-            )
-            path.append(UIBezierPath(ovalIn: dotRect))
-        } else {
-            // Connect all the points with smooth curves.
-            path.move(to: points[0])
-            for index in 1 ..< points.count {
-                let previous = points[index - 1]
-                let current = points[index]
-                // Find the middle point between two touches.
-                let midpoint = CGPoint(x: (previous.x + current.x) * 0.5, y: (previous.y + current.y) * 0.5)
-                if index == 1 {
-                    path.addLine(to: midpoint)
-                } else {
-                    // Use a curve for smoother lines.
-                    path.addQuadCurve(to: midpoint, controlPoint: previous)
-                }
-                if index == points.count - 1 {
-                    path.addQuadCurve(to: current, controlPoint: current)
-                }
-            }
-        }
-
         // Set the color.
         // Highlighters are semi-transparent so you can see through them.
         let baseColor = UIColor(stroke.color.swiftUIColor)
@@ -641,7 +680,51 @@ private final class PencilFilteredDrawingUIView: UIView {
         // Highlighters blend with what's underneath like real highlighters.
         context.setBlendMode(stroke.tool == .highlighter ? .multiply : .normal)
         finalColor.setStroke()
-        path.stroke()
+        var segment: [CGPoint] = []
+        for point in points {
+            if point.x < 0 || point.y < 0 {
+                strokeSegment(segment, strokeWidth: stroke.width)
+                segment.removeAll(keepingCapacity: true)
+                continue
+            }
+            segment.append(point)
+        }
+        strokeSegment(segment, strokeWidth: stroke.width)
         context.restoreGState()
+    }
+
+    /// Draw one continuous segment of a stroke.
+    private func strokeSegment(_ points: [CGPoint], strokeWidth: CGFloat) {
+        guard !points.isEmpty else { return }
+        let path = UIBezierPath()
+        path.lineCapStyle = .round
+        path.lineJoinStyle = .round
+        path.lineWidth = strokeWidth
+
+        if points.count == 1 {
+            let dotRect = CGRect(
+                x: points[0].x - strokeWidth * 0.5,
+                y: points[0].y - strokeWidth * 0.5,
+                width: strokeWidth,
+                height: strokeWidth
+            )
+            path.append(UIBezierPath(ovalIn: dotRect))
+        } else {
+            path.move(to: points[0])
+            for index in 1 ..< points.count {
+                let previous = points[index - 1]
+                let current = points[index]
+                let midpoint = CGPoint(x: (previous.x + current.x) * 0.5, y: (previous.y + current.y) * 0.5)
+                if index == 1 {
+                    path.addLine(to: midpoint)
+                } else {
+                    path.addQuadCurve(to: midpoint, controlPoint: previous)
+                }
+                if index == points.count - 1 {
+                    path.addQuadCurve(to: current, controlPoint: current)
+                }
+            }
+        }
+        path.stroke()
     }
 }
