@@ -7,9 +7,11 @@ struct NoteEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(ToolbarState.self) private var toolbar
     @Environment(\.dismiss) private var dismiss
-    // Gives us access to iOS undo/redo stack so toolbar buttons work.
-    @Environment(\.undoManager) private var undoManager
     @Query private var notes: [Note]
+    /// The active page-specific undo stack from the multipage canvas.
+    @State private var canvasUndoManager: UndoManager?
+    /// The page the user is currently looking at in the vertical stack.
+    @State private var currentPageIndex = 0
 
     private var note: Note? {
         notes.first
@@ -33,30 +35,23 @@ struct NoteEditorView: View {
     private func noteContent(_ note: Note) -> some View {
         @Bindable var toolbar = toolbar
         let pageManager = PageManager(modelContext: modelContext)
-        // For now we render only the first page on the letter-sized canvas.
-        let currentPage = note.sortedPages.first
 
         ZStack {
-            Color.white.ignoresSafeArea()
-
-            // If we have at least one page, show the drawing surface.
-            if let currentPage {
-                ExcalidrawWritingSurface(
-                    // Persist drawing bytes into this page model.
-                    page: currentPage,
-                    // Read current tool/color/width from shared toolbar state.
-                    toolbar: toolbar,
-                    // Connect canvas changes to undo/redo stack.
-                    undoManager: undoManager,
-                    // Update note timestamp when drawing changes.
-                    onPageMutated: { note.updatedAt = .now }
-                )
-                // Let drawing area extend edge-to-edge behind top controls.
-                .ignoresSafeArea()
-            } else {
-                // Fallback if somehow a note has zero pages.
-                ContentUnavailableView("No Pages", systemImage: "doc")
-            }
+            // Main multipage drawing surface with pinch-to-zoom + pull-to-add-page.
+            PagedCanvasContainer(
+                pages: Binding(
+                    get: { note.sortedPages },
+                    set: { _ in }
+                ),
+                toolbar: toolbar,
+                onUndoManagerReady: { canvasUndoManager = $0 },
+                onPencilDoubleTap: { toolbar.switchToPreviousTool() },
+                onCurrentPageChanged: { currentPageIndex = $0 },
+                addPage: { pageManager.addPage(to: note) },
+                addPageAbove: { pageManager.addPageAbove(in: note) },
+                onPageMutated: { note.updatedAt = .now }
+            )
+            .ignoresSafeArea()
 
             VStack {
                 HStack {
@@ -76,8 +71,19 @@ struct NoteEditorView: View {
                 Spacer()
             }
 
-            // Floating toolbar (now receives real undo manager).
-            DrawingToolbar(toolbar: toolbar, undoManager: undoManager)
+            // Floating tool palette (pen, eraser, colors, undo, etc).
+            DrawingToolbar(toolbar: toolbar, undoManager: canvasUndoManager)
+
+            VStack {
+                Spacer()
+                HStack {
+                    // Bottom-left page number badge.
+                    PageCounterView(currentPage: currentPageIndex, totalPages: note.pages.count)
+                        .padding(.leading, Design.Spacing.pageCounterLeading)
+                        .padding(.bottom, Design.Spacing.pageCounterBottom)
+                    Spacer()
+                }
+            }
         }
         .navigationBarHidden(true)
         .onChange(of: toolbar.colorSelectedByUser) {
@@ -93,7 +99,7 @@ struct NoteEditorView: View {
             toolbar.save(colorScheme: colorScheme)
         }
         .sheet(isPresented: $showingBookmarks) {
-            BookmarkListSheet(note: note, onTap: { _ in })
+            BookmarkListSheet(note: note, onTap: scrollToPage)
         }
         .sheet(isPresented: $showingExport) {
             PDFExportSheet(note: note)
@@ -107,8 +113,27 @@ struct NoteEditorView: View {
     @State private var showingExport = false
     @State private var showingImport = false
 
+    private var currentPage: Page? {
+        guard let note else { return nil }
+        let sorted = note.sortedPages
+        guard sorted.indices.contains(currentPageIndex) else { return nil }
+        return sorted[currentPageIndex]
+    }
+
     private func editorTopActions(note: Note, pageManager _: PageManager) -> some View {
         HStack(spacing: 10) {
+            Button {
+                if let page = currentPage {
+                    page.isBookmarked.toggle()
+                    note.updatedAt = .now
+                }
+            } label: {
+                Image(systemName: (currentPage?.isBookmarked ?? false) ? "bookmark.fill" : "bookmark")
+                    .font(.system(size: Design.FontSize.headerIcon, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .floatingButton()
+            }
+
             Button { showingBookmarks = true } label: {
                 Image(systemName: "list.bullet")
                     .font(.system(size: Design.FontSize.headerIcon, weight: .semibold))
@@ -118,8 +143,18 @@ struct NoteEditorView: View {
 
             Menu {
                 Button { showingImport = true } label: { Label("Import PDF", systemImage: "square.and.arrow.down") }
-                Button { showingExport = true } label: { Label("Export PDF", systemImage: "square.and.arrow.up") }
-                Button { printNote(note) } label: { Label("Print", systemImage: "printer") }
+                Button {
+                    flushDrawings()
+                    showingExport = true
+                } label: {
+                    Label("Export PDF", systemImage: "square.and.arrow.up")
+                }
+                Button {
+                    flushDrawings()
+                    printNote(note)
+                } label: {
+                    Label("Print", systemImage: "printer")
+                }
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .font(.system(size: Design.FontSize.headerIcon, weight: .semibold))
@@ -129,11 +164,23 @@ struct NoteEditorView: View {
         }
     }
 
+    private func scrollToPage(_ page: Page) {
+        guard let note else { return }
+        if let index = note.sortedPages.firstIndex(where: { $0.id == page.id }) {
+            NotificationCenter.default.post(name: .scrollToPage, object: index)
+        }
+    }
+
     private func handleImport(result: Result<URL, Error>, note: Note) {
         guard case let .success(url) = result else { return }
         let didAccess = url.startAccessingSecurityScopedResource()
         defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
         PDFService.importPDF(url: url, into: note, modelContext: modelContext)
+    }
+
+    private func flushDrawings() {
+        NotificationCenter.default.post(name: .flushDrawings, object: nil)
+        try? modelContext.save()
     }
 
     private func printNote(_ note: Note) {
