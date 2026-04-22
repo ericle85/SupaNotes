@@ -87,16 +87,16 @@ struct NoteEditorView: View {
         }
         .navigationBarHidden(true)
         .onChange(of: toolbar.colorSelectedByUser) {
-            toolbar.save(colorScheme: colorScheme)
+            toolbar.save()
         }
         .onChange(of: toolbar.currentlyActiveTool) { oldValue, newValue in
             if oldValue != newValue {
                 toolbar.toolUsedPreviously = oldValue
             }
-            toolbar.save(colorScheme: colorScheme)
+            toolbar.save()
         }
         .onChange(of: toolbar.toolbarIcons) {
-            toolbar.save(colorScheme: colorScheme)
+            toolbar.save()
         }
         .sheet(isPresented: $showingBookmarks) {
             BookmarkListSheet(note: note, onTap: scrollToPage)

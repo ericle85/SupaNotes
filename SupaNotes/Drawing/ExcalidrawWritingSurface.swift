@@ -30,44 +30,6 @@ private enum ExcalidrawTool: String, Codable {
     case highlighter
 }
 
-// MARK: - Colors
-
-/// A codable color model so we can save colors as plain numbers.
-private struct ExcalidrawColor: Codable, Hashable {
-    /// RBG channels, from 0 to 1.
-    let red: CGFloat
-    let green: CGFloat
-    let blue: CGFloat
-    /// Alpha (opacity), from 0 to 1.
-    let alpha: CGFloat
-
-    /// Build this model from a SwiftUI Color.
-    init(color: Color) {
-        // Convert SwiftUI Color to UIColor so we can read RGBA channels.
-        let uiColor = UIColor(color)
-        // Temporary storage for channel values.
-        var red: CGFloat = 0
-        var green: CGFloat = 0
-        var blue: CGFloat = 0
-        var alpha: CGFloat = 0
-
-        // Ask UIColor for RGBA values.
-        uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-        // Save RBG channels.
-        self.red = red
-        self.green = green
-        self.blue = blue
-        // Save opacity channel.
-        self.alpha = alpha
-    }
-
-    /// Convert saved RGBA values back to a SwiftUI Color.
-    var swiftUIColor: Color {
-        // Build the color from stored channels.
-        Color(red: red, green: green, blue: blue, opacity: alpha)
-    }
-}
-
 // MARK: - Points and Coordinates
 
 /// A single 2D point for a stroke path.
@@ -99,7 +61,7 @@ private struct ExcalidrawStroke: Identifiable, Codable, Hashable {
     /// Which tool created this stroke.
     let tool: ExcalidrawTool
     /// Stroke color and width.
-    let color: ExcalidrawColor
+    let color: CodableColor
     let width: CGFloat
 
     /// Strokes are made up of a series of points.
@@ -243,7 +205,7 @@ struct ExcalidrawWritingSurface: View {
             // Active tool type.
             tool: activeTool,
             // Active color.
-            color: ExcalidrawColor(color: toolbar.colorSelectedByUser),
+            color: CodableColor(color: toolbar.colorSelectedByUser),
             // Active line width.
             width: activeLineWidth,
             // Convert CGPoint list to codable point list.
@@ -344,7 +306,7 @@ struct ExcalidrawWritingSurface: View {
                 // Tool used.
                 tool: activeTool,
                 // Color used.
-                color: ExcalidrawColor(color: toolbar.colorSelectedByUser),
+                color: CodableColor(color: toolbar.colorSelectedByUser),
                 // Width used.
                 width: activeLineWidth,
                 // Points used.
@@ -674,7 +636,7 @@ private final class PencilFilteredDrawingUIView: UIView {
 
         // Set the color.
         // Highlighters are semi-transparent so you can see through them.
-        let baseColor = UIColor(stroke.color.swiftUIColor)
+        let baseColor = UIColor(stroke.color.toColor())
         let finalColor = stroke.tool == .highlighter ? baseColor.withAlphaComponent(0.35) : baseColor
         context.saveGState()
         // Highlighters blend with what's underneath like real highlighters.

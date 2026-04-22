@@ -7,24 +7,24 @@ enum ToolbarPersistence {
     private static let sectionOrderKey = "toolbar.sectionOrder"
     private static let showUndoRedoKey = "toolbar.showUndoRedo"
 
-    static func defaultIcons(colorScheme: ColorScheme) -> [ToolbarIcon] {
+    static func defaultIcons() -> [ToolbarIcon] {
         [
             ToolbarIcon.toolIcon(.pen),
             ToolbarIcon.toolIcon(.eraser),
-            ToolbarIcon.colorIcon(.black, name: "Black", colorScheme: colorScheme),
-            ToolbarIcon.colorIcon(.red, name: "Red", colorScheme: colorScheme),
-            ToolbarIcon.colorIcon(.blue, name: "Blue", colorScheme: colorScheme),
-            ToolbarIcon.colorIcon(.green, name: "Green", colorScheme: colorScheme),
+            ToolbarIcon.colorIcon(.black, name: "Black"),
+            ToolbarIcon.colorIcon(.red, name: "Red"),
+            ToolbarIcon.colorIcon(.blue, name: "Blue"),
+            ToolbarIcon.colorIcon(.green, name: "Green"),
         ]
     }
 
     private static let supportedTools: Set<ToolType> = [.pen, .eraser]
 
-    private static func sanitizedIcons(from icons: [ToolbarIcon], colorScheme: ColorScheme) -> [ToolbarIcon] {
+    private static func sanitizedIcons(from icons: [ToolbarIcon]) -> [ToolbarIcon] {
         let filtered = icons.filter { icon in
             icon.type == .color || supportedTools.contains(icon.type)
         }
-        return filtered.isEmpty ? defaultIcons(colorScheme: colorScheme) : filtered
+        return filtered.isEmpty ? defaultIcons() : filtered
     }
 
     private static func supportedActiveTool(_ tool: ActiveTool) -> ActiveTool {
@@ -44,10 +44,10 @@ enum ToolbarPersistence {
            let icons = try? JSONDecoder().decode([ToolbarIcon].self, from: data),
            !icons.isEmpty
         {
-            state.toolbarIcons = sanitizedIcons(from: icons, colorScheme: .light)
+            state.toolbarIcons = sanitizedIcons(from: icons)
         } else {
             // If no icons are saved, use the defaults
-            state.toolbarIcons = defaultIcons(colorScheme: .light)
+            state.toolbarIcons = defaultIcons()
         }
 
         // 2. Load the color the user was using
@@ -78,7 +78,7 @@ enum ToolbarPersistence {
         }
     }
 
-    static func save(_ state: ToolbarState, colorScheme: ColorScheme) {
+    static func save(_ state: ToolbarState) {
         let defaults = UserDefaults.standard
 
         // Save the list of icons
@@ -87,7 +87,7 @@ enum ToolbarPersistence {
         }
 
         // Save the current color
-        let codableColor = CodableColor(color: state.colorSelectedByUser, colorScheme: colorScheme)
+        let codableColor = CodableColor(color: state.colorSelectedByUser)
         if let data = try? JSONEncoder().encode(codableColor) {
             defaults.set(data, forKey: selectedColorKey)
         }

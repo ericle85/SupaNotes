@@ -283,7 +283,7 @@ struct ToolbarCustomizationView: View {
 
     private var resetButton: some View {
         Button(role: .destructive) {
-            withAnimation { toolbar.resetToDefaults(colorScheme: colorScheme) }
+            withAnimation { toolbar.resetToDefaults() }
         } label: {
             HStack {
                 Image(systemName: "arrow.counterclockwise")

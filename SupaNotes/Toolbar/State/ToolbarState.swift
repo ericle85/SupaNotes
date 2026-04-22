@@ -47,12 +47,12 @@ final class ToolbarState {
         return matchingIcon?.instrumentSettings?.width ?? WritingInstrumentSettings.pen().width
     }
 
-    func save(colorScheme: ColorScheme) {
-        ToolbarPersistence.save(self, colorScheme: colorScheme)
+    func save() {
+        ToolbarPersistence.save(self)
     }
 
-    func resetToDefaults(colorScheme: ColorScheme) {
-        toolbarIcons = ToolbarPersistence.defaultIcons(colorScheme: colorScheme)
+    func resetToDefaults() {
+        toolbarIcons = ToolbarPersistence.defaultIcons()
         sectionOrder = [.undoRedo, .tools, .colors]
         showUndoRedo = true
     }

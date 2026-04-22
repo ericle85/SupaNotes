@@ -1,23 +1,18 @@
 import SwiftUI
 
-/// A Codable wrapper for SwiftUI Color
-/// Stores RGB values resolved for a specific color scheme
-struct CodableColor: Codable, Equatable {
+/// Codable RGBA wrapper for SwiftUI Color.
+struct CodableColor: Codable, Equatable, Hashable {
     let red: Double
     let green: Double
     let blue: Double
     let opacity: Double
 
-    /// Create from a SwiftUI Color
-    init(color: Color, colorScheme: ColorScheme) {
-        let (r, g, b) = color.resolveRGB(colorScheme: colorScheme)
-        red = Double(r)
-        green = Double(g)
-        blue = Double(b)
-        opacity = 1.0
+    init(color: Color) {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(color).getRed(&r, green: &g, blue: &b, alpha: &a)
+        red = Double(r); green = Double(g); blue = Double(b); opacity = Double(a)
     }
 
-    /// Convert back to SwiftUI Color
     func toColor() -> Color {
         Color(red: red, green: green, blue: blue, opacity: opacity)
     }

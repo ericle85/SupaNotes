@@ -39,7 +39,7 @@ struct EditColorView: View {
     }
 
     private func updateColor(to newColor: Color) {
-        let candidate = ToolbarIcon.colorIcon(newColor, colorScheme: colorScheme)
+        let candidate = ToolbarIcon.colorIcon(newColor)
         if let existing = toolbarIcons.first(where: { $0.id != icon.id && $0.isEquivalent(to: candidate, colorScheme: colorScheme) }) {
             withAnimation(.spring(response: 0.3)) {
                 toolbarIcons.removeAll { $0.id == icon.id }
@@ -47,7 +47,7 @@ struct EditColorView: View {
             colorSelectedByUser = existing.color ?? newColor
             dismiss()
         } else if let index = toolbarIcons.firstIndex(where: { $0.id == icon.id }) {
-            toolbarIcons[index].colorData = CodableColor(color: newColor, colorScheme: colorScheme)
+            toolbarIcons[index].colorData = CodableColor(color: newColor)
             colorSelectedByUser = newColor
         }
     }

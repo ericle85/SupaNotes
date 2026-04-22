@@ -72,11 +72,11 @@ struct ToolbarIcon: Identifiable, Equatable, Codable {
         return type != .color
     }
 
-    static func colorIcon(_ color: Color, name: String = "Color", colorScheme: ColorScheme) -> ToolbarIcon {
+    static func colorIcon(_ color: Color, name: String = "Color") -> ToolbarIcon {
         ToolbarIcon(
             id: UUID(),
             type: .color,
-            colorData: CodableColor(color: color, colorScheme: colorScheme),
+            colorData: CodableColor(color: color),
             name: name
         )
     }
