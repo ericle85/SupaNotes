@@ -16,7 +16,7 @@ struct ExcalidrawPageStroke: Identifiable, Codable, Hashable {
     /// Which tool created this stroke.
     let tool: ExcalidrawPageTool
     /// Stroke color and width.
-    let color: ExcalidrawPageColor
+    let color: CodableColor
     let width: CGFloat
     /// Strokes are made up of a series of points.
     let points: [ExcalidrawPagePoint]
@@ -30,40 +30,6 @@ enum ExcalidrawPageTool: String, Codable {
     case highlighter
 }
 
-/// A codable color model so we can save colors as plain numbers.
-struct ExcalidrawPageColor: Codable, Hashable {
-    /// RGB channels, from 0 to 1.
-    let red: CGFloat
-    let green: CGFloat
-    let blue: CGFloat
-    /// Alpha (opacity), from 0 to 1.
-    let alpha: CGFloat
-
-    /// Build this model from a SwiftUI Color.
-    init(color: Color) {
-        // Convert SwiftUI Color to UIColor so we can read RGBA channels.
-        let uiColor = UIColor(color)
-        // Temporary storage for channel values.
-        var red: CGFloat = 0
-        var green: CGFloat = 0
-        var blue: CGFloat = 0
-        var alpha: CGFloat = 0
-        // Ask UIColor for RGBA values.
-        uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-        // Save RGB channels.
-        self.red = red
-        self.green = green
-        self.blue = blue
-        // Save opacity channel.
-        self.alpha = alpha
-    }
-
-    /// Convert saved RGBA values back to a SwiftUI Color.
-    var swiftUIColor: Color {
-        // Build the color from stored channels.
-        Color(red: red, green: green, blue: blue, opacity: alpha)
-    }
-}
 
 /// A single 2D point for a stroke path.
 struct ExcalidrawPagePoint: Codable, Hashable {
@@ -308,7 +274,7 @@ final class ExcalidrawPageCanvasView: UIView {
             // Active tool type.
             tool: activeStrokeTool,
             // Active color.
-            color: ExcalidrawPageColor(color: toolStyle.selectedColor),
+            color: CodableColor(color: toolStyle.selectedColor),
             // Active line width.
             width: activeLineWidth,
             // Convert CGPoint list to codable point list.
@@ -410,7 +376,7 @@ final class ExcalidrawPageCanvasView: UIView {
                 // Tool used.
                 tool: activeStrokeTool,
                 // Color used.
-                color: ExcalidrawPageColor(color: toolStyle.selectedColor),
+                color: CodableColor(color: toolStyle.selectedColor),
                 // Width used.
                 width: activeLineWidth,
                 // Points used.
@@ -659,7 +625,7 @@ private final class PencilFilteredDrawingUIView: UIView {
 
         // Set the color.
         // Highlighters are semi-transparent so you can see through them.
-        let baseColor = UIColor(stroke.color.swiftUIColor)
+        let baseColor = UIColor(stroke.color.toColor())
         let finalColor = stroke.tool == .highlighter ? baseColor.withAlphaComponent(0.35) : baseColor
         context.saveGState()
         // Highlighters blend with what's underneath like real highlighters.
