@@ -154,8 +154,6 @@ final class ExcalidrawPageCanvasView: UIView {
     private enum CanvasMetrics {
         /// US Letter in points (8.5 * 72 by 11 * 72).
         static let letterSize = CGSize(width: 612, height: 792)
-        /// Internal marker that separates visible subsegments in one stroke.
-        static let segmentBreakPoint = CGPoint(x: -1, y: -1)
     }
 
     /// Delegate for interaction callbacks.
@@ -245,10 +243,6 @@ final class ExcalidrawPageCanvasView: UIView {
         // Handle pencil movement during drawing.
         drawingView.onChangedInLetterSpace = { [weak self] point in
             self?.handleChanged(at: point)
-        }
-        // Break the current visible segment when returning from off-canvas.
-        drawingView.onSegmentBreak = { [weak self] in
-            self?.handleSegmentBreak()
         }
         // Handle pencil lift at end of drawing.
         drawingView.onEndedInLetterSpace = { [weak self] point in
@@ -359,14 +353,6 @@ final class ExcalidrawPageCanvasView: UIView {
         }
     }
 
-    /// Insert a marker so re-entry does not connect bezier segments.
-    private func handleSegmentBreak() {
-        guard toolStyle.selectedTool != .eraser else { return }
-        guard !activePoints.isEmpty else { return }
-        guard let last = activePoints.last, !isSegmentBreakPoint(last) else { return }
-        activePoints.append(CanvasMetrics.segmentBreakPoint)
-    }
-
     private func handleEnded(at point: CGPoint) {
         // Finish erase or draw gesture depending on current tool.
         if toolStyle.selectedTool == .eraser {
@@ -386,13 +372,6 @@ final class ExcalidrawPageCanvasView: UIView {
             drawingView.setNeedsDisplay()
             return
         }
-        // If we resumed after going off-canvas, start a new visible segment.
-        if let last = activePoints.last, isSegmentBreakPoint(last) {
-            activePoints.append(point)
-            drawingView.activeStroke = activeStrokePreview
-            drawingView.setNeedsDisplay()
-            return
-        }
         // Skip tiny moves to reduce noisy points.
         guard let last = activePoints.last, distance(last, point) >= 0.5 else { return }
         // Append new meaningful point.
@@ -407,9 +386,6 @@ final class ExcalidrawPageCanvasView: UIView {
         if activePoints.isEmpty {
             // Seed point.
             activePoints = [point]
-        } else if let last = activePoints.last, isSegmentBreakPoint(last) {
-            // If we ended right after a break marker, start a new point segment.
-            activePoints.append(point)
         } else if let last = activePoints.last, distance(last, point) > 0.5 {
             // Add final point if it is meaningfully different.
             activePoints.append(point)
@@ -421,8 +397,8 @@ final class ExcalidrawPageCanvasView: UIView {
             drawingView.activeStroke = nil
             drawingView.setNeedsDisplay()
         }
-        // Need at least one real point to create a stroke (single-point stroke = dot).
-        guard activePoints.contains(where: { !isSegmentBreakPoint($0) }) else { return }
+        // Need at least one point to create a stroke (single-point stroke = dot).
+        guard !activePoints.isEmpty else { return }
 
         // Capture previous state for undo.
         let previous = document
@@ -518,7 +494,8 @@ final class ExcalidrawPageCanvasView: UIView {
         onPageMutated()
     }
 
-    /// True if any point in stroke is within eraser radius. We use this to determine if something is in the radius of our eraser.
+    /// True if any point in the stroke is within eraser radius.
+    /// We use this to determine whether a stroke should be erased.
     private func intersects(stroke: ExcalidrawPageStroke, point: CGPoint, radius: CGFloat) -> Bool {
         // Compare every stroke point to eraser center.
         stroke.points.contains { distance($0.cgPoint, point) <= radius }
@@ -551,18 +528,11 @@ private final class PencilFilteredDrawingUIView: UIView {
     var onGestureBegan: (() -> Void)?
     /// What to do when the pencil moves (updates the current line).
     var onChangedInLetterSpace: ((CGPoint) -> Void)?
-    /// What to do when a gesture leaves and re-enters the canvas bounds.
-    var onSegmentBreak: (() -> Void)?
     /// What to do when the pencil stops drawing (saves the line).
     var onEndedInLetterSpace: ((CGPoint) -> Void)?
 
     /// The pencil touch we're currently tracking.
     private var activePencilTouch: UITouch?
-    /// Last in-bounds point reported during the active pencil gesture.
-    private var lastInBoundsLetterPoint: CGPoint?
-    /// True once the active touch has left bounds; reset on re-entry.
-    private var didLeaveBoundsSinceLastReportedPoint = false
-
     /// Set up the drawing area when it's first created.
     /// Allow multiple touches to be detected (though only pencil will work).
     override init(frame: CGRect) {
@@ -630,8 +600,6 @@ private final class PencilFilteredDrawingUIView: UIView {
         onGestureBegan?()
         // Report touch position in letter space.
         let point = toLetterSpace(touch.location(in: self))
-        lastInBoundsLetterPoint = point
-        didLeaveBoundsSinceLastReportedPoint = false
         onChangedInLetterSpace?(point)
     }
 
@@ -642,18 +610,9 @@ private final class PencilFilteredDrawingUIView: UIView {
         guard let activePencilTouch else { return }
         guard touches.contains(activePencilTouch) else { return }
         let location = activePencilTouch.location(in: self)
-        // Keep gesture alive off-canvas, but do not draw/store off-canvas points.
-        guard bounds.contains(location) else {
-            didLeaveBoundsSinceLastReportedPoint = true
-            return
-        }
-        // Report new position in letter space.
+        // Keep reporting points even when the pencil drifts off the page so the
+        // saved path remains continuous and can reconnect naturally on re-entry.
         let point = toLetterSpace(location)
-        if didLeaveBoundsSinceLastReportedPoint {
-            onSegmentBreak?()
-            didLeaveBoundsSinceLastReportedPoint = false
-        }
-        lastInBoundsLetterPoint = point
         onChangedInLetterSpace?(point)
     }
 
@@ -664,19 +623,12 @@ private final class PencilFilteredDrawingUIView: UIView {
         guard let activePencilTouch else { return }
         guard touches.contains(activePencilTouch) else { return }
         let location = activePencilTouch.location(in: self)
-        if bounds.contains(location) {
-            // End inside canvas: use real endpoint.
-            let point = toLetterSpace(location)
-            lastInBoundsLetterPoint = point
-            onEndedInLetterSpace?(point)
-        } else if let lastInBoundsLetterPoint {
-            // Ended outside canvas: keep stroke alive but commit only in-bounds data.
-            onEndedInLetterSpace?(lastInBoundsLetterPoint)
-        }
+        // Always end with the real final pencil position, including off-page, so
+        // the committed stroke matches exactly what the user drew.
+        let point = toLetterSpace(location)
+        onEndedInLetterSpace?(point)
         // Stop tracking this pencil touch.
         self.activePencilTouch = nil
-        lastInBoundsLetterPoint = nil
-        didLeaveBoundsSinceLastReportedPoint = false
     }
 
     /// Called if the drawing is interrupted (like a phone call).
@@ -686,28 +638,20 @@ private final class PencilFilteredDrawingUIView: UIView {
         guard let activePencilTouch else { return }
         guard touches.contains(activePencilTouch) else { return }
         let location = activePencilTouch.location(in: self)
-        if bounds.contains(location) {
-            let point = toLetterSpace(location)
-            lastInBoundsLetterPoint = point
-            onEndedInLetterSpace?(point)
-        } else if let lastInBoundsLetterPoint {
-            onEndedInLetterSpace?(lastInBoundsLetterPoint)
-        }
+        // Mirror touchesEnded behavior so cancellation still commits the
+        // continuous path that existed at interruption time.
+        let point = toLetterSpace(location)
+        onEndedInLetterSpace?(point)
         // Stop tracking this pencil touch.
         self.activePencilTouch = nil
-        lastInBoundsLetterPoint = nil
-        didLeaveBoundsSinceLastReportedPoint = false
     }
 
     /// Convert a screen position to a position on the standard paper size.
     /// This lets drawings look the same regardless of screen size.
     private func toLetterSpace(_ point: CGPoint) -> CGPoint {
-        // Keep the point within the drawing area boundaries.
-        let clampedX = max(0, min(bounds.width, point.x))
-        let clampedY = max(0, min(bounds.height, point.y))
         // Convert to a percentage (0 to 1) of the screen size.
-        let relativeX = bounds.width > 0 ? clampedX / bounds.width : 0
-        let relativeY = bounds.height > 0 ? clampedY / bounds.height : 0
+        let relativeX = bounds.width > 0 ? point.x / bounds.width : 0
+        let relativeY = bounds.height > 0 ? point.y / bounds.height : 0
         // Apply that percentage to the standard paper size.
         return CGPoint(x: relativeX * Self.letterSize.width, y: relativeY * Self.letterSize.height)
     }
