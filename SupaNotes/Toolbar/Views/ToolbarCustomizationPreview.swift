@@ -39,9 +39,15 @@ struct ToolbarCustomizationPreview: View {
     }
 
     private func fitScale(intrinsic: CGSize, available: CGSize) -> CGFloat {
+        // If the toolbar has no measured size yet, don't scale at all.
         guard intrinsic.width > 0, intrinsic.height > 0 else { return 1 }
+        // How many times does the available width fit into the toolbar's natural width?
+        // A value less than 1 means the toolbar is wider than the space — we need to shrink.
         let sx = available.width / intrinsic.width
+        // Same check for height.
         let sy = available.height / intrinsic.height
+        // Use whichever axis requires the most shrinking so the toolbar fits in both dimensions.
+        // Cap at 1 so we never scale UP — only shrink when needed.
         return min(1, min(sx, sy))
     }
 

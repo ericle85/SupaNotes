@@ -31,9 +31,12 @@ enum PageLayout {
 
     /// Center content when it is smaller than the visible scroll area.
     static func centeringOrigin(contentSize: CGSize, scrollBounds: CGSize) -> CGPoint {
+        // Subtracting content width from scroll area width gives the total leftover horizontal space.
+        // Dividing by 2 splits it equally on both sides, so the content sits in the middle.
+        // max(0, ...) clamps to zero — if the content is wider than the scroll area, don't offset at all.
         CGPoint(
-            x: max(0, (scrollBounds.width - contentSize.width) / 2), // Center horizontally if content is narrower than view.
-            y: max(0, (scrollBounds.height - contentSize.height) / 2) // Center vertically if content is shorter than view.
+            x: max(0, (scrollBounds.width - contentSize.width) / 2),
+            y: max(0, (scrollBounds.height - contentSize.height) / 2)
         )
     }
 
