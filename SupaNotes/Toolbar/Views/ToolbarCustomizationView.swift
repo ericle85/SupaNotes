@@ -142,9 +142,7 @@ struct ToolbarCustomizationView: View {
                 Toggle("", isOn: $toolbar.showUndoRedo).labelsHidden()
             }
         }
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .customizationRow()
     }
 
     // MARK: - Tools
@@ -185,9 +183,7 @@ struct ToolbarCustomizationView: View {
             Text(icon.type.displayName)
             Spacer()
         }
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .customizationRow()
     }
 
     private func toolToggleRow(type: ToolType) -> some View {
@@ -265,9 +261,7 @@ struct ToolbarCustomizationView: View {
                 .disabled(colorRows.count <= 1)
             }
         }
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .customizationRow()
     }
 
     private func removeColor(id: UUID) {
@@ -293,5 +287,15 @@ struct ToolbarCustomizationView: View {
             .padding(.vertical, 10)
         }
         .buttonStyle(.bordered)
+    }
+}
+
+private extension View {
+    /// Standard row style for the toolbar customization list.
+    func customizationRow() -> some View {
+        self
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
 }
