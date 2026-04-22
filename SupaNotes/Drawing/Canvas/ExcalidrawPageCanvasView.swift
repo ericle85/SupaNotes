@@ -119,7 +119,7 @@ final class ExcalidrawPageCanvasView: UIView {
     /// Constants for this canvas.
     private enum CanvasMetrics {
         /// US Letter in points (8.5 * 72 by 11 * 72).
-        static let letterSize = CGSize(width: 612, height: 792)
+        static let letterSize = CGSize(width: PageConstants.pageWidth, height: PageConstants.pageHeight)
     }
 
     /// Delegate for interaction callbacks.
@@ -479,7 +479,7 @@ final class ExcalidrawPageCanvasView: UIView {
 /// This connects the drawing display with the pencil touch detection.
 private final class PencilFilteredDrawingUIView: UIView {
     /// The standard paper size (letter) used for storing drawings.
-    private static let letterSize = CGSize(width: 612, height: 792)
+    private static let letterSize = CGSize(width: PageConstants.pageWidth, height: PageConstants.pageHeight)
 
     /// All the drawings that have been saved.
     var document = ExcalidrawPageDocument()

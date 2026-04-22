@@ -4,7 +4,7 @@ import SwiftData
 import UIKit
 
 enum PDFService {
-    static let pageSize = CGSize(width: 612, height: 792)
+    static let pageSize = CGSize(width: PageConstants.pageWidth, height: PageConstants.pageHeight)
     private static let bgRenderScale: CGFloat = 2.0
 
     // MARK: - Import
