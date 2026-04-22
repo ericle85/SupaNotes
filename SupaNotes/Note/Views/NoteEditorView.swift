@@ -38,7 +38,7 @@ struct NoteEditorView: View {
 
         ZStack {
             // Main multipage drawing surface with pinch-to-zoom + pull-to-add-page.
-            PagedCanvasContainer(
+            MultipageCanvasContainer(
                 pages: Binding(
                     get: { note.sortedPages },
                     set: { _ in }

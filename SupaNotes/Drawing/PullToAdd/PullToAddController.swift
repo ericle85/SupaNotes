@@ -96,8 +96,8 @@ final class PullToAddController {
     }
 
     /// Handle the end of a drag gesture - trigger page add if threshold was reached.
-    func handleEndDragging(addPage: () -> Void, addPageAbove: (() -> Void)?) -> PagedCanvasContainer.ScrollAfterRebuild {
-        var scroll: PagedCanvasContainer.ScrollAfterRebuild = .none
+    func handleEndDragging(addPage: () -> Void, addPageAbove: (() -> Void)?) -> MultipageCanvasContainer.ScrollAfterRebuild {
+        var scroll: MultipageCanvasContainer.ScrollAfterRebuild = .none
 
         // If top trigger was reached, add a page above.
         if hasTriggeredTop {

@@ -31,7 +31,7 @@ final class PageLayoutManager {
         toolStyle: ExcalidrawToolStyle,
         interactionDelegate: ExcalidrawPageCanvasInteractionDelegate,
         pullController: PullToAddController,
-        pendingScroll: inout PagedCanvasContainer.ScrollAfterRebuild,
+        pendingScroll: inout MultipageCanvasContainer.ScrollAfterRebuild,
         viewport: ViewportState?,
         onUndoManagerReady: @escaping (UndoManager?) -> Void,
         onPageMutated: @escaping () -> Void
@@ -226,7 +226,7 @@ final class PageLayoutManager {
     }
 
     /// Apply any pending scroll action after page rebuild.
-    private func applyPendingScroll(_ pendingScroll: inout PagedCanvasContainer.ScrollAfterRebuild, pageCount: Int) {
+    private func applyPendingScroll(_ pendingScroll: inout MultipageCanvasContainer.ScrollAfterRebuild, pageCount: Int) {
         guard let scrollView, let containerView else { return }
 
         // Take the pending action and reset it.
