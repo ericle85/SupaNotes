@@ -505,11 +505,6 @@ final class ExcalidrawPageCanvasView: UIView {
     private func distance(_ lhs: CGPoint, _ rhs: CGPoint) -> CGFloat {
         hypot(lhs.x - rhs.x, lhs.y - rhs.y)
     }
-
-    /// True when this point is our internal segment break marker.
-    private func isSegmentBreakPoint(_ point: CGPoint) -> Bool {
-        point.x < 0 || point.y < 0
-    }
 }
 
 // MARK: - Pencil-Only Drawing Surface
@@ -670,16 +665,8 @@ private final class PencilFilteredDrawingUIView: UIView {
         // Highlighters blend with what's underneath like real highlighters.
         context.setBlendMode(stroke.tool == .highlighter ? .multiply : .normal)
         finalColor.setStroke()
-        var segment: [CGPoint] = []
-        for point in points {
-            if point.x < 0 || point.y < 0 {
-                strokeSegment(segment, strokeWidth: stroke.width)
-                segment.removeAll(keepingCapacity: true)
-                continue
-            }
-            segment.append(point)
-        }
-        strokeSegment(segment, strokeWidth: stroke.width)
+        // Render the stroke as one continuous path, including off-page points.
+        strokeSegment(points, strokeWidth: stroke.width)
         context.restoreGState()
     }
 
