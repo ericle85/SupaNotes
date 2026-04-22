@@ -257,7 +257,7 @@ final class ExcalidrawPageCanvasView: UIView {
             drawingView.topAnchor.constraint(equalTo: topAnchor),
             drawingView.leadingAnchor.constraint(equalTo: leadingAnchor),
             drawingView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            drawingView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            drawingView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
 
         // Configure undo callback target.
@@ -679,6 +679,8 @@ private final class PencilFilteredDrawingUIView: UIView {
         path.lineWidth = strokeWidth
 
         if points.count == 1 {
+            // A single sampled point should render as a round dot whose diameter
+            // matches the active stroke width, so taps still look like ink.
             let dotRect = CGRect(
                 x: points[0].x - strokeWidth * 0.5,
                 y: points[0].y - strokeWidth * 0.5,
@@ -686,20 +688,37 @@ private final class PencilFilteredDrawingUIView: UIView {
                 height: strokeWidth
             )
             path.append(UIBezierPath(ovalIn: dotRect))
-        } else {
+        } else if points.count == 2 {
+            // For very short strokes, drawing a direct line is more predictable
+            // than curve fitting and avoids introducing artificial bends.
             path.move(to: points[0])
-            for index in 1 ..< points.count {
-                let previous = points[index - 1]
-                let current = points[index]
-                let midpoint = CGPoint(x: (previous.x + current.x) * 0.5, y: (previous.y + current.y) * 0.5)
-                if index == 1 {
-                    path.addLine(to: midpoint)
-                } else {
-                    path.addQuadCurve(to: midpoint, controlPoint: previous)
-                }
-                if index == points.count - 1 {
-                    path.addQuadCurve(to: current, controlPoint: current)
-                }
+            path.addLine(to: points[1])
+        } else {
+            // Use cubic Bézier segments generated from neighboring points so the
+            // stroke passes through each sampled point with smoother transitions.
+            path.move(to: points[0])
+            for index in 0 ..< (points.count - 1) {
+                // Collect the local neighborhood around this segment endpoint so
+                // controls reflect both incoming and outgoing trajectory.
+                let previousNeighbor = index > 0 ? points[index - 1] : points[index]
+                let segmentStart = points[index]
+                let segmentEnd = points[index + 1]
+                let nextNeighbor = (index + 2) < points.count ? points[index + 2] : points[index + 1]
+
+                // Convert Catmull-Rom style tangents into cubic Bézier control
+                // points. This gives smooth joins without flattening segment ends.
+                let controlPoint1 = CGPoint(
+                    x: segmentStart.x + (segmentEnd.x - previousNeighbor.x) / 6,
+                    y: segmentStart.y + (segmentEnd.y - previousNeighbor.y) / 6
+                )
+                let controlPoint2 = CGPoint(
+                    x: segmentEnd.x - (nextNeighbor.x - segmentStart.x) / 6,
+                    y: segmentEnd.y - (nextNeighbor.y - segmentStart.y) / 6
+                )
+
+                // Draw one cubic segment that ends exactly at the next sampled
+                // point so the rendered ink follows the user's path.
+                path.addCurve(to: segmentEnd, controlPoint1: controlPoint1, controlPoint2: controlPoint2)
             }
         }
         path.stroke()
