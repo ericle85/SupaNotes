@@ -130,10 +130,7 @@ struct HomeView: View {
                 }
             }
         } label: {
-            Image(systemName: "arrow.up.arrow.down")
-                .font(.system(size: Design.FontSize.toolIcon))
-                .foregroundStyle(.secondary)
-                .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
+            headerIcon("arrow.up.arrow.down")
         }
     }
 
@@ -142,33 +139,28 @@ struct HomeView: View {
             let newFolder = Folder()
             modelContext.insert(newFolder)
         } label: {
-            Image(systemName: "folder.badge.plus")
-                .font(.system(size: Design.FontSize.toolIcon))
-                .foregroundStyle(.secondary)
-                .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
+            headerIcon("folder.badge.plus")
         }
     }
 
     private var goToTrashButton: some View {
-        Button {
-            currentViewInApp = .trash
-        } label: {
-            Image(systemName: "trash")
-                .font(.system(size: Design.FontSize.toolIcon))
-                .foregroundStyle(.secondary)
-                .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
+        Button { currentViewInApp = .trash } label: {
+            headerIcon("trash")
         }
     }
 
     private var goToSettingsButton: some View {
-        Button {
-            currentViewInApp = .settings
-        } label: {
-            Image(systemName: "gearshape")
-                .font(.system(size: Design.FontSize.toolIcon))
-                .foregroundStyle(.secondary)
-                .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
+        Button { currentViewInApp = .settings } label: {
+            headerIcon("gearshape")
         }
+    }
+
+    /// Secondary icon sized for the top navigation bar. Only the SF Symbol name varies.
+    private func headerIcon(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(size: Design.FontSize.toolIcon))
+            .foregroundStyle(.secondary)
+            .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
     }
 
     private var createNewNoteButton: some View {
