@@ -34,7 +34,6 @@ private enum ExcalidrawTool: String, Codable {
 
 /// A codable color model so we can save colors as plain numbers.
 private struct ExcalidrawColor: Codable, Hashable {
-
     /// RBG channels, from 0 to 1.
     let red: CGFloat
     let green: CGFloat
@@ -171,24 +170,27 @@ struct ExcalidrawWritingSurface: View {
                     // Fill full screen.
                     .ignoresSafeArea()
 
-                // SwiftUI immediate-mode drawing surface.
-                Canvas { context, _ in
-                    // Scale drawing commands from letter-space to visible frame.
-                    context.scaleBy(
-                        x: frame.width / CanvasMetrics.letterSize.width,
-                        y: frame.height / CanvasMetrics.letterSize.height
-                    )
-                    // Draw every saved stroke.
-                    for stroke in document.strokes {
-                        // Render one stroke.
-                        draw(stroke: stroke, in: &context)
+                // Pencil-only drawing surface (render + input in one view).
+                PencilFilteredDrawingSurface(
+                    document: document,
+                    activeStroke: activeStroke,
+                    onChangedInLetterSpace: { point in
+                        // Erase or draw depending on current tool.
+                        if toolbar.currentlyActiveTool == .eraser {
+                            handleEraserChanged(at: point)
+                        } else {
+                            handleDrawChanged(at: point)
+                        }
+                    },
+                    onEndedInLetterSpace: { point in
+                        // Finish erase or draw gesture depending on current tool.
+                        if toolbar.currentlyActiveTool == .eraser {
+                            handleEraserEnded(at: point)
+                        } else {
+                            handleDrawEnded(at: point)
+                        }
                     }
-                    // Draw in-progress stroke while user is dragging.
-                    if let activeStroke {
-                        // Render temporary stroke preview.
-                        draw(stroke: activeStroke, in: &context)
-                    }
-                }
+                )
                 // Set visible page size.
                 .frame(width: frame.width, height: frame.height)
                 // White paper background.
@@ -202,8 +204,6 @@ struct ExcalidrawWritingSurface: View {
             }
             // Allow gestures anywhere in this container.
             .contentShape(Rectangle())
-            // Attach draw/erase drag gesture.
-            .gesture(writingGesture(frame: frame))
         }
         // Load saved drawing data first time this view appears.
         .onAppear {
@@ -224,50 +224,6 @@ struct ExcalidrawWritingSurface: View {
     }
 
     // MARK: - Touch and Drag Actions
-
-    /// Drag gesture used for drawing and erasing.
-    private func writingGesture(frame: CGRect) -> some Gesture {
-        // Minimum distance 0 means immediate touch-down response.
-        DragGesture(minimumDistance: 0, coordinateSpace: .local)
-            // Called while finger/pencil moves.
-            .onChanged { value in
-                // Ignore touches outside the letter page.
-                guard let point = toCanvasPoint(value.location, frame: frame) else {
-                    // Exit early when outside page.
-                    return
-                }
-                // Route to eraser logic if eraser is active.
-                if toolbar.currentlyActiveTool == .eraser {
-                    // Update erasing operation.
-                    handleEraserChanged(at: point)
-                } else {
-                    // Update drawing operation.
-                    handleDrawChanged(at: point)
-                }
-            }
-            // Called once when drag ends.
-            .onEnded { value in
-                // Ignore ended touches outside letter page.
-                guard let point = toCanvasPoint(value.location, frame: frame) else {
-                    // Clear in-progress draw points.
-                    activePoints = []
-                    // Clear erasing set.
-                    erasingIDs.removeAll()
-                    // Reset erasing snapshot.
-                    documentBeforeErasing = ExcalidrawDocument()
-                    // Exit early.
-                    return
-                }
-                // Route to eraser finish if eraser is active.
-                if toolbar.currentlyActiveTool == .eraser {
-                    // Finish erase gesture.
-                    handleEraserEnded(at: point)
-                } else {
-                    // Finish draw gesture.
-                    handleDrawEnded(at: point)
-                }
-            }
-    }
 
     // MARK: - Current Drawing Info
 
@@ -332,7 +288,9 @@ struct ExcalidrawWritingSurface: View {
             return
         }
         // Skip tiny moves to reduce noisy points.
-        guard let last = activePoints.last, distance(last, point) >= 0.5 else { return }
+        guard let last = activePoints.last, distance(last, point) >= 0.5 else {
+            return
+        }
         // Append new meaningful point.
         activePoints.append(point)
     }
@@ -349,9 +307,11 @@ struct ExcalidrawWritingSurface: View {
         }
 
         // Always clear temporary points after this function exits.
-        defer { activePoints = [] }
-        // Need enough points to create a stroke.
-        guard activePoints.count > 1 else { return }
+        defer {
+            activePoints = []
+        }
+        // Need at least one point to create a stroke (single-point stroke = dot).
+        guard !activePoints.isEmpty else { return }
 
         // Capture previous state for undo.
         let previous = document
@@ -449,69 +409,6 @@ struct ExcalidrawWritingSurface: View {
         onPageMutated()
     }
 
-    // MARK: - Drawing on Screen
-
-    /// Draw one stroke onto the Canvas context.
-    private func draw(stroke: ExcalidrawStroke, in context: inout GraphicsContext) {
-        // Convert model points to CG points.
-        let points = stroke.points.map(\.cgPoint)
-        // If no points, there is nothing to draw.
-        guard !points.isEmpty else { return }
-
-        // Build a path for this stroke.
-        var path = Path()
-        // If exactly one point, draw a dot.
-        if points.count == 1 {
-            // Dot is represented as a small circle.
-            path.addEllipse(in: CGRect(
-                x: points[0].x - stroke.width * 0.5,
-                y: points[0].y - stroke.width * 0.5,
-                width: stroke.width,
-                height: stroke.width
-            ))
-        } else {
-            // Start at first point.
-            path.move(to: points[0])
-            // Walk through remaining points and smooth with quadratic curves.
-            for index in 1 ..< points.count {
-                // Previous point.
-                let previous = points[index - 1]
-                // Current point.
-                let current = points[index]
-                // Midpoint helps smooth transitions.
-                let midpoint = CGPoint(x: (previous.x + current.x) * 0.5, y: (previous.y + current.y) * 0.5)
-                // For first segment, draw a line to midpoint.
-                if index == 1 {
-                    path.addLine(to: midpoint)
-                } else {
-                    // For others, draw curve using previous as control point.
-                    path.addQuadCurve(to: midpoint, control: previous)
-                }
-                // Finish by curving to the final point.
-                if index == points.count - 1 {
-                    path.addQuadCurve(to: current, control: current)
-                }
-            }
-        }
-
-        // Highlighter uses lower opacity; pen uses full opacity.
-        let color = stroke.tool == .highlighter
-            ? stroke.color.swiftUIColor.opacity(0.35)
-            : stroke.color.swiftUIColor
-        // Highlighter blends with multiply for marker-like feel.
-        let blend: GraphicsContext.BlendMode = stroke.tool == .highlighter ? .multiply : .normal
-        // Make a copy so blend mode only affects this stroke.
-        var layer = context
-        // Set blend mode.
-        layer.blendMode = blend
-        // Stroke the path.
-        layer.stroke(
-            path,
-            with: .color(color),
-            style: StrokeStyle(lineWidth: stroke.width, lineCap: .round, lineJoin: .round)
-        )
-    }
-
     // MARK: - Math and Position Helpers
 
     /// True if any point in stroke is within eraser radius. We use this to determine if something is in the radius of our eraser.
@@ -539,19 +436,212 @@ struct ExcalidrawWritingSurface: View {
             height: size.height
         )
     }
+}
 
-    /// Convert a screen touch location into letter-page coordinates.
-    private func toCanvasPoint(_ location: CGPoint, frame: CGRect) -> CGPoint? {
-        // Ignore touches outside the visible letter page.
-        guard frame.contains(location) else { return nil }
-        // Horizontal position from 0...1 inside page frame.
-        let relativeX = (location.x - frame.minX) / frame.width
-        // Vertical position from 0...1 inside page frame.
-        let relativeY = (location.y - frame.minY) / frame.height
-        // Map normalized values into fixed letter coordinate space.
-        return CGPoint(
-            x: relativeX * CanvasMetrics.letterSize.width,
-            y: relativeY * CanvasMetrics.letterSize.height
-        )
+/// A drawing area that only responds to Apple Pencil, not finger touches.
+/// This connects the drawing display with the pencil touch detection.
+private struct PencilFilteredDrawingSurface: UIViewRepresentable {
+    /// All the drawings that have been saved.
+    let document: ExcalidrawDocument
+    /// The line currently being drawn before it's saved.
+    let activeStroke: ExcalidrawStroke?
+    /// What to do when the pencil moves (updates the current line).
+    let onChangedInLetterSpace: (CGPoint) -> Void
+    /// What to do when the pencil stops drawing (saves the line).
+    let onEndedInLetterSpace: (CGPoint) -> Void
+
+    /// Create the actual drawing area on the screen.
+    func makeUIView(context _: Context) -> PencilFilteredDrawingUIView {
+        let view = PencilFilteredDrawingUIView()
+        view.backgroundColor = .clear
+        return view
+    }
+
+    /// Update the drawing area whenever the drawings change.
+    func updateUIView(_ uiView: PencilFilteredDrawingUIView, context _: Context) {
+        uiView.document = document
+        uiView.activeStroke = activeStroke
+        uiView.onChangedInLetterSpace = onChangedInLetterSpace
+        uiView.onEndedInLetterSpace = onEndedInLetterSpace
+        uiView.setNeedsDisplay()
+    }
+}
+
+/// The actual drawing area that shows on screen.
+/// It draws all the saved lines and only responds to Apple Pencil, not fingers.
+private final class PencilFilteredDrawingUIView: UIView {
+    /// The standard paper size (letter) used for storing drawings.
+    private static let letterSize = CGSize(width: 612, height: 792)
+
+    /// All the drawings that have been saved.
+    var document = ExcalidrawDocument()
+    /// The line currently being drawn before it's saved.
+    var activeStroke: ExcalidrawStroke?
+    /// What to do when the pencil moves (updates the current line).
+    var onChangedInLetterSpace: ((CGPoint) -> Void)?
+    /// What to do when the pencil stops drawing (saves the line).
+    var onEndedInLetterSpace: ((CGPoint) -> Void)?
+
+    /// The pencil touch we're currently tracking.
+    private var activePencilTouch: UITouch?
+
+    /// Set up the drawing area when it's first created.
+    /// Allow multiple touches to be detected (though only pencil will work).
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isMultipleTouchEnabled = true
+    }
+
+    /// This way of creating the view is not used in this app.
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    /// Decide whether a touch should be recognized.
+    /// Only Apple Pencil touches are allowed - finger touches are ignored.
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        // If the touch is outside the drawing area, ignore it.
+        guard bounds.contains(point) else { return nil }
+        guard let touches = event?.allTouches else {
+            // Sometimes the system checks without telling us what touched.
+            // We say yes to allow pencil touches to start.
+            return self
+        }
+        guard !touches.isEmpty else { return self }
+        // Only accept if there's an Apple Pencil touch.
+        return touches.contains { touch in
+            touch.type == .pencil || touch == activePencilTouch
+        } ? self : nil
+    }
+
+    /// Draw all the saved lines and the current line being drawn.
+    override func draw(_ rect: CGRect) {
+        guard let context = UIGraphicsGetCurrentContext() else { return }
+
+        // Scale the drawing to fit the screen size.
+        context.saveGState()
+        context.scaleBy(x: rect.width / Self.letterSize.width, y: rect.height / Self.letterSize.height)
+        // Draw each saved line.
+        for stroke in document.strokes {
+            drawStroke(stroke, in: context)
+        }
+        // Draw the line currently being drawn.
+        if let activeStroke {
+            drawStroke(activeStroke, in: context)
+        }
+        context.restoreGState()
+    }
+
+    /// Called when the pencil first touches the screen.
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesBegan(touches, with: event)
+        // Only start if we're not already tracking a pencil touch.
+        guard activePencilTouch == nil else { return }
+        // Only respond to Apple Pencil, not fingers.
+        guard let touch = touches.first(where: { $0.type == .pencil }) else { return }
+        activePencilTouch = touch
+        let point = toLetterSpace(touch.location(in: self))
+        onChangedInLetterSpace?(point)
+    }
+
+    /// Called when the pencil moves across the screen while drawing.
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesMoved(touches, with: event)
+        // Only respond if we're tracking a pencil touch.
+        guard let activePencilTouch else { return }
+        guard touches.contains(activePencilTouch) else { return }
+        let point = toLetterSpace(activePencilTouch.location(in: self))
+        onChangedInLetterSpace?(point)
+    }
+
+    /// Called when the pencil lifts off the screen.
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesEnded(touches, with: event)
+        // Only respond if we're tracking a pencil touch.
+        guard let activePencilTouch else { return }
+        guard touches.contains(activePencilTouch) else { return }
+        let point = toLetterSpace(activePencilTouch.location(in: self))
+        onEndedInLetterSpace?(point)
+        // Stop tracking this pencil touch.
+        self.activePencilTouch = nil
+    }
+
+    /// Called if the drawing is interrupted (like a phone call).
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesCancelled(touches, with: event)
+        // Only respond if we're tracking a pencil touch.
+        guard let activePencilTouch else { return }
+        guard touches.contains(activePencilTouch) else { return }
+        let point = toLetterSpace(activePencilTouch.location(in: self))
+        onEndedInLetterSpace?(point)
+        // Stop tracking this pencil touch.
+        self.activePencilTouch = nil
+    }
+
+    /// Convert a screen position to a position on the standard paper size.
+    /// This lets drawings look the same regardless of screen size.
+    private func toLetterSpace(_ point: CGPoint) -> CGPoint {
+        // Keep the point within the drawing area boundaries.
+        let clampedX = max(0, min(bounds.width, point.x))
+        let clampedY = max(0, min(bounds.height, point.y))
+        // Convert to a percentage (0 to 1) of the screen size.
+        let relativeX = bounds.width > 0 ? clampedX / bounds.width : 0
+        let relativeY = bounds.height > 0 ? clampedY / bounds.height : 0
+        // Apply that percentage to the standard paper size.
+        return CGPoint(x: relativeX * Self.letterSize.width, y: relativeY * Self.letterSize.height)
+    }
+
+    /// Draw a single line on the screen.
+    /// Makes smooth curves and handles both regular pens and highlighters.
+    private func drawStroke(_ stroke: ExcalidrawStroke, in context: CGContext) {
+        let points = stroke.points.map(\.cgPoint)
+        guard !points.isEmpty else { return }
+
+        // Set up how the line should look.
+        let path = UIBezierPath()
+        path.lineCapStyle = .round // Rounded line ends.
+        path.lineJoinStyle = .round // Smooth line connections.
+        path.lineWidth = stroke.width
+
+        // If it's just a single dot, draw a circle.
+        if points.count == 1 {
+            let dotRect = CGRect(
+                x: points[0].x - stroke.width * 0.5,
+                y: points[0].y - stroke.width * 0.5,
+                width: stroke.width,
+                height: stroke.width
+            )
+            path.append(UIBezierPath(ovalIn: dotRect))
+        } else {
+            // Connect all the points with smooth curves.
+            path.move(to: points[0])
+            for index in 1 ..< points.count {
+                let previous = points[index - 1]
+                let current = points[index]
+                // Find the middle point between two touches.
+                let midpoint = CGPoint(x: (previous.x + current.x) * 0.5, y: (previous.y + current.y) * 0.5)
+                if index == 1 {
+                    path.addLine(to: midpoint)
+                } else {
+                    // Use a curve for smoother lines.
+                    path.addQuadCurve(to: midpoint, controlPoint: previous)
+                }
+                if index == points.count - 1 {
+                    path.addQuadCurve(to: current, controlPoint: current)
+                }
+            }
+        }
+
+        // Set the color.
+        // Highlighters are semi-transparent so you can see through them.
+        let baseColor = UIColor(stroke.color.swiftUIColor)
+        let finalColor = stroke.tool == .highlighter ? baseColor.withAlphaComponent(0.35) : baseColor
+        context.saveGState()
+        // Highlighters blend with what's underneath like real highlighters.
+        context.setBlendMode(stroke.tool == .highlighter ? .multiply : .normal)
+        finalColor.setStroke()
+        path.stroke()
+        context.restoreGState()
     }
 }
