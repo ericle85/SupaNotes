@@ -26,8 +26,6 @@ struct ExcalidrawPageStroke: Identifiable, Codable, Hashable {
 enum ExcalidrawPageTool: String, Codable {
     /// Normal ink pen.
     case pen
-    /// Transparent marker-like highlighter.
-    case highlighter
 }
 
 /// A single 2D point for a stroke path.
@@ -77,8 +75,6 @@ struct ExcalidrawToolStyle {
     let selectedColor: Color
     /// Width for pen strokes.
     let penWidth: CGFloat
-    /// Width for highlighter strokes.
-    let highlighterWidth: CGFloat
     /// Width for eraser.
     let eraserWidth: CGFloat
 
@@ -89,7 +85,6 @@ struct ExcalidrawToolStyle {
             selectedTool: toolbar.currentlyActiveTool,
             selectedColor: toolbar.colorSelectedByUser,
             penWidth: toolbar.instrumentWidth(for: .pen),
-            highlighterWidth: toolbar.instrumentWidth(for: .highlighter),
             eraserWidth: toolbar.instrumentWidth(for: .eraser)
         )
     }
@@ -303,24 +298,14 @@ final class ExcalidrawPageCanvasView: UIView {
 
     /// Convert toolbar active tool to drawing tool enum.
     private var activeStrokeTool: ExcalidrawPageTool {
-        // Switch based on app toolbar state.
-        switch toolStyle.selectedTool {
-        // Highlighter maps to highlighter.
-        case .highlighter: .highlighter
-        // Everything else maps to pen for now.
-        default: .pen
-        }
+        // Only pen strokes are supported.
+        .pen
     }
 
     /// Current stroke width for drawing tools.
     private var activeLineWidth: CGFloat {
-        // Decide width by active tool.
-        switch toolStyle.selectedTool {
-        // Use highlighter width.
-        case .highlighter: toolStyle.highlighterWidth
-        // Default to pen width.
-        default: toolStyle.penWidth
-        }
+        // Only pen width is used.
+        toolStyle.penWidth
     }
 
     /// Current eraser radius/width from toolbar.

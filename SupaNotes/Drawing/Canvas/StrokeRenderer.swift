@@ -35,14 +35,8 @@ enum StrokeRenderer {
         let points = stroke.points.map(\.cgPoint)
         guard !points.isEmpty else { return }
 
-        // Highlighters are semi-transparent and blend with what's underneath.
-        let baseColor = UIColor(stroke.color.toColor())
-        let finalColor = stroke.tool == .highlighter
-            ? baseColor.withAlphaComponent(0.35)
-            : baseColor
         context.saveGState()
-        context.setBlendMode(stroke.tool == .highlighter ? .multiply : .normal)
-        finalColor.setStroke()
+        UIColor(stroke.color.toColor()).setStroke()
         // Render the stroke as one continuous path.
         strokeSegment(points, strokeWidth: stroke.width)
         context.restoreGState()

@@ -99,29 +99,8 @@ enum PDFService {
         // Fast path: all pages are unannotated PDF placeholders — return original data as-is
         let allArePDFPlaceholders = targetPages.allSatisfy { $0.pdfPageNumber != nil && $0.drawingData.isEmpty && $0.backgroundImageData == nil }
         if allArePDFPlaceholders, let originalData = note.originalPdfData {
-            print("⚡️ Fast path: returning original PDF (\(originalData.count) bytes)")
             return originalData
         }
-
-        print("--- 📝 [Debug] Internal Note Size Breakdown ---")
-        let pdfSize = note.originalPdfData?.count ?? 0
-        var totalBgSize = 0
-        var totalDrawingSize = 0
-
-        for (index, page) in targetPages.enumerated() {
-            let bgSize = page.backgroundImageData?.count ?? 0
-            let drSize = page.drawingData.count
-            totalBgSize += bgSize
-            totalDrawingSize += drSize
-            print("Page \(index + 1): Raster BG \(bgSize / 1024) KB, Drawing \(drSize / 1024) KB")
-        }
-
-        let totalKb = (pdfSize + totalBgSize + totalDrawingSize) / 1024
-        print("PDF Source: \(pdfSize / 1024) KB")
-        print("Raster BGs: \(totalBgSize / 1024) KB")
-        print("All Drawings: \(totalDrawingSize / 1024) KB")
-        print("Grand Total Note Footprint: \(totalKb) KB")
-        print("---------------------------------------------")
 
         let bounds = CGRect(origin: .zero, size: pageSize)
         let renderer = UIGraphicsPDFRenderer(bounds: bounds)
@@ -132,7 +111,6 @@ enum PDFService {
             }
         }
 
-        print("📄 [Debug] Exported PDF size: \(data.count / 1024) KB")
         return data
     }
 

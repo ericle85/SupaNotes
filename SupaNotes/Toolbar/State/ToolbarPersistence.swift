@@ -27,15 +27,6 @@ enum ToolbarPersistence {
         return filtered.isEmpty ? defaultIcons() : filtered
     }
 
-    private static func supportedActiveTool(_ tool: ActiveTool) -> ActiveTool {
-        switch tool {
-        case .pen, .eraser:
-            return tool
-        case .highlighter, .lasso:
-            return .pen
-        }
-    }
-
     static func load(into state: ToolbarState) {
         let defaults = UserDefaults.standard
 
@@ -61,7 +52,7 @@ enum ToolbarPersistence {
         if let rawTool = defaults.string(forKey: activeToolKey),
            let tool = ActiveTool(rawValue: rawTool)
         {
-            state.currentlyActiveTool = supportedActiveTool(tool)
+            state.currentlyActiveTool = tool
         }
 
         // 4. Load the order of the toolbar sections

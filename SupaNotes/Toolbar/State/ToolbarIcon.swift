@@ -12,16 +12,12 @@ enum ToolType: String, Codable, CaseIterable {
     case color
     case pen = "pencil" // Raw value preserved for backwards compatibility
     case eraser
-    case highlighter
-    case lasso
 
     var iconName: String {
         switch self {
         case .color: return "paintpalette.fill"
         case .pen: return "pencil"
         case .eraser: return "eraser.fill"
-        case .highlighter: return "highlighter"
-        case .lasso: return "lasso"
         }
     }
 
@@ -34,7 +30,7 @@ enum ToolType: String, Codable, CaseIterable {
 
     var isWritingInstrument: Bool {
         switch self {
-        case .pen, .eraser, .highlighter: return true
+        case .pen, .eraser: return true
         default: return false
         }
     }
@@ -85,7 +81,6 @@ struct ToolbarIcon: Identifiable, Equatable, Codable {
         let settings: WritingInstrumentSettings? = switch type {
         case .pen: .pen()
         case .eraser: .eraser()
-        case .highlighter: .highlighter()
         default: nil
         }
         return ToolbarIcon(

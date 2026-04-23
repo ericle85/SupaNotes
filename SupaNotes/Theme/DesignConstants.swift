@@ -99,7 +99,6 @@ enum Design {
     enum SliderRange {
         static let pen: ClosedRange<CGFloat> = 1 ... 50
         static let eraser: ClosedRange<CGFloat> = 10 ... 150
-        static let highlighter: ClosedRange<CGFloat> = 5 ... 40
     }
 
     // MARK: - Debounce

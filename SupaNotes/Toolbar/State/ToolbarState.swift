@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 enum ActiveTool: String, Codable, Equatable {
-    case pen, eraser, highlighter, lasso
+    case pen, eraser
 }
 
 enum ToolbarSection: String, Codable, CaseIterable, Identifiable {
@@ -32,7 +32,7 @@ final class ToolbarState {
     var previewDraggedIconID: UUID?
     var previewDraggedSection: ToolbarSection?
 
-    /// All toolbar icons that are drawing tools (pen, eraser, highlighter) — not colors.
+    /// All toolbar icons that are drawing tools (pen, eraser) — not colors.
     var toolIcons: [ToolbarIcon] {
         toolbarIcons.filter { $0.type != .color }
     }

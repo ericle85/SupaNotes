@@ -11,8 +11,4 @@ struct WritingInstrumentSettings: Codable, Equatable {
     static func eraser() -> WritingInstrumentSettings {
         .init(width: 40, presets: [20, 40, 80])
     }
-
-    static func highlighter() -> WritingInstrumentSettings {
-        .init(width: 15, presets: [8, 15, 25])
-    }
 }
