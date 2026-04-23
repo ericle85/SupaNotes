@@ -30,7 +30,6 @@ enum ExcalidrawPageTool: String, Codable {
     case highlighter
 }
 
-
 /// A single 2D point for a stroke path.
 struct ExcalidrawPagePoint: Codable, Hashable {
     /// XY coordinates.
@@ -120,6 +119,8 @@ final class ExcalidrawPageCanvasView: UIView {
     private enum CanvasMetrics {
         /// US Letter in points (8.5 * 72 by 11 * 72).
         static let letterSize = CGSize(width: PageConstants.pageWidth, height: PageConstants.pageHeight)
+        /// Minimum and maximum render scales used for vector-quality redraws while zooming.
+        static let renderScaleRange: ClosedRange<CGFloat> = 1 ... 6
     }
 
     /// Delegate for interaction callbacks.
@@ -149,6 +150,8 @@ final class ExcalidrawPageCanvasView: UIView {
     private let backgroundImageView = UIImageView()
     /// Callback for parent to update modified time, etc.
     private var onPageMutated: () -> Void
+    /// Current page zoom scale from the parent scroll view.
+    private var zoomScale: CGFloat = 1
 
     /// Set up the view with page data and callbacks.
     init(page: Page, frame: CGRect, toolStyle: ExcalidrawToolStyle, onPageMutated: @escaping () -> Void) {
@@ -181,6 +184,17 @@ final class ExcalidrawPageCanvasView: UIView {
         toolStyle = style
     }
 
+    /// Update render scale whenever the notebook zoom changes.
+    func updateZoomScale(_ zoomScale: CGFloat) {
+        // Clamp the zoom to the supported design range so accidental values do not destabilize rendering.
+        self.zoomScale = min(max(zoomScale, Design.Zoom.min), Design.Zoom.max)
+        // Ask the drawing surface to redraw vector strokes at a matching pixel scale.
+        drawingView.updateRenderScale(
+            forZoomScale: self.zoomScale,
+            allowedRange: CanvasMetrics.renderScaleRange
+        )
+    }
+
     /// Force a save before export/print.
     func flushToModel() {
         // Write current document to page model.
@@ -199,6 +213,8 @@ final class ExcalidrawPageCanvasView: UIView {
 
         // Configure drawing surface.
         drawingView.backgroundColor = .clear
+        // Redraw ink whenever geometry changes so vector strokes remain sharp.
+        drawingView.contentMode = .redraw
         drawingView.translatesAutoresizingMaskIntoConstraints = false
         drawingView.document = document
         // Notify delegate when drawing starts.
@@ -223,8 +239,11 @@ final class ExcalidrawPageCanvasView: UIView {
             drawingView.topAnchor.constraint(equalTo: topAnchor),
             drawingView.leadingAnchor.constraint(equalTo: leadingAnchor),
             drawingView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            drawingView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            drawingView.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
+
+        // Configure initial render scale before the first draw call.
+        updateZoomScale(zoomScale)
 
         // Configure undo callback target.
         undoBridge.apply = { [weak self] restored in
@@ -494,6 +513,9 @@ private final class PencilFilteredDrawingUIView: UIView {
 
     /// The pencil touch we're currently tracking.
     private var activePencilTouch: UITouch?
+    /// Last effective pixel scale used for redraw so we avoid redundant invalidations.
+    private var currentRenderScale: CGFloat = 0
+
     /// Set up the drawing area when it's first created.
     /// Allow multiple touches to be detected (though only pencil will work).
     override init(frame: CGRect) {
@@ -504,6 +526,34 @@ private final class PencilFilteredDrawingUIView: UIView {
     @available(*, unavailable)
     required init?(coder _: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    /// Re-apply screen-aware scale whenever this view moves to a new window/screen.
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        // Keep current zoom assumption but refresh against the active screen scale.
+        updateRenderScale(forZoomScale: 1, allowedRange: 1 ... 6, preserveCurrentZoom: true)
+    }
+
+    /// Update the pixel density used to redraw vector strokes for the current zoom level.
+    func updateRenderScale(
+        forZoomScale zoomScale: CGFloat,
+        allowedRange: ClosedRange<CGFloat>,
+        preserveCurrentZoom: Bool = false
+    ) {
+        // Use active window scale when available (important for external displays), else fall back to main screen.
+        let screenScale = window?.windowScene?.screen.scale ?? traitCollection.displayScale
+        // Derive target pixels-per-point so strokes stay sharp as the user zooms in.
+        let effectiveZoom = preserveCurrentZoom ? max(currentRenderScale / max(screenScale, 0.001), 1) : zoomScale
+        let targetScale = min(max(screenScale * effectiveZoom, allowedRange.lowerBound), allowedRange.upperBound)
+        // Avoid expensive redraw churn when scale change is visually insignificant.
+        guard abs(targetScale - currentRenderScale) > 0.01 else { return }
+        // Store and apply the new drawing scale for both UIView and tiled backing layer.
+        currentRenderScale = targetScale
+        contentScaleFactor = targetScale
+        layer.contentsScale = targetScale
+        // Trigger redraw so tiles regenerate at the new detail level.
+        setNeedsDisplay()
     }
 
     /// Decide whether a touch should be recognized.
@@ -532,21 +582,19 @@ private final class PencilFilteredDrawingUIView: UIView {
     }
 
     /// Draw all the saved lines and the current line being drawn.
-    override func draw(_ rect: CGRect) {
+    override func draw(_: CGRect) {
         guard let context = UIGraphicsGetCurrentContext() else { return }
 
-        // Scale the drawing to fit the screen size.
-        context.saveGState()
-        context.scaleBy(x: rect.width / Self.letterSize.width, y: rect.height / Self.letterSize.height)
-        // Draw each saved line.
-        for stroke in document.strokes {
-            drawStroke(stroke, in: context)
-        }
-        // Draw the line currently being drawn.
+        // Draw committed strokes via the shared renderer.
+        StrokeRenderer.drawStrokes(from: document, in: context, rect: bounds)
+
+        // Draw the in-progress stroke on top (only exists during active touch).
         if let activeStroke {
-            drawStroke(activeStroke, in: context)
+            context.saveGState()
+            context.scaleBy(x: bounds.width / Self.letterSize.width, y: bounds.height / Self.letterSize.height)
+            StrokeRenderer.drawStroke(activeStroke, in: context)
+            context.restoreGState()
         }
-        context.restoreGState()
     }
 
     /// Called when the pencil first touches the screen.
@@ -617,76 +665,4 @@ private final class PencilFilteredDrawingUIView: UIView {
         return CGPoint(x: relativeX * Self.letterSize.width, y: relativeY * Self.letterSize.height)
     }
 
-    /// Draw a single line on the screen.
-    /// Makes smooth curves and handles both regular pens and highlighters.
-    private func drawStroke(_ stroke: ExcalidrawPageStroke, in context: CGContext) {
-        let points = stroke.points.map(\.cgPoint)
-        guard !points.isEmpty else { return }
-
-        // Set the color.
-        // Highlighters are semi-transparent so you can see through them.
-        let baseColor = UIColor(stroke.color.toColor())
-        let finalColor = stroke.tool == .highlighter ? baseColor.withAlphaComponent(0.35) : baseColor
-        context.saveGState()
-        // Highlighters blend with what's underneath like real highlighters.
-        context.setBlendMode(stroke.tool == .highlighter ? .multiply : .normal)
-        finalColor.setStroke()
-        // Render the stroke as one continuous path, including off-page points.
-        strokeSegment(points, strokeWidth: stroke.width)
-        context.restoreGState()
-    }
-
-    /// Draw one continuous segment of a stroke.
-    private func strokeSegment(_ points: [CGPoint], strokeWidth: CGFloat) {
-        guard !points.isEmpty else { return }
-        let path = UIBezierPath()
-        path.lineCapStyle = .round
-        path.lineJoinStyle = .round
-        path.lineWidth = strokeWidth
-
-        if points.count == 1 {
-            // A single sampled point should render as a round dot whose diameter
-            // matches the active stroke width, so taps still look like ink.
-            let dotRect = CGRect(
-                x: points[0].x - strokeWidth * 0.5,
-                y: points[0].y - strokeWidth * 0.5,
-                width: strokeWidth,
-                height: strokeWidth
-            )
-            path.append(UIBezierPath(ovalIn: dotRect))
-        } else if points.count == 2 {
-            // For very short strokes, drawing a direct line is more predictable
-            // than curve fitting and avoids introducing artificial bends.
-            path.move(to: points[0])
-            path.addLine(to: points[1])
-        } else {
-            // Use cubic Bézier segments generated from neighboring points so the
-            // stroke passes through each sampled point with smoother transitions.
-            path.move(to: points[0])
-            for index in 0 ..< (points.count - 1) {
-                // Collect the local neighborhood around this segment endpoint so
-                // controls reflect both incoming and outgoing trajectory.
-                let previousNeighbor = index > 0 ? points[index - 1] : points[index]
-                let segmentStart = points[index]
-                let segmentEnd = points[index + 1]
-                let nextNeighbor = (index + 2) < points.count ? points[index + 2] : points[index + 1]
-
-                // Convert Catmull-Rom style tangents into cubic Bézier control
-                // points. This gives smooth joins without flattening segment ends.
-                let controlPoint1 = CGPoint(
-                    x: segmentStart.x + (segmentEnd.x - previousNeighbor.x) / 6,
-                    y: segmentStart.y + (segmentEnd.y - previousNeighbor.y) / 6
-                )
-                let controlPoint2 = CGPoint(
-                    x: segmentEnd.x - (nextNeighbor.x - segmentStart.x) / 6,
-                    y: segmentEnd.y - (nextNeighbor.y - segmentStart.y) / 6
-                )
-
-                // Draw one cubic segment that ends exactly at the next sampled
-                // point so the rendered ink follows the user's path.
-                path.addCurve(to: segmentEnd, controlPoint1: controlPoint1, controlPoint2: controlPoint2)
-            }
-        }
-        path.stroke()
-    }
 }

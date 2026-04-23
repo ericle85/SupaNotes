@@ -43,7 +43,7 @@ final class PageLayoutManager {
         let sortedPages = pages.sorted { $0.orderIndex < $1.orderIndex }
         // Calculate container width based on page size and scroll view width.
         let containerWidth = PageLayout.containerWidth(pageW: pageWidth, gap: pageGap, scrollWidth: scrollView.bounds.width)
-        
+
         // Calculate total height needed for all pages plus gaps.
         let totalSize = CGSize(
             width: containerWidth,
@@ -80,6 +80,9 @@ final class PageLayoutManager {
                 containerView.addSubview(canvas)
                 return canvas
             }
+
+            // Match every page's vector redraw scale to the current notebook zoom immediately after rebuild.
+            canvasViews.forEach { $0.updateZoomScale(scrollView.zoomScale) }
 
             // Either restore saved viewport or set up initial layout.
             if let viewport {
@@ -292,7 +295,7 @@ final class PageLayoutManager {
         // Find the Y coordinate at the center of the visible area (unzoomed).
         let centerY = (scrollView.contentOffset.y + scrollView.bounds.height / 2) / max(scrollView.zoomScale, 0.001) - containerView.frame.minY
         let pageIndex = max(0, Int((centerY - pageGap) / (pageHeight + pageGap))) // Convert Y coordinate to page index.
-        
+
         onCurrentPageChanged?(min(pageIndex, max(0, pages.count - 1))) // Clamp to valid page range and notify callback.
     }
 }

@@ -157,6 +157,10 @@ enum PDFService {
             // 2. Fallback to old bitmap background
             bg.draw(in: rect)
         }
+
+        // 3. Draw user strokes on top of the background
+        let drawing = ExcalidrawPageCodec.decode(data: page.drawingData)
+        StrokeRenderer.drawStrokes(from: drawing, in: ctx, rect: rect)
     }
 
     // MARK: - Thumbnail

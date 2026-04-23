@@ -139,8 +139,7 @@ struct MultipageCanvasContainer: UIViewRepresentable {
 
     /// The coordinator is the middleman between the scrollable area (UIKit) and the rest of the app (SwiftUI).
     /// It listens for scroll, zoom, and pencil events from UIKit and passes the important ones back to SwiftUI.
-    final class Coordinator: NSObject, UIScrollViewDelegate, UIPencilInteractionDelegate,
-        ExcalidrawPageCanvasInteractionDelegate {
+    final class Coordinator: NSObject, UIScrollViewDelegate, UIPencilInteractionDelegate, ExcalidrawPageCanvasInteractionDelegate {
         var pages: [Page]
         var toolbar: ToolbarState
         var onUndoManagerReady: (UndoManager?) -> Void
@@ -253,6 +252,12 @@ struct MultipageCanvasContainer: UIViewRepresentable {
             // After zooming, make sure the pages are still centered left-to-right on screen.
             layoutManager.centerContainerIfNeeded()
             layoutManager.updateCurrentPage(pages: pages, onCurrentPageChanged: onCurrentPageChanged)
+        }
+
+        func scrollViewDidEndZooming(_: UIScrollView, with _: UIView?, atScale scale: CGFloat) {
+            // Once pinch zoom finishes, redraw every page at the final zoom scale.
+            // This avoids mid-gesture redraw churn that can look like tearing.
+            layoutManager.canvasViews.forEach { $0.updateZoomScale(scale) }
         }
 
         func scrollViewDidEndDragging(_: UIScrollView, willDecelerate _: Bool) {
