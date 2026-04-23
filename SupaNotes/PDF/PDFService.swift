@@ -40,7 +40,11 @@ enum PDFService {
         }
 
         note.updatedAt = .now
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            assertionFailure("Failed to save after PDF import: \(error)")
+        }
     }
 
     // MARK: - Rendering Helpers
@@ -72,22 +76,6 @@ enum PDFService {
         }
 
         return nil
-    }
-
-    private static func rasterize(pdfPage: PDFPage) -> UIImage? {
-        let pageRect = pdfPage.bounds(for: .mediaBox)
-        let targetSize = CGSize(width: pageSize.width * bgRenderScale, height: pageSize.height * bgRenderScale)
-        let renderer = UIGraphicsImageRenderer(size: targetSize)
-        return renderer.image { ctx in
-            UIColor.white.setFill()
-            ctx.fill(CGRect(origin: .zero, size: targetSize))
-            let cg = ctx.cgContext
-            cg.saveGState()
-            cg.translateBy(x: 0, y: targetSize.height)
-            cg.scaleBy(x: targetSize.width / pageRect.width, y: -targetSize.height / pageRect.height)
-            pdfPage.draw(with: .mediaBox, to: cg)
-            cg.restoreGState()
-        }
     }
 
     // MARK: - Export

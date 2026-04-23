@@ -46,15 +46,15 @@ enum Design {
     // MARK: - Shadow
 
     struct Shadow {
-        let color: CGFloat // opacity
+        let opacity: CGFloat
         let radius: CGFloat
         let x: CGFloat
         let y: CGFloat
 
-        static let toolbar = Shadow(color: 0.15, radius: 8, x: 0, y: 2)
-        static let floating = Shadow(color: 0.1, radius: 4, x: 0, y: 2)
-        static let subtle = Shadow(color: 0.08, radius: 4, x: 0, y: 1)
-        static let page = Shadow(color: 0.08, radius: 8, x: 0, y: 2)
+        static let toolbar = Shadow(opacity: 0.15, radius: 8, x: 0, y: 2)
+        static let floating = Shadow(opacity: 0.1, radius: 4, x: 0, y: 2)
+        static let subtle = Shadow(opacity: 0.08, radius: 4, x: 0, y: 1)
+        static let page = Shadow(opacity: 0.08, radius: 8, x: 0, y: 2)
     }
 
     // MARK: - Animation

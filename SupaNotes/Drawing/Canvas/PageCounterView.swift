@@ -20,7 +20,7 @@ struct PageCounterView: View {
                 RoundedRectangle(cornerRadius: Design.CornerRadius.small)
                     .fill(Color("ToolbarBackground"))
                     .shadow(
-                        color: .black.opacity(Design.Shadow.subtle.color),
+                        color: .black.opacity(Design.Shadow.subtle.opacity),
                         radius: Design.Shadow.subtle.radius,
                         x: Design.Shadow.subtle.x,
                         y: Design.Shadow.subtle.y

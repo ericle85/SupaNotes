@@ -103,10 +103,18 @@ struct PDFExportSheet: View {
     private func exportAndShare() {
         let pages: [Page]? = mode == .all ? nil : note.sortedPages.filter { selection.contains($0.id) }
         guard let data = PDFService.exportNote(note, pages: pages) else { return }
+        // Sanitize title to prevent path traversal or invalid filenames.
+        let safeTitle = note.title
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: "..", with: "-")
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("\(note.title).pdf")
-        try? data.write(to: url)
-        exportURL = url
+            .appendingPathComponent("\(safeTitle).pdf")
+        do {
+            try data.write(to: url)
+            exportURL = url
+        } catch {
+            assertionFailure("PDF write failed: \(error)")
+        }
     }
 }
 
@@ -127,7 +135,9 @@ private struct PageThumbnail: View {
             }
         }
         .task(id: page.id) {
-            self.image = PDFService.thumbnail(for: page, width: 260)
+            // Render off main thread to avoid UI freeze with many pages.
+            let img = await Task.detached { PDFService.thumbnail(for: page, width: 260) }.value
+            self.image = img
         }
     }
 }

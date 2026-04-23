@@ -60,8 +60,13 @@ enum ExcalidrawPageCodec {
 
     /// Convert a drawing document into bytes so it can be saved.
     static func encode(document: ExcalidrawPageDocument) -> Data {
-        // Try JSON encoding; if it fails, return empty data.
-        (try? JSONEncoder().encode(document)) ?? Data()
+        do {
+            return try JSONEncoder().encode(document)
+        } catch {
+            // Surface encoding failures during development so data-loss bugs are caught early.
+            assertionFailure("Failed to encode drawing: \(error)")
+            return Data()
+        }
     }
 }
 
@@ -443,11 +448,11 @@ final class ExcalidrawPageCanvasView: UIView {
     /// Register one undo/redo pair.
     private func registerUndo(previous: ExcalidrawPageDocument, current: ExcalidrawPageDocument, actionName: String) {
         // Register undo that restores previous state.
-        pageUndoManager.registerUndo(withTarget: undoBridge) { bridge in
+        pageUndoManager.registerUndo(withTarget: undoBridge) { [weak self] bridge in
             // Apply previous state.
             bridge.apply?(previous)
             // Register redo that restores current state again.
-            self.pageUndoManager.registerUndo(withTarget: bridge) { redoBridge in
+            self?.pageUndoManager.registerUndo(withTarget: bridge) { redoBridge in
                 // Apply current state.
                 redoBridge.apply?(current)
             }

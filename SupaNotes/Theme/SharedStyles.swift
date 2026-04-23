@@ -38,7 +38,7 @@ struct FloatingButtonStyle: ViewModifier {
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .fill(Color("ToolbarBackground"))
-                    .shadow(color: .black.opacity(shadow.color), radius: shadow.radius, x: shadow.x, y: shadow.y)
+                    .shadow(color: .black.opacity(shadow.opacity), radius: shadow.radius, x: shadow.x, y: shadow.y)
             )
     }
 }

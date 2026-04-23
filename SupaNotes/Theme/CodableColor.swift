@@ -9,7 +9,9 @@ struct CodableColor: Codable, Equatable, Hashable {
 
     init(color: Color) {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        UIColor(color).getRed(&r, green: &g, blue: &b, alpha: &a)
+        // Resolve to concrete RGB first — system colors like .label aren't in an RGB colorspace.
+        let resolved = UIColor(color).resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+        resolved.getRed(&r, green: &g, blue: &b, alpha: &a)
         red = Double(r); green = Double(g); blue = Double(b); opacity = Double(a)
     }
 

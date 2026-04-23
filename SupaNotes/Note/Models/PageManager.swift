@@ -10,7 +10,8 @@ struct PageManager {
     }
 
     func addPage(to note: Note) {
-        let newIndex = note.pages.count
+        // Derive next index from sorted pages to handle gaps after deletes.
+        let newIndex = (note.sortedPages.last?.orderIndex ?? -1) + 1
         let page = Page(orderIndex: newIndex, template: defaultTemplate)
         page.note = note
         modelContext.insert(page)

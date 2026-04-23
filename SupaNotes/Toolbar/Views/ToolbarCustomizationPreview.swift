@@ -93,7 +93,7 @@ struct ToolbarCustomizationPreview: View {
         RoundedRectangle(cornerRadius: Design.CornerRadius.toolbar)
             .fill(Color("ToolbarBackground"))
             .shadow(
-                color: .black.opacity(Design.Shadow.toolbar.color),
+                color: .black.opacity(Design.Shadow.toolbar.opacity),
                 radius: Design.Shadow.toolbar.radius,
                 x: Design.Shadow.toolbar.x,
                 y: Design.Shadow.toolbar.y

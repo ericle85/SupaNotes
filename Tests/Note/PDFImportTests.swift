@@ -30,13 +30,7 @@ struct PDFImportTests {
         #expect(note.sortedPages.count > 0)
         #expect(note.sortedPages.allSatisfy { $0.drawingData.isEmpty })
 
-        guard let exportedData = PDFService.exportNote(note, pages: nil) else {
-            Issue.record("Export failed")
-            return
-        }
-
-        print("Original PDF size: \(originalData.count) bytes")
-        print("Exported PDF size: \(exportedData.count) bytes")
+        let exportedData = try #require(PDFService.exportNote(note, pages: nil), "Export returned nil")
 
         #expect(exportedData.count <= originalData.count)
     }

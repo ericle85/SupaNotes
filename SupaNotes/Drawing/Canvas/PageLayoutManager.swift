@@ -37,54 +37,69 @@ final class PageLayoutManager {
         onPageMutated: @escaping () -> Void
     ) {
         // Need both scroll view and container to do layout.
-        guard let containerView, let scrollView else { return }
+        guard containerView != nil, let scrollView else { return }
 
         // Sort pages by their display order.
         let sortedPages = pages.sorted { $0.orderIndex < $1.orderIndex }
-        // Calculate container width based on page size and scroll view width.
         let containerWidth = PageLayout.containerWidth(pageW: pageWidth, gap: pageGap, scrollWidth: scrollView.bounds.width)
-
-        // Calculate total height needed for all pages plus gaps.
-        let totalSize = CGSize(
-            width: containerWidth,
-            height: CGFloat(sortedPages.count) * pageHeight + CGFloat(max(0, sortedPages.count - 1)) * pageGap + pageGap * 2
-        )
-
-        // Calculate frame for each page.
+        let totalSize = containerSize(pageCount: sortedPages.count, containerWidth: containerWidth)
         let pageFrames = PageLayout.pageFrames(
-            count: sortedPages.count,
-            pageW: pageWidth,
-            pageH: pageHeight,
-            gap: pageGap,
-            containerWidth: containerWidth
+            count: sortedPages.count, pageW: pageWidth, pageH: pageHeight,
+            gap: pageGap, containerWidth: containerWidth
         )
 
-        // Rebuild views without animation to avoid flicker.
-        UIView.performWithoutAnimation {
-            canvasViews.forEach { $0.removeFromSuperview() } // Remove old canvas views.
-            canvasViews.removeAll()
+        // Rebuild canvas views and layout without animation to avoid flicker.
+        replaceCanvasViews(
+            sortedPages: sortedPages, pageFrames: pageFrames, totalSize: totalSize,
+            toolStyle: toolStyle, interactionDelegate: interactionDelegate,
+            viewport: viewport, onPageMutated: onPageMutated
+        )
 
-            // Resize container to fit all pages.
+        // Post-rebuild setup: pull indicators, pending scroll, undo manager.
+        pullController.setupIndicators(in: scrollView)
+        applyPendingScroll(&pendingScroll, pageCount: sortedPages.count)
+        centerContainerIfNeeded()
+        deliverUndoManager(onUndoManagerReady)
+    }
+
+    // MARK: - rebuildPages Helpers
+
+    /// Total container size needed to hold all pages vertically with gaps.
+    private func containerSize(pageCount: Int, containerWidth: CGFloat) -> CGSize {
+        CGSize(
+            width: containerWidth,
+            height: CGFloat(pageCount) * pageHeight + CGFloat(max(0, pageCount - 1)) * pageGap + pageGap * 2
+        )
+    }
+
+    /// Tear down old canvas views, create new ones, and apply viewport.
+    private func replaceCanvasViews(
+        sortedPages: [Page], pageFrames: [CGRect], totalSize: CGSize,
+        toolStyle: ExcalidrawToolStyle, interactionDelegate: ExcalidrawPageCanvasInteractionDelegate,
+        viewport: ViewportState?, onPageMutated: @escaping () -> Void
+    ) {
+        guard let containerView, let scrollView else { return }
+
+        UIView.performWithoutAnimation {
+            canvasViews.forEach { $0.removeFromSuperview() }
+            canvasViews.removeAll()
             containerView.bounds.size = totalSize
 
-            // Create new canvas views for each page.
+            // Create a canvas view for each page and add to container.
             canvasViews = pageFrames.enumerated().map { index, frame in
                 let canvas = Self.makeCanvasView(
-                    page: sortedPages[index],
-                    index: index,
-                    frame: frame,
-                    toolStyle: toolStyle,
-                    interactionDelegate: interactionDelegate,
+                    page: sortedPages[index], index: index, frame: frame,
+                    toolStyle: toolStyle, interactionDelegate: interactionDelegate,
                     onPageMutated: onPageMutated
                 )
                 containerView.addSubview(canvas)
                 return canvas
             }
 
-            // Match every page's vector redraw scale to the current notebook zoom immediately after rebuild.
+            // Match vector redraw scale to current zoom.
             canvasViews.forEach { $0.updateZoomScale(scrollView.zoomScale) }
 
-            // Either restore saved viewport or set up initial layout.
+            // Restore saved viewport or set up initial layout.
             if let viewport {
                 restoreViewport(viewport, containerSize: totalSize)
             } else {
@@ -92,21 +107,16 @@ final class PageLayoutManager {
                 centerContainerIfNeeded()
             }
 
-            // Force layout to complete immediately.
             containerView.layoutIfNeeded()
             scrollView.layoutIfNeeded()
         }
+    }
 
-        // Set up pull-to-add indicators.
-        pullController.setupIndicators(in: scrollView)
-        // Apply any pending scroll action (e.g., scroll to new page).
-        applyPendingScroll(&pendingScroll, pageCount: sortedPages.count)
-        centerContainerIfNeeded()
-
-        // Provide the undo manager to the parent once ready.
+    /// Provide the first page's undo manager to the parent on the next run loop.
+    private func deliverUndoManager(_ onReady: @escaping (UndoManager?) -> Void) {
         if let first = canvasViews.first {
             DispatchQueue.main.async {
-                onUndoManagerReady(first.undoManagerForPage)
+                onReady(first.undoManagerForPage)
             }
         }
     }
@@ -222,7 +232,7 @@ final class PageLayoutManager {
 
         // Add page shadow for depth effect.
         canvas.layer.shadowColor = UIColor.black.cgColor
-        canvas.layer.shadowOpacity = Float(Design.Shadow.page.color)
+        canvas.layer.shadowOpacity = Float(Design.Shadow.page.opacity)
         canvas.layer.shadowOffset = CGSize(width: Design.Shadow.page.x, height: Design.Shadow.page.y)
         canvas.layer.shadowRadius = Design.Shadow.page.radius
         return canvas
