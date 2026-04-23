@@ -298,6 +298,14 @@ final class PageLayoutManager {
         }
     }
 
+    /// Return only the canvas views whose frames overlap the scroll view's visible rect.
+    func visibleCanvasViews() -> [ExcalidrawPageCanvasView] {
+        guard let scrollView, let containerView else { return canvasViews }
+        // Convert the scroll view's visible bounds into the container's coordinate space.
+        let visibleRect = scrollView.convert(scrollView.bounds, to: containerView)
+        return canvasViews.filter { $0.frame.intersects(visibleRect) }
+    }
+
     /// Update the current page index based on scroll position.
     func updateCurrentPage(pages: [Page], onCurrentPageChanged: ((Int) -> Void)?) {
         guard let scrollView, let containerView else { return }

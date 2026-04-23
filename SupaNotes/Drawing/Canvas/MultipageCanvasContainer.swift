@@ -255,9 +255,9 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         }
 
         func scrollViewDidEndZooming(_: UIScrollView, with _: UIView?, atScale scale: CGFloat) {
-            // Once pinch zoom finishes, redraw every page at the final zoom scale.
-            // This avoids mid-gesture redraw churn that can look like tearing.
-            layoutManager.canvasViews.forEach { $0.updateZoomScale(scale) }
+            // Once pinch zoom finishes, redraw only visible pages at the final zoom scale.
+            // Off-screen pages keep their cached bitmap until scrolled into view.
+            layoutManager.visibleCanvasViews().forEach { $0.updateZoomScale(scale) }
         }
 
         func scrollViewDidEndDragging(_: UIScrollView, willDecelerate _: Bool) {
