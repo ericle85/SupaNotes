@@ -38,29 +38,14 @@ struct NoteListView: View {
         handleOpeningNote = onOpenNote
         handleOpeningFolder = onOpenFolder
 
-        // Decide how to sort notes based on the user's preference
-        let noteSortDescriptor: SortDescriptor<Note> = switch sortOrder {
-        case .name: SortDescriptor(\Note.title)
-        case .lastEdited: SortDescriptor(\Note.updatedAt, order: .reverse)
-        case .dateCreated: SortDescriptor(\Note.createdAt, order: .reverse)
-        }
-
-        // Only fetch notes that are NOT in the trash (isDeleted == false)
+        // Only fetch notes that are NOT in the trash, sorted by the user's chosen order.
         _allNotesFromDatabase = Query(
-            filter: #Predicate<Note> { note in
-                note.isDeleted == false
-            },
-            sort: [noteSortDescriptor]
+            filter: #Predicate<Note> { note in note.isDeleted == false },
+            sort: [sortOrder.noteSort]
         )
 
-        // Decide how to sort folders to match. Since folders don't have a "last edited"
-        // property, we fall back to "date created" for that case.
-        let folderSortDescriptor: SortDescriptor<Folder> = switch sortOrder {
-        case .name: SortDescriptor(\Folder.name)
-        case .lastEdited, .dateCreated: SortDescriptor(\Folder.createdAt, order: .reverse)
-        }
-
-        _allFoldersFromDatabase = Query(sort: [folderSortDescriptor])
+        // Fetch folders sorted to match the chosen order.
+        _allFoldersFromDatabase = Query(sort: [sortOrder.folderSort])
     }
 
     /// Returns only the notes that should be shown in the current folder view

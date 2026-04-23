@@ -5,6 +5,24 @@ enum NoteSortOrder: String, CaseIterable {
     case name = "Name"
     case lastEdited = "Last Edited"
     case dateCreated = "Date Created"
+
+    /// How to sort Note objects in the database for this order.
+    var noteSort: SortDescriptor<Note> {
+        switch self {
+        case .name: SortDescriptor(\Note.title)
+        case .lastEdited: SortDescriptor(\Note.updatedAt, order: .reverse)
+        case .dateCreated: SortDescriptor(\Note.createdAt, order: .reverse)
+        }
+    }
+
+    /// How to sort Folder objects for this order.
+    /// Folders have no "last edited" date, so that case falls back to creation date.
+    var folderSort: SortDescriptor<Folder> {
+        switch self {
+        case .name: SortDescriptor(\Folder.name)
+        case .lastEdited, .dateCreated: SortDescriptor(\Folder.createdAt, order: .reverse)
+        }
+    }
 }
 
 struct HomeView: View {
