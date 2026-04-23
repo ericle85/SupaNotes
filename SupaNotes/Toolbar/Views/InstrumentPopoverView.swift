@@ -31,7 +31,7 @@ struct InstrumentPopoverView: View {
 
             // Preset buttons (tap to recall)
             HStack(spacing: 24) {
-                ForEach(0..<3, id: \.self) { index in
+                ForEach(0 ..< 3, id: \.self) { index in
                     Button {
                         selectedPresetIndex = index
                         settings.width = settings.presets[index]

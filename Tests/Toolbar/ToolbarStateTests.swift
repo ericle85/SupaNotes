@@ -14,30 +14,30 @@ struct ToolbarStateTests {
     @Test func switchToPreviousTool_swapsActiveAndPrevious() {
         // Start with pen as active and eraser as previous
         let state = ToolbarState()
-        state.activeTool = .pen
-        state.previousTool = .eraser
+        state.currentlyActiveTool = .pen
+        state.toolUsedPreviously = .eraser
 
         // Switch to the previous tool
         state.switchToPreviousTool()
 
         // Now eraser should be active and pen should be the previous tool
-        #expect(state.activeTool == .eraser)
-        #expect(state.previousTool == .pen)
+        #expect(state.currentlyActiveTool == .eraser)
+        #expect(state.toolUsedPreviously == .pen)
     }
 
     @Test func switchToPreviousTool_doubleSwap_restoresOriginal() {
-        // Start with highlighter as active and lasso as previous
+        // Start with eraser as active and pen as previous
         let state = ToolbarState()
-        state.activeTool = .highlighter
-        state.previousTool = .lasso
+        state.currentlyActiveTool = .eraser
+        state.toolUsedPreviously = .pen
 
-        // Switch twice - should toggle back to the original
+        // Switch twice — should toggle back to the original
         state.switchToPreviousTool()
         state.switchToPreviousTool()
 
         // Should be back where we started
-        #expect(state.activeTool == .highlighter)
-        #expect(state.previousTool == .lasso)
+        #expect(state.currentlyActiveTool == .eraser)
+        #expect(state.toolUsedPreviously == .pen)
     }
 
     // MARK: - instrumentWidth
@@ -57,12 +57,12 @@ struct ToolbarStateTests {
     }
 
     @Test func instrumentWidth_forMissingType_returnsPenDefault() {
-        // Create state with no tools
+        // Create state with no tools in the toolbar
         let state = ToolbarState()
         state.toolbarIcons = []
 
-        // Ask for the highlighter's width even though it doesn't exist
-        let width = state.instrumentWidth(for: .highlighter)
+        // Ask for eraser width when no icons exist — should fall back to pen default
+        let width = state.instrumentWidth(for: .eraser)
 
         // Should fall back to pen's default width (a safe default)
         #expect(width == WritingInstrumentSettings.pen().width)

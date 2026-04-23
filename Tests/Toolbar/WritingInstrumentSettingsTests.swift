@@ -26,14 +26,6 @@ struct WritingInstrumentSettingsTests {
         #expect(eraser.presets.count == 3)          // Exactly 3 preset options
     }
 
-    @Test func highlighter_hasExpectedDefaults() {
-        // The highlighter should be between pen and eraser width
-        let highlighter = WritingInstrumentSettings.highlighter()
-        #expect(highlighter.width == 15)            // Default highlighter width is 15 pixels
-        #expect(highlighter.presets == [8, 15, 25]) // Preset sizes: thin, medium, thick
-        #expect(highlighter.presets.count == 3)     // Exactly 3 preset options
-    }
-
     // MARK: - Default width is a preset
     // Tests that the default width is always one of the available presets
     // (This ensures the width selector UI works correctly)
@@ -50,13 +42,6 @@ struct WritingInstrumentSettingsTests {
         let eraser = WritingInstrumentSettings.eraser()
         // Check that 40 (the default) is in the preset list [20, 40, 80]
         #expect(eraser.presets.contains(eraser.width))
-    }
-
-    @Test func highlighter_defaultWidthIsAPreset() {
-        // The highlighter's default width should be selectable from the presets
-        let highlighter = WritingInstrumentSettings.highlighter()
-        // Check that 15 (the default) is in the preset list [8, 15, 25]
-        #expect(highlighter.presets.contains(highlighter.width))
     }
 
     // MARK: - Codable round-trip

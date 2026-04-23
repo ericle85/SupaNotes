@@ -6,12 +6,20 @@ enum SidebarDestination: Equatable {
     case trash
     case settings
 
-    var isAllNotes: Bool { self == .allNotes }
-    var isTrash: Bool { self == .trash }
-    var isSettings: Bool { self == .settings }
+    var isAllNotes: Bool {
+        self == .allNotes
+    }
+
+    var isTrash: Bool {
+        self == .trash
+    }
+
+    var isSettings: Bool {
+        self == .settings
+    }
 
     var folder: Folder? {
-        if case .folder(let f) = self { return f }
+        if case let .folder(f) = self { return f }
         return nil
     }
 

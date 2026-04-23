@@ -10,7 +10,7 @@ struct CodableColorTests {
 
     @Test func roundTrip_preservesRGBValues() throws {
         // Create a color with specific RGB values
-        let original = CodableColor(color: Color(red: 0.2, green: 0.4, blue: 0.8), colorScheme: .light)
+        let original = CodableColor(color: Color(red: 0.2, green: 0.4, blue: 0.8))
 
         // Encode to JSON (like saving to a file)
         let data = try JSONEncoder().encode(original)
@@ -27,7 +27,7 @@ struct CodableColorTests {
 
     @Test func initFromColor_capturesComponents() {
         // Create a CodableColor from white (which is full brightness for all channels)
-        let codable = CodableColor(color: .white, colorScheme: .light)
+        let codable = CodableColor(color: .white)
 
         // White should have high values for all components
         #expect(codable.red > 0.99)      // Red is almost 1.0
@@ -38,7 +38,7 @@ struct CodableColorTests {
 
     @Test func toColor_producesEquivalentColor() {
         // Create a CodableColor with specific RGB values
-        let codable = CodableColor(color: Color(red: 0.3, green: 0.6, blue: 0.9), colorScheme: .light)
+        let codable = CodableColor(color: Color(red: 0.3, green: 0.6, blue: 0.9))
 
         // Convert it back to a SwiftUI Color
         let restored = codable.toColor()
@@ -54,15 +54,15 @@ struct CodableColorTests {
 
     @Test func equality_sameValues_areEqual() {
         // Two CodableColors with the same red color should be equal
-        let a = CodableColor(color: .red, colorScheme: .light)
-        let b = CodableColor(color: .red, colorScheme: .light)
+        let a = CodableColor(color: .red)
+        let b = CodableColor(color: .red)
         #expect(a == b)
     }
 
     @Test func equality_differentValues_areNotEqual() {
         // Red and blue are different colors, so they shouldn't be equal
-        let a = CodableColor(color: .red, colorScheme: .light)
-        let b = CodableColor(color: .blue, colorScheme: .light)
+        let a = CodableColor(color: .red)
+        let b = CodableColor(color: .blue)
         #expect(a != b)
     }
 }
