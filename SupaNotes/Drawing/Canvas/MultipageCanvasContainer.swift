@@ -260,13 +260,28 @@ struct MultipageCanvasContainer: UIViewRepresentable {
             layoutManager.visibleCanvasViews().forEach { $0.updateZoomScale(scale) }
         }
 
-        func scrollViewDidEndDragging(_: UIScrollView, willDecelerate _: Bool) {
+        func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
             // The user just lifted their finger. Check if they pulled far enough
             // to trigger adding a new page at the top or bottom.
             let scroll = pullController.handleEndDragging(addPage: addPage, addPageAbove: addPageAbove)
             if scroll != .none {
                 pendingScroll = scroll
             }
+            // If scroll stopped immediately (no momentum), update newly-visible pages.
+            if !decelerate {
+                updateVisiblePagesRenderScale(scrollView)
+            }
+        }
+
+        func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+            // Momentum scroll finished — update any newly-visible pages' render scale.
+            updateVisiblePagesRenderScale(scrollView)
+        }
+
+        /// Update render scale on pages that scrolled into view since the last zoom.
+        private func updateVisiblePagesRenderScale(_ scrollView: UIScrollView) {
+            let scale = scrollView.zoomScale
+            layoutManager.visibleCanvasViews().forEach { $0.updateZoomScale(scale) }
         }
 
         // MARK: - Drawing surface events
