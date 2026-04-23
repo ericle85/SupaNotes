@@ -46,7 +46,7 @@ struct ToolbarIconButton: View {
     }
 
     private func toolIconView() -> some View {
-        let isThisToolActive = doesToolMatchIconType(icon.type)
+        let isThisToolActive = toolFor(icon.type) == currentlyActiveTool
         return Image(systemName: icon.type.iconName)
             .font(.system(size: Design.FontSize.toolIcon))
             .fontWeight(isThisToolActive ? .bold : .regular)
@@ -63,18 +63,6 @@ struct ToolbarIconButton: View {
             return AnyShapeStyle(colorSelectedByUser)
         default:
             return AnyShapeStyle(.primary)
-        }
-    }
-
-    private func doesToolMatchIconType(_ type: ToolType) -> Bool {
-        switch type {
-        case .pen: return currentlyActiveTool == .pen
-        case .eraser: return currentlyActiveTool == .eraser
-        // Keep highlighter icon visibly active when highlighter is selected.
-        case .highlighter: return currentlyActiveTool == .highlighter
-        // Keep lasso icon visibly active when lasso is selected.
-        case .lasso: return currentlyActiveTool == .lasso
-        default: return false
         }
     }
 
