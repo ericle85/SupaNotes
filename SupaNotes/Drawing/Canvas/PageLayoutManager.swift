@@ -283,18 +283,26 @@ final class PageLayoutManager {
         )
     }
 
-    /// Smoothly scroll to a specific page by index.
+    /// Smoothly scroll to a specific page by index, resetting zoom to 1.0 (fresh-note state).
     func scrollToPage(index: Int) {
         guard let scrollView, let containerView, canvasViews.indices.contains(index) else { return }
 
-        // Calculate Y position of the target page.
+        // Reset zoom to default (same as opening a fresh note).
+        scrollView.zoomScale = 1.0
+        let totalSize = containerView.bounds.size
+        scrollView.contentSize = PageLayout.scrollContentSize(containerSize: totalSize, zoomScale: 1.0)
+        centerContainerIfNeeded()
+
+        // Calculate Y position of the target page at zoom 1.0.
         let y = pageGap + CGFloat(index) * (pageHeight + pageGap)
         let maxY = max(0, scrollView.contentSize.height - scrollView.bounds.height)
-        let targetY = min(max(0, (containerView.frame.minY + y) * scrollView.zoomScale - 20), maxY)
+        let targetY = min(max(0, containerView.frame.minY + y - 20), maxY)
 
-        // Animate scroll to target.
+        // Animate scroll to target, then update render scale on visible pages.
         UIView.animate(withDuration: 0.3) {
             scrollView.contentOffset = CGPoint(x: 0, y: targetY)
+        } completion: { [weak self] _ in
+            self?.visibleCanvasViews().forEach { $0.updateZoomScale(1.0) }
         }
     }
 
