@@ -1,25 +1,23 @@
 import SwiftUI
 
 // MARK: - Toolbar Layout Constants
+
 enum ToolbarConstants {
     static let tapTargetSize: CGFloat = 38
 }
 
 // MARK: - Tool Type Enum
+
 enum ToolType: String, Codable, CaseIterable {
     case color
     case pen = "pencil" // Raw value preserved for backwards compatibility
     case eraser
-    case highlighter
-    case lasso
 
     var iconName: String {
         switch self {
         case .color: return "paintpalette.fill"
         case .pen: return "pencil"
         case .eraser: return "eraser.fill"
-        case .highlighter: return "highlighter"
-        case .lasso: return "lasso"
         }
     }
 
@@ -32,13 +30,14 @@ enum ToolType: String, Codable, CaseIterable {
 
     var isWritingInstrument: Bool {
         switch self {
-        case .pen, .eraser, .highlighter: return true
+        case .pen, .eraser: return true
         default: return false
         }
     }
 }
 
 // MARK: - Toolbar Icon Model
+
 struct ToolbarIcon: Identifiable, Equatable, Codable {
     let id: UUID
     let type: ToolType
@@ -69,11 +68,11 @@ struct ToolbarIcon: Identifiable, Equatable, Codable {
         return type != .color
     }
 
-    static func colorIcon(_ color: Color, name: String = "Color", colorScheme: ColorScheme) -> ToolbarIcon {
+    static func colorIcon(_ color: Color, name: String = "Color") -> ToolbarIcon {
         ToolbarIcon(
             id: UUID(),
             type: .color,
-            colorData: CodableColor(color: color, colorScheme: colorScheme),
+            colorData: CodableColor(color: color),
             name: name
         )
     }
@@ -82,7 +81,6 @@ struct ToolbarIcon: Identifiable, Equatable, Codable {
         let settings: WritingInstrumentSettings? = switch type {
         case .pen: .pen()
         case .eraser: .eraser()
-        case .highlighter: .highlighter()
         default: nil
         }
         return ToolbarIcon(
@@ -95,6 +93,7 @@ struct ToolbarIcon: Identifiable, Equatable, Codable {
 }
 
 // MARK: - Zone-aware insertion
+
 extension Array where Element == ToolbarIcon {
     mutating func appendToZone(_ icon: ToolbarIcon) {
         if icon.type == .color {

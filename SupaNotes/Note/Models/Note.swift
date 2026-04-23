@@ -10,6 +10,7 @@ final class Note {
     var isDeleted: Bool = false
     var deletedAt: Date?
     var folder: Folder?
+    @Attribute(.externalStorage) var originalPdfData: Data?
     @Relationship(deleteRule: .cascade, inverse: \Page.note) var pages: [Page]
 
     var sortedPages: [Page] {
@@ -17,11 +18,11 @@ final class Note {
     }
 
     init(title: String = "Untitled Note") {
-        self.id = UUID()
+        id = UUID()
         self.title = title
-        self.createdAt = .now
-        self.updatedAt = .now
-        self.pages = [Page(orderIndex: 0)]
+        createdAt = .now
+        updatedAt = .now
+        pages = [Page(orderIndex: 0)]
     }
 
     func moveToTrash() {

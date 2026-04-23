@@ -1,156 +1,179 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct TrashView: View {
     @Environment(\.modelContext) private var modelContext
+
+    /// A list of all notes that have been moved to the trash (isDeleted == true)
     @Query(
         filter: #Predicate<Note> { $0.isDeleted == true },
         sort: \Note.deletedAt,
         order: .reverse
-    ) private var trashedNotes: [Note]
+    ) private var notesCurrentlyInTrash: [Note]
 
-    @State private var isSelectionMode = false
-    @State private var selectedNotes: Set<UUID> = []
-    @State private var showEmptyTrashAlert = false
-    @State private var showDeleteSelectedAlert = false
+    /// Tracks if the user is currently picking multiple notes to delete or restore
+    @State private var userIsCurrentlySelectingNotes = false
+
+    /// A set of note IDs that the user has selected while in selection mode
+    @State private var notesSelectedForAction: Set<UUID> = []
+
+    @State private var showEmptyTrashConfirmationAlert = false
+    @State private var showDeleteSelectedConfirmationAlert = false
 
     var body: some View {
         VStack(spacing: 0) {
-            headerToolbar
+            // The bar at the top with "Select" and "Empty Trash" buttons
+            trashHeaderToolbar
+
             Divider()
 
-            if trashedNotes.isEmpty {
-                ContentUnavailableView(
-                    "Trash is Empty",
-                    systemImage: "trash",
-                    description: Text("Deleted notes will appear here.")
-                )
+            if notesCurrentlyInTrash.isEmpty {
+                emptyTrashPlaceholderView
             } else {
-                List {
-                    ForEach(trashedNotes) { note in
-                        HStack {
-                            NoteRowView(
-                                title: note.title,
-                                subtitle: note.deletedAt.map { "Deleted \($0.formatted(.relative(presentation: .named)))" } ?? ""
-                            )
-                            Spacer()
-
-                            // Selection indicator
-                            if isSelectionMode {
-                                Image(systemName: selectedNotes.contains(note.id)
-                                    ? "checkmark.circle.fill"
-                                    : "circle")
-                                    .foregroundStyle(selectedNotes.contains(note.id)
-                                        ? .blue
-                                        : .secondary)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if isSelectionMode {
-                                toggleSelection(note.id)
-                            }
-                        }
-                        .swipeActions(edge: .trailing) {
-                            if !isSelectionMode {
-                                Button("Delete", role: .destructive) {
-                                    modelContext.delete(note)
-                                }
-                            }
-                        }
-                        .swipeActions(edge: .leading) {
-                            if !isSelectionMode {
-                                Button("Restore") {
-                                    note.restore()
-                                }
-                                .tint(.green)
-                            }
-                        }
-                    }
-                }
-                .listStyle(.plain)
-                .overlay(selectionActionBar, alignment: .bottom)
+                listOfTrashedNotes
             }
         }
-        .alert("Empty Trash?", isPresented: $showEmptyTrashAlert) {
-            Button("Cancel", role: .cancel) { }
+        .alert("Empty Trash?", isPresented: $showEmptyTrashConfirmationAlert) {
+            Button("Cancel", role: .cancel) {}
             Button("Empty Trash", role: .destructive) {
-                emptyTrash()
+                permanentlyDeleteAllNotesInTrash()
             }
         } message: {
-            Text("This will permanently delete all \(trashedNotes.count) " + (trashedNotes.count == 1 ? "note" : "notes") + ". This action cannot be undone.")
+            let noteCount = notesCurrentlyInTrash.count
+            Text("This will permanently delete all \(noteCount) " + (noteCount == 1 ? "note" : "notes") + ". This action cannot be undone.")
         }
-        .alert(selectedNotes.count == 1 ? "Delete 1 note?" : "Delete \(selectedNotes.count) notes?", isPresented: $showDeleteSelectedAlert) {
-            Button("Cancel", role: .cancel) { }
+        .alert(notesSelectedForAction.count == 1 ? "Delete 1 note?" : "Delete \(notesSelectedForAction.count) notes?", isPresented: $showDeleteSelectedConfirmationAlert) {
+            Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
-                deleteSelectedNotes()
+                permanentlyDeleteSelectedNotes()
             }
         } message: {
             Text("This will permanently delete the selected notes. This action cannot be undone.")
         }
     }
 
-    // MARK: - Helper Methods
+    // MARK: - Helper Methods (The "Logic")
 
-    private func emptyTrash() {
-        for note in trashedNotes {
+    /// Deletes every single note that is currently in the trash
+    private func permanentlyDeleteAllNotesInTrash() {
+        for note in notesCurrentlyInTrash {
             modelContext.delete(note)
         }
     }
 
-    private func deleteSelectedNotes() {
-        for note in trashedNotes where selectedNotes.contains(note.id) {
+    /// Deletes only the notes that the user has checked off
+    private func permanentlyDeleteSelectedNotes() {
+        for note in notesCurrentlyInTrash where notesSelectedForAction.contains(note.id) {
             modelContext.delete(note)
         }
-        exitSelectionMode()
+        stopSelectingNotes()
     }
 
-    private func restoreSelectedNotes() {
-        for note in trashedNotes where selectedNotes.contains(note.id) {
+    /// Restores the selected notes back to their original folders
+    private func restoreSelectedNotesToOriginalLocation() {
+        for note in notesCurrentlyInTrash where notesSelectedForAction.contains(note.id) {
             note.restore()
         }
-        exitSelectionMode()
+        stopSelectingNotes()
     }
 
-    private func exitSelectionMode() {
-        selectedNotes.removeAll()
-        isSelectionMode = false
+    /// Turns off selection mode and clears the checkmarks
+    private func stopSelectingNotes() {
+        notesSelectedForAction.removeAll()
+        userIsCurrentlySelectingNotes = false
     }
 
-    private func toggleSelection(_ noteID: UUID) {
-        if selectedNotes.contains(noteID) {
-            selectedNotes.remove(noteID)
+    /// Checks or unchecks a specific note
+    private func toggleCheckmarkForNote(_ noteID: UUID) {
+        if notesSelectedForAction.contains(noteID) {
+            notesSelectedForAction.remove(noteID)
         } else {
-            selectedNotes.insert(noteID)
+            notesSelectedForAction.insert(noteID)
         }
     }
 
-    // MARK: - Views
+    // MARK: - Subviews (The "UI Parts")
 
-    @ViewBuilder
-    private var headerToolbar: some View {
+    private var emptyTrashPlaceholderView: some View {
+        ContentUnavailableView(
+            "Trash is Empty",
+            systemImage: "trash",
+            description: Text("Deleted notes will appear here.")
+        )
+    }
+
+    private var listOfTrashedNotes: some View {
+        List {
+            ForEach(notesCurrentlyInTrash) { note in
+                trashedNoteRow(for: note)
+            }
+        }
+        .listStyle(.plain)
+        .overlay(selectionModeBottomActionBar, alignment: .bottom)
+    }
+
+    private func trashedNoteRow(for note: Note) -> some View {
         HStack {
-            if isSelectionMode {
-                // Selection mode: Cancel | X selected | Done
-                Button("Cancel") {
-                    exitSelectionMode()
+            NoteRowView(
+                title: note.title,
+                subtitle: note.deletedAt.map { "Deleted \($0.formatted(.relative(presentation: .named)))" } ?? ""
+            )
+            Spacer()
+
+            // If we are selecting, show a circle or a checkmark
+            if userIsCurrentlySelectingNotes {
+                selectionIndicatorIcon(isNoteSelected: notesSelectedForAction.contains(note.id))
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if userIsCurrentlySelectingNotes {
+                toggleCheckmarkForNote(note.id)
+            }
+        }
+        .swipeActions(edge: .trailing) {
+            // Only allow swipe-to-delete if we aren't already in bulk selection mode
+            if !userIsCurrentlySelectingNotes {
+                Button("Delete", role: .destructive) {
+                    modelContext.delete(note)
+                }
+            }
+        }
+        .swipeActions(edge: .leading) {
+            if !userIsCurrentlySelectingNotes {
+                Button("Restore") {
+                    note.restore()
+                }
+                .tint(.green)
+            }
+        }
+    }
+
+    private func selectionIndicatorIcon(isNoteSelected: Bool) -> some View {
+        Image(systemName: isNoteSelected ? "checkmark.circle.fill" : "circle")
+            .foregroundStyle(isNoteSelected ? .blue : .secondary)
+    }
+
+    private var trashHeaderToolbar: some View {
+        HStack {
+            if userIsCurrentlySelectingNotes {
+                // When selecting: show "Done" and how many are picked
+                Button("Done") {
+                    stopSelectingNotes()
                 }
                 Spacer()
-                Text("\(selectedNotes.count) selected")
+                Text("\(notesSelectedForAction.count) selected")
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Done") {
-                    exitSelectionMode()
-                }
-            } else if !trashedNotes.isEmpty {
-                // Normal mode: Select | Empty Trash buttons
+            } else if !notesCurrentlyInTrash.isEmpty {
+                // Normally: show "Select" and "Empty Trash" buttons
                 Spacer()
                 Button("Select") {
-                    isSelectionMode = true
+                    userIsCurrentlySelectingNotes = true
                 }
 
                 Button {
-                    showEmptyTrashAlert = true
+                    showEmptyTrashConfirmationAlert = true
                 } label: {
                     Image(systemName: "trash.slash")
                         .font(.system(size: Design.FontSize.toolIcon))
@@ -165,26 +188,26 @@ struct TrashView: View {
     }
 
     @ViewBuilder
-    private var selectionActionBar: some View {
-        if isSelectionMode {
+    private var selectionModeBottomActionBar: some View {
+        if userIsCurrentlySelectingNotes {
             HStack(spacing: 16) {
                 Button {
-                    restoreSelectedNotes()
+                    restoreSelectedNotesToOriginalLocation()
                 } label: {
                     Label("Restore", systemImage: "arrow.uturn.backward")
                 }
-                .disabled(selectedNotes.isEmpty)
+                .disabled(notesSelectedForAction.isEmpty)
 
                 Spacer()
 
                 Button(role: .destructive) {
-                    if !selectedNotes.isEmpty {
-                        showDeleteSelectedAlert = true
+                    if !notesSelectedForAction.isEmpty {
+                        showDeleteSelectedConfirmationAlert = true
                     }
                 } label: {
                     Label("Delete", systemImage: "trash")
                 }
-                .disabled(selectedNotes.isEmpty)
+                .disabled(notesSelectedForAction.isEmpty)
             }
             .padding()
             .background(.ultraThinMaterial)

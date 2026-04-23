@@ -1,6 +1,7 @@
 import SwiftUI
 
 // MARK: - Color Swatch View
+
 struct ColorSwatchView: View {
     let color: Color
     var size: CGFloat = Design.Layout.colorSwatchSize
@@ -25,6 +26,7 @@ struct ColorSwatchView: View {
 }
 
 // MARK: - Floating Button Style
+
 struct FloatingButtonStyle: ViewModifier {
     var size: CGFloat = Design.Layout.floatingButtonSize
     var cornerRadius: CGFloat = Design.CornerRadius.medium
@@ -36,7 +38,7 @@ struct FloatingButtonStyle: ViewModifier {
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .fill(Color("ToolbarBackground"))
-                    .shadow(color: .black.opacity(shadow.color), radius: shadow.radius, x: shadow.x, y: shadow.y)
+                    .shadow(color: .black.opacity(shadow.opacity), radius: shadow.radius, x: shadow.x, y: shadow.y)
             )
     }
 }
@@ -52,6 +54,7 @@ extension View {
 }
 
 // MARK: - Binding Helper for Optional Values
+
 extension Binding where Value == WritingInstrumentSettings? {
     static func ?? (lhs: Binding<WritingInstrumentSettings?>, rhs: Binding<WritingInstrumentSettings>) -> Binding<WritingInstrumentSettings> {
         Binding<WritingInstrumentSettings>(

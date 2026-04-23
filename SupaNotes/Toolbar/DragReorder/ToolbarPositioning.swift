@@ -1,6 +1,7 @@
 import SwiftUI
 
 // MARK: - Edge Snapping & Axis Helpers
+
 struct ToolbarPositioning {
     @AppStorage("toolbarEdge") var toolbarEdge: String = "bottom"
 
@@ -39,6 +40,7 @@ struct ToolbarPositioning {
     }
 
     // MARK: - Repositioning Gesture
+
     static func repositionGesture(
         draggedIconID: UUID?,
         isDraggingToolbar: Binding<Bool>,
@@ -58,26 +60,25 @@ struct ToolbarPositioning {
                 guard isDraggingToolbar.wrappedValue else { return }
                 isDraggingToolbar.wrappedValue = false
                 toolbarDragOffset.wrappedValue = .zero
+
+                // Briefly disable interactions while the toolbar animates
                 DispatchQueue.main.asyncAfter(deadline: .now() + Design.Drag.repositionDelay) {
                     didRepositionToolbar.wrappedValue = false
                 }
 
+                // Determine which edge of the screen is closest to the drag end location
                 let loc = value.location
-                let distTop = loc.y
-                let distBottom = screenSize.height - loc.y
-                let distLeft = loc.x
-                let distRight = screenSize.width - loc.x
-                let minDist = min(distTop, distBottom, distLeft, distRight)
+                let distances: [String: CGFloat] = [
+                    "top": loc.y,
+                    "bottom": screenSize.height - loc.y,
+                    "left": loc.x,
+                    "right": screenSize.width - loc.x,
+                ]
 
-                withAnimation(.spring(response: Design.Animation.springResponse, dampingFraction: Design.Animation.springDamping)) {
-                    if minDist == distTop {
-                        toolbarEdge.wrappedValue = "top"
-                    } else if minDist == distBottom {
-                        toolbarEdge.wrappedValue = "bottom"
-                    } else if minDist == distLeft {
-                        toolbarEdge.wrappedValue = "left"
-                    } else {
-                        toolbarEdge.wrappedValue = "right"
+                // Find the edge with the minimum distance
+                if let closestEdge = distances.min(by: { $0.value < $1.value })?.key {
+                    withAnimation(.spring(response: Design.Animation.springResponse, dampingFraction: Design.Animation.springDamping)) {
+                        toolbarEdge.wrappedValue = closestEdge
                     }
                 }
             }

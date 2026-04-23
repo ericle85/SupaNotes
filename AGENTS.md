@@ -1,0 +1,4 @@
+- Build on ipad air 11-inch M3 simulator
+- Always include inline comments in code which use double slashes (//) for clarity and maintainability
+- Comments should be written where even someone who has never seen the code before can understand what's happening, both at at what is happening currently in the function and on the scale of the overall system
+- App isn't in production yet, so don't worry about breaking changes or backwards compatibility

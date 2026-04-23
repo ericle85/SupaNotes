@@ -3,115 +3,95 @@ import SwiftUI
 struct ToolbarIconButton: View {
     let icon: ToolbarIcon
     @Binding var toolbarIcons: [ToolbarIcon]
-    @Binding var selectedColor: Color
-    @Binding var activeTool: ActiveTool
-    let positioning: ToolbarPositioning
-    let dragState: IconDragState
-    let toolIcons: [ToolbarIcon]
-    let colorIcons: [ToolbarIcon]
+    @Binding var colorSelectedByUser: Color
+    @Binding var currentlyActiveTool: ActiveTool
     var didRepositionToolbar: Bool
-    var lastDeletedColor: Binding<Color>
-    var editingIconID: Binding<UUID?>
+    var iconIDBeingEdited: Binding<UUID?>
 
     @Environment(\.colorScheme) private var colorScheme
 
-    private let slotPitch: CGFloat = ToolbarConstants.tapTargetSize + 2
-
     var body: some View {
-        let isDragged = dragState.draggedIconID == icon.id
         Group {
             if icon.type == .color, let color = icon.color {
+                // Show a colored circle for color choices
                 colorIconView(color: color)
             } else {
+                // Show an icon for tools (Pen, Eraser, etc.)
                 toolIconView()
             }
         }
         .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
         .contentShape(Rectangle())
-        .scaleEffect(isDragged ? (dragState.isDraggingOutOfBounds ? 0.8 : 1.05) : 1.0)
-        .shadow(color: isDragged && !dragState.isDraggingOutOfBounds ? .black.opacity(0.2) : .clear, radius: 4, x: 0, y: 2)
-        .offset(isDragged ? dragState.dragTranslation : positioning.mainAxisOffset(
-            dragState.reorderDisplacement(for: icon, toolIcons: toolIcons, colorIcons: colorIcons, slotPitch: slotPitch)
-        ))
-        .zIndex(isDragged ? 100 : 0)
         .popover(isPresented: Binding(
-            get: { editingIconID.wrappedValue == icon.id },
-            set: { if !$0 { editingIconID.wrappedValue = nil } }
+            get: { iconIDBeingEdited.wrappedValue == icon.id },
+            set: { if !$0 { iconIDBeingEdited.wrappedValue = nil } }
         )) {
+            // This is the little menu that pops up when you tap a tool twice
             popoverContent()
         }
-        .gesture(dragGesture())
+        .onTapGesture {
+            // Don't do anything if the user was just dragging the toolbar
+            guard !didRepositionToolbar else { return }
+            handleIconTap()
+        }
     }
 
-    // MARK: - Color Icon
     private func colorIconView(color: Color) -> some View {
-        let isDrawingTool = activeTool == .pen || activeTool == .highlighter
+        // Show selected state when pen is active since pen uses color.
+        let isDrawingTool = currentlyActiveTool == .pen
         return ColorSwatchView(
             color: color,
-            showCheckmark: isDrawingTool && selectedColor.isSimilar(to: color, colorScheme: colorScheme)
+            showCheckmark: isDrawingTool && colorSelectedByUser.isSimilar(to: color, colorScheme: colorScheme)
         )
     }
 
-    // MARK: - Tool Icon
     private func toolIconView() -> some View {
-        let isActive = activeToolMatches(icon.type)
+        let isThisToolActive = toolFor(icon.type) == currentlyActiveTool
         return Image(systemName: icon.type.iconName)
             .font(.system(size: Design.FontSize.toolIcon))
-            .fontWeight(isActive ? .bold : .regular)
-            .scaleEffect(isActive ? 1.2 : 1.0)
+            .fontWeight(isThisToolActive ? .bold : .regular)
+            .scaleEffect(isThisToolActive ? 1.2 : 1.0)
             .frame(width: Design.Layout.colorSwatchSize, height: Design.Layout.colorSwatchSize)
-            .foregroundStyle(toolForeground(for: icon.type, isActive: isActive))
+            .foregroundStyle(toolForeground(for: icon.type, isActive: isThisToolActive))
     }
 
     private func toolForeground(for type: ToolType, isActive: Bool) -> some ShapeStyle {
         if !isActive { return AnyShapeStyle(.secondary) }
         switch type {
-        case .pen, .highlighter:
-            return AnyShapeStyle(selectedColor)
+        case .pen:
+            // Use the user's selected color for drawing tools
+            return AnyShapeStyle(colorSelectedByUser)
         default:
             return AnyShapeStyle(.primary)
         }
     }
 
-    private func activeToolMatches(_ type: ToolType) -> Bool {
-        switch type {
-        case .pen: return activeTool == .pen
-        case .eraser: return activeTool == .eraser
-        case .highlighter: return activeTool == .highlighter
-        case .lasso: return activeTool == .lasso
-        default: return false
-        }
-    }
-
-    private func activeToolFor(_ type: ToolType) -> ActiveTool {
+    private func toolFor(_ type: ToolType) -> ActiveTool {
         switch type {
         case .pen: return .pen
         case .eraser: return .eraser
-        case .highlighter: return .highlighter
-        case .lasso: return .lasso
         default: return .pen
         }
     }
 
-    // MARK: - Popover Content
     @ViewBuilder
     private func popoverContent() -> some View {
         if icon.type == .color {
             EditColorView(
                 toolbarIcons: $toolbarIcons,
                 icon: icon,
-                selectedColor: $selectedColor
+                colorSelectedByUser: $colorSelectedByUser
             )
         } else if icon.type.isWritingInstrument,
-                  let idx = toolbarIcons.firstIndex(where: { $0.id == icon.id }) {
+                  let index = toolbarIcons.firstIndex(where: { $0.id == icon.id })
+        {
             let range = sliderRange(for: icon.type)
-            let opacity: Double = icon.type == .highlighter ? 0.4 : 1.0
-            let color = icon.type == .eraser ? Color.primary : selectedColor
+            let color = icon.type == .eraser ? Color.primary : colorSelectedByUser
             InstrumentPopoverView(
-                settings: $toolbarIcons[idx].instrumentSettings ?? .constant(.pen()),
+                settings: $toolbarIcons[index].instrumentSettings ?? .constant(.pen()),
                 sliderRange: range,
                 displayColor: color,
-                colorOpacity: opacity
+                colorOpacity: 1.0
             )
         }
     }
@@ -120,120 +100,33 @@ struct ToolbarIconButton: View {
         switch type {
         case .pen: return Design.SliderRange.pen
         case .eraser: return Design.SliderRange.eraser
-        case .highlighter: return Design.SliderRange.highlighter
         default: return Design.SliderRange.pen
         }
     }
 
-    // MARK: - Tap Handler
     private func handleIconTap() {
         switch icon.type {
         case .color:
             if let color = icon.color {
-                if (activeTool == .pen || activeTool == .highlighter) && selectedColor.isSimilar(to: color, colorScheme: colorScheme) {
-                    editingIconID.wrappedValue = icon.id
+                // If this color is already selected, open the editor. Otherwise, select it.
+                if currentlyActiveTool == .pen, colorSelectedByUser.isSimilar(to: color, colorScheme: colorScheme) {
+                    iconIDBeingEdited.wrappedValue = icon.id
                 } else {
-                    selectedColor = color
-                    if activeTool == .eraser || activeTool == .lasso {
-                        activeTool = .pen
+                    colorSelectedByUser = color
+                    // Color picking implies drawing, so move from erase to pen.
+                    if currentlyActiveTool == .eraser {
+                        currentlyActiveTool = .pen
                     }
                 }
             }
-        case .pen, .eraser, .highlighter:
-            let targetTool = activeToolFor(icon.type)
-            if activeTool == targetTool {
-                editingIconID.wrappedValue = icon.id
+        case .pen, .eraser:
+            let targetTool = toolFor(icon.type)
+            // If the tool is already active, open its settings. Otherwise, switch to it.
+            if currentlyActiveTool == targetTool {
+                iconIDBeingEdited.wrappedValue = icon.id
             } else {
-                activeTool = targetTool
+                currentlyActiveTool = targetTool
             }
-        case .lasso:
-            activeTool = .lasso
-        default:
-            break
         }
-    }
-
-    // MARK: - Drag Gesture
-    private func dragGesture() -> some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { value in
-                let translation = value.translation
-                guard abs(translation.width) > Design.Drag.reorderMinDistance || abs(translation.height) > Design.Drag.reorderMinDistance else { return }
-
-                if dragState.draggedIconID != icon.id {
-                    dragState.draggedIconID = icon.id
-                    let isColor = icon.type == .color
-                    dragState.dragZoneIsColor = isColor
-                    let zone = isColor ? colorIcons : toolIcons
-                    let zoneIdx = zone.firstIndex(where: { $0.id == icon.id }) ?? 0
-                    dragState.dragStartZoneIndex = zoneIdx
-                    dragState.proposedZoneIndex = zoneIdx
-                }
-
-                dragState.dragTranslation = translation
-
-                let crossAxis = abs(positioning.crossAxisValue(translation))
-                let canDelete: Bool = {
-                    if !icon.isEssential { return true }
-                    return toolbarIcons.filter { $0.type == icon.type }.count > 1
-                }()
-
-                if crossAxis > Design.Drag.deleteThreshold && !dragState.isDraggingOutOfBounds && canDelete {
-                    dragState.isDraggingOutOfBounds = true
-                    if icon.type == .color, let deletedColor = icon.color {
-                        lastDeletedColor.wrappedValue = deletedColor
-                    }
-                    withAnimation(.spring(response: 0.4, dampingFraction: Design.Animation.springDamping)) {
-                        toolbarIcons.removeAll { $0.id == icon.id }
-                    }
-                    return
-                }
-
-                guard !dragState.isDraggingOutOfBounds,
-                      let startIdx = dragState.dragStartZoneIndex,
-                      let curProposed = dragState.proposedZoneIndex else { return }
-
-                let mainDelta = positioning.mainAxisValue(translation)
-                let proposedSlotHome = CGFloat(curProposed - startIdx) * slotPitch
-                let deltaFromProposed = mainDelta - proposedSlotHome
-                let threshold = slotPitch * 0.5
-
-                var newProposed = curProposed
-                if deltaFromProposed > threshold {
-                    newProposed = curProposed + 1
-                } else if deltaFromProposed < -threshold {
-                    newProposed = curProposed - 1
-                }
-
-                let zone = dragState.dragZoneIsColor ? colorIcons : toolIcons
-                let clamped = max(0, min(newProposed, zone.count - 1))
-
-                if clamped != curProposed {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.86)) {
-                        dragState.proposedZoneIndex = clamped
-                    }
-                }
-            }
-            .onEnded { value in
-                let distance = sqrt(pow(value.translation.width, 2) + pow(value.translation.height, 2))
-                if distance < Design.Drag.tapMaxDistance {
-                    handleIconTap()
-                }
-
-                if let startIdx = dragState.dragStartZoneIndex,
-                   let targetIdx = dragState.proposedZoneIndex,
-                   startIdx != targetIdx {
-                    toolbarIcons.moveIconInZone(id: icon.id, toZoneIndex: targetIdx, isColor: dragState.dragZoneIsColor)
-                    let layoutDelta = CGFloat(startIdx - targetIdx) * slotPitch
-                    if positioning.axis == .vertical {
-                        dragState.dragTranslation.height += layoutDelta
-                    } else {
-                        dragState.dragTranslation.width += layoutDelta
-                    }
-                }
-
-                dragState.reset()
-            }
     }
 }

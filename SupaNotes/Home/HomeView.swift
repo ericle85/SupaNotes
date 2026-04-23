@@ -1,140 +1,213 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 enum NoteSortOrder: String, CaseIterable {
     case name = "Name"
     case lastEdited = "Last Edited"
     case dateCreated = "Date Created"
+
+    /// How to sort Note objects in the database for this order.
+    var noteSort: SortDescriptor<Note> {
+        switch self {
+        case .name: SortDescriptor(\Note.title)
+        case .lastEdited: SortDescriptor(\Note.updatedAt, order: .reverse)
+        case .dateCreated: SortDescriptor(\Note.createdAt, order: .reverse)
+        }
+    }
+
+    /// How to sort Folder objects for this order.
+    /// Folders have no "last edited" date, so that case falls back to creation date.
+    var folderSort: SortDescriptor<Folder> {
+        switch self {
+        case .name: SortDescriptor(\Folder.name)
+        case .lastEdited, .dateCreated: SortDescriptor(\Folder.createdAt, order: .reverse)
+        }
+    }
 }
 
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
-    @State private var isSidebarVisible = true
-    @State private var destination: SidebarDestination = .allNotes
-    @State private var sortOrder: NoteSortOrder = .lastEdited
-    @State private var navigationPath = NavigationPath()
+
+    /// Tracks which section of the app we are currently looking at (e.g. All Notes, Trash, Settings)
+    @State private var currentViewInApp: SidebarDestination = .allNotes
+
+    /// The sorting order for the list of notes
+    @State private var selectedNoteSortOrder: NoteSortOrder = .lastEdited
+
+    /// A stack of note IDs that the user has opened. This allows navigation between views.
+    @State private var noteNavigationStack = NavigationPath()
+
+    /// Manages the state of currently open notes in tabs
+    @State private var openTabsState = TabsState()
 
     var body: some View {
-        NavigationStack(path: $navigationPath) {
-            HStack(spacing: 0) {
-                if isSidebarVisible {
-                    FolderSidebarView(destination: $destination)
-                        .frame(width: Design.Layout.sidebarWidth)
-                        .transition(.move(edge: .leading))
-                }
+        // NavigationStack is the container that allows us to move between different screens
+        NavigationStack(path: $noteNavigationStack) {
+            VStack(spacing: 0) {
+                // The top bar of the app containing the title and actions
+                appTopNavigationBar
 
-                VStack(spacing: 0) {
-                    headerView
-                    Divider()
+                Divider()
 
-                    switch destination {
-                    case .trash:
-                        TrashView()
-                    case .settings:
-                        SettingsView()
-                    case .allNotes:
-                        NoteListView(
-                            folder: nil,
-                            sortOrder: sortOrder,
-                            onOpenNote: { navigationPath.append($0) }
-                        )
-                    case .folder(let folder):
-                        NoteListView(
-                            folder: folder,
-                            sortOrder: sortOrder,
-                            onOpenNote: { navigationPath.append($0) }
-                        )
-                    }
-                }
+                // Display the correct view based on what the user has selected
+                mainContentArea
             }
             .background(Color("PaperBackground"))
             .navigationBarHidden(true)
+            // This tells the app how to show a note when one is selected
             .navigationDestination(for: UUID.self) { noteID in
-                NoteEditorView(noteID: noteID)
+                TabbedEditorRoot(initialID: noteID)
             }
         }
+        .environment(openTabsState)
     }
 
     @ViewBuilder
-    private var headerView: some View {
-        HStack(spacing: 12) {
-            Button {
-                withAnimation(.easeInOut(duration: Design.Animation.sidebarDuration)) {
-                    isSidebarVisible.toggle()
-                }
-            } label: {
-                Image(systemName: "sidebar.left")
-                    .font(.system(size: Design.FontSize.headerIcon))
-                    .foregroundStyle(.primary)
-                    .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
-            }
+    private var mainContentArea: some View {
+        switch currentViewInApp {
+        case .trash:
+            TrashView()
+        case .settings:
+            SettingsView()
+        case .allNotes:
+            NoteListView(
+                folder: nil,
+                sortOrder: selectedNoteSortOrder,
+                onOpenNote: { noteID in noteNavigationStack.append(noteID) },
+                onOpenFolder: { folder in currentViewInApp = .folder(folder) }
+            )
+        case let .folder(folder):
+            NoteListView(
+                folder: folder,
+                sortOrder: selectedNoteSortOrder,
+                onOpenNote: { noteID in noteNavigationStack.append(noteID) },
+                onOpenFolder: { folder in currentViewInApp = .folder(folder) }
+            )
+        }
+    }
 
-            Text(headerTitle)
+    private var appTopNavigationBar: some View {
+        HStack(spacing: 12) {
+            backButtonIfShowingSubView
+
+            Text(titleForCurrentView)
                 .font(.title2)
                 .fontWeight(.semibold)
 
             Spacer()
 
-            if destination.showsNoteActions {
-                Menu {
-                    ForEach(NoteSortOrder.allCases, id: \.self) { order in
-                        Button {
-                            sortOrder = order
-                        } label: {
-                            HStack {
-                                Text(order.rawValue)
-                                if sortOrder == order {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    Image(systemName: "arrow.up.arrow.down")
-                        .font(.system(size: Design.FontSize.toolIcon))
-                        .foregroundStyle(.secondary)
-                        .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
-                }
-
-                Button {
-                    let folder = Folder()
-                    modelContext.insert(folder)
-                } label: {
-                    Image(systemName: "folder.badge.plus")
-                        .font(.system(size: Design.FontSize.toolIcon))
-                        .foregroundStyle(.secondary)
-                        .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
-                }
-
-                Button {
-                    let note = Note()
-                    if let folder = destination.folder {
-                        note.folder = folder
-                    }
-                    modelContext.insert(note)
-                    navigationPath.append(note.id)
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: Design.FontSize.headerIcon, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
-                        .background(
-                            RoundedRectangle(cornerRadius: Design.CornerRadius.small)
-                                .fill(Color.accentColor)
-                        )
-                }
+            // If we are in a note-related view, show buttons to add folders or notes
+            if currentViewInApp.showsNoteActions {
+                noteRelatedActionButtons
             }
         }
         .padding(.horizontal, Design.Spacing.headerHorizontal)
         .padding(.vertical, Design.Spacing.headerVertical)
     }
 
-    private var headerTitle: String {
-        switch destination {
+    @ViewBuilder
+    private var backButtonIfShowingSubView: some View {
+        // If we are not on the main "All Notes" screen, show a way to go back
+        if currentViewInApp != .allNotes {
+            Button {
+                currentViewInApp = .allNotes
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: Design.FontSize.headerIcon))
+                    .foregroundStyle(.primary)
+                    .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var noteRelatedActionButtons: some View {
+        sortOrderMenuButton
+
+        createNewFolderButton
+
+        goToTrashButton
+
+        goToSettingsButton
+
+        createNewNoteButton
+    }
+
+    private var sortOrderMenuButton: some View {
+        Menu {
+            ForEach(NoteSortOrder.allCases, id: \.self) { order in
+                Button {
+                    selectedNoteSortOrder = order
+                } label: {
+                    HStack {
+                        Text(order.rawValue)
+                        if selectedNoteSortOrder == order {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            headerIcon("arrow.up.arrow.down")
+        }
+    }
+
+    private var createNewFolderButton: some View {
+        Button {
+            let newFolder = Folder()
+            modelContext.insert(newFolder)
+        } label: {
+            headerIcon("folder.badge.plus")
+        }
+    }
+
+    private var goToTrashButton: some View {
+        Button { currentViewInApp = .trash } label: {
+            headerIcon("trash")
+        }
+    }
+
+    private var goToSettingsButton: some View {
+        Button { currentViewInApp = .settings } label: {
+            headerIcon("gearshape")
+        }
+    }
+
+    /// Secondary icon sized for the top navigation bar. Only the SF Symbol name varies.
+    private func headerIcon(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(size: Design.FontSize.toolIcon))
+            .foregroundStyle(.secondary)
+            .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
+    }
+
+    private var createNewNoteButton: some View {
+        Button {
+            let newNote = Note()
+            // If we are currently inside a folder, the new note should be put there
+            if let folder = currentViewInApp.folder {
+                newNote.folder = folder
+            }
+            modelContext.insert(newNote)
+            noteNavigationStack.append(newNote.id)
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: Design.FontSize.headerIcon, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
+                .background(
+                    RoundedRectangle(cornerRadius: Design.CornerRadius.small)
+                        .fill(Color.accentColor)
+                )
+        }
+    }
+
+    private var titleForCurrentView: String {
+        switch currentViewInApp {
         case .trash: return "Trash"
         case .settings: return "Settings"
         case .allNotes: return "All Notes"
-        case .folder(let folder): return folder.name
+        case let .folder(folder): return folder.name
         }
     }
 }

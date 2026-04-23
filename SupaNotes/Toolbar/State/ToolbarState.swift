@@ -1,21 +1,51 @@
 import SwiftUI
-import PencilKit
+import UIKit
 
 enum ActiveTool: String, Codable, Equatable {
-    case pen, eraser, highlighter, lasso
+    case pen, eraser
+}
+
+enum ToolbarSection: String, Codable, CaseIterable, Identifiable {
+    case undoRedo, tools, colors
+    var id: String {
+        rawValue
+    }
+
+    var displayName: String {
+        switch self {
+        case .undoRedo: return "Undo / Redo"
+        case .tools: return "Tools"
+        case .colors: return "Colors"
+        }
+    }
 }
 
 @Observable
 final class ToolbarState {
-    var selectedColor: Color = .black
-    var activeTool: ActiveTool = .pen
+    var colorSelectedByUser: Color = .black
+    var currentlyActiveTool: ActiveTool = .pen
     var toolbarIcons: [ToolbarIcon] = []
-    var previousTool: ActiveTool = .eraser
+    var toolUsedPreviously: ActiveTool = .eraser
+    var sectionOrder: [ToolbarSection] = [.undoRedo, .tools, .colors]
+    var showUndoRedo: Bool = true
+    var showCustomization: Bool = false
+    var previewDraggedIconID: UUID?
+    var previewDraggedSection: ToolbarSection?
+
+    /// All toolbar icons that are drawing tools (pen, eraser) — not colors.
+    var toolIcons: [ToolbarIcon] {
+        toolbarIcons.filter { $0.type != .color }
+    }
+
+    /// All toolbar icons that are colors.
+    var colorIcons: [ToolbarIcon] {
+        toolbarIcons.filter { $0.type == .color }
+    }
 
     func switchToPreviousTool() {
-        let oldTool = activeTool
-        activeTool = previousTool
-        previousTool = oldTool
+        let currentTool = currentlyActiveTool
+        currentlyActiveTool = toolUsedPreviously
+        toolUsedPreviously = currentTool
     }
 
     init() {
@@ -23,25 +53,17 @@ final class ToolbarState {
     }
 
     func instrumentWidth(for type: ToolType) -> CGFloat {
-        toolbarIcons.first(where: { $0.type == type })?.instrumentSettings?.width
-            ?? WritingInstrumentSettings.pen().width
+        let matchingIcon = toolbarIcons.first(where: { icon in icon.type == type })
+        return matchingIcon?.instrumentSettings?.width ?? WritingInstrumentSettings.pen().width
     }
 
-    var currentPKTool: PKTool {
-        let scale = PageConstants.renderScale
-        switch activeTool {
-        case .pen:
-            return PKInkingTool(.pen, color: UIColor(selectedColor), width: instrumentWidth(for: .pen) * scale)
-        case .eraser:
-            return PKEraserTool(.bitmap, width: instrumentWidth(for: .eraser) * scale)
-        case .highlighter:
-            return PKInkingTool(.marker, color: UIColor(selectedColor), width: instrumentWidth(for: .highlighter) * scale)
-        case .lasso:
-            return PKLassoTool()
-        }
+    func save() {
+        ToolbarPersistence.save(self)
     }
 
-    func save(colorScheme: ColorScheme) {
-        ToolbarPersistence.save(self, colorScheme: colorScheme)
+    func resetToDefaults() {
+        toolbarIcons = ToolbarPersistence.defaultIcons()
+        sectionOrder = [.undoRedo, .tools, .colors]
+        showUndoRedo = true
     }
 }

@@ -9,9 +9,9 @@ final class Folder {
     @Relationship(deleteRule: .nullify, inverse: \Note.folder) var notes: [Note]
 
     init(name: String = "New Folder") {
-        self.id = UUID()
+        id = UUID()
         self.name = name
-        self.createdAt = .now
-        self.notes = []
+        createdAt = .now
+        notes = []
     }
 }

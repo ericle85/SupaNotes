@@ -18,11 +18,11 @@ extension Color {
     }
 
     func isSimilar(to other: Color, colorScheme: ColorScheme) -> Bool {
-        let c1 = self.resolveRGB(colorScheme: colorScheme)
+        let c1 = resolveRGB(colorScheme: colorScheme)
         let c2 = other.resolveRGB(colorScheme: colorScheme)
         let threshold: CGFloat = 0.02
         return abs(c1.r - c2.r) < threshold &&
-               abs(c1.g - c2.g) < threshold &&
-               abs(c1.b - c2.b) < threshold
+            abs(c1.g - c2.g) < threshold &&
+            abs(c1.b - c2.b) < threshold
     }
 }
