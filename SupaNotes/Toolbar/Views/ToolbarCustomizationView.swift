@@ -9,14 +9,6 @@ struct ToolbarCustomizationView: View {
     @State private var isRearranging = false
     @State private var positioning = ToolbarPositioning()
 
-    private var toolRows: [ToolbarIcon] {
-        toolbar.toolbarIcons.filter { $0.type != .color }
-    }
-
-    private var colorRows: [ToolbarIcon] {
-        toolbar.toolbarIcons.filter { $0.type == .color }
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -152,7 +144,7 @@ struct ToolbarCustomizationView: View {
             Text("Tools").font(.subheadline).foregroundStyle(.secondary)
             if isRearranging {
                 ReorderableList(
-                    items: toolRows,
+                    items: toolbar.toolIcons,
                     isEditing: true,
                     rowHeight: 44,
                     spacing: 6,
@@ -226,7 +218,7 @@ struct ToolbarCustomizationView: View {
                 }
             }
             ReorderableList(
-                items: colorRows,
+                items: toolbar.colorIcons,
                 isEditing: isRearranging,
                 rowHeight: 44,
                 spacing: 6,
@@ -255,17 +247,17 @@ struct ToolbarCustomizationView: View {
             if !isRearranging {
                 Button { removeColor(id: icon.id) } label: {
                     Image(systemName: "trash")
-                        .foregroundStyle(colorRows.count <= 1 ? Color.secondary.opacity(0.4) : Color.red)
+                        .foregroundStyle(toolbar.colorIcons.count <= 1 ? Color.secondary.opacity(0.4) : Color.red)
                 }
                 .buttonStyle(.borderless)
-                .disabled(colorRows.count <= 1)
+                .disabled(toolbar.colorIcons.count <= 1)
             }
         }
         .customizationRow()
     }
 
     private func removeColor(id: UUID) {
-        guard colorRows.count > 1 else { return }
+        guard toolbar.colorIcons.count > 1 else { return }
         var t = Transaction()
         t.disablesAnimations = true
         withTransaction(t) {

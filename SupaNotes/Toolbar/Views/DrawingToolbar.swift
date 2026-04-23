@@ -13,14 +13,6 @@ struct DrawingToolbar: View {
     @State private var isDraggingToolbar = false
     @State private var didRepositionToolbar = false
 
-    private var toolIcons: [ToolbarIcon] {
-        toolbar.toolbarIcons.filter { $0.type != .color }
-    }
-
-    private var colorIcons: [ToolbarIcon] {
-        toolbar.toolbarIcons.filter { $0.type == .color }
-    }
-
     var body: some View {
         GeometryReader { geometry in
             toolbarContent
@@ -80,9 +72,22 @@ struct DrawingToolbar: View {
     private func isSectionVisible(_ section: ToolbarSection) -> Bool {
         switch section {
         case .undoRedo: return toolbar.showUndoRedo
-        case .tools: return !toolIcons.isEmpty
-        case .colors: return !colorIcons.isEmpty
+        case .tools: return !toolbar.toolIcons.isEmpty
+        case .colors: return !toolbar.colorIcons.isEmpty
         }
+    }
+
+    /// A single toolbar icon button, used for both tool and color icons.
+    private func iconButtons(for icon: ToolbarIcon) -> some View {
+        ToolbarIconButton(
+            icon: icon,
+            toolbarIcons: $toolbar.toolbarIcons,
+            colorSelectedByUser: $toolbar.colorSelectedByUser,
+            currentlyActiveTool: $toolbar.currentlyActiveTool,
+            didRepositionToolbar: didRepositionToolbar,
+            iconIDBeingEdited: $editingIconID
+        )
+        .transition(.scale.combined(with: .opacity))
     }
 
     @ViewBuilder
@@ -94,29 +99,9 @@ struct DrawingToolbar: View {
                     .transition(.scale.combined(with: .opacity))
             }
         case .tools:
-            ForEach(toolIcons) { icon in
-                ToolbarIconButton(
-                    icon: icon,
-                    toolbarIcons: $toolbar.toolbarIcons,
-                    colorSelectedByUser: $toolbar.colorSelectedByUser,
-                    currentlyActiveTool: $toolbar.currentlyActiveTool,
-                    didRepositionToolbar: didRepositionToolbar,
-                    iconIDBeingEdited: $editingIconID
-                )
-                .transition(.scale.combined(with: .opacity))
-            }
+            ForEach(toolbar.toolIcons) { iconButtons(for: $0) }
         case .colors:
-            ForEach(colorIcons) { icon in
-                ToolbarIconButton(
-                    icon: icon,
-                    toolbarIcons: $toolbar.toolbarIcons,
-                    colorSelectedByUser: $toolbar.colorSelectedByUser,
-                    currentlyActiveTool: $toolbar.currentlyActiveTool,
-                    didRepositionToolbar: didRepositionToolbar,
-                    iconIDBeingEdited: $editingIconID
-                )
-                .transition(.scale.combined(with: .opacity))
-            }
+            ForEach(toolbar.colorIcons) { iconButtons(for: $0) }
             addColorButton
         }
     }

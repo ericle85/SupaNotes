@@ -4,14 +4,6 @@ struct ToolbarCustomizationPreview: View {
     @Bindable var toolbar: ToolbarState
     @State private var positioning = ToolbarPositioning()
 
-    private var toolIcons: [ToolbarIcon] {
-        toolbar.toolbarIcons.filter { $0.type != .color }
-    }
-
-    private var colorIcons: [ToolbarIcon] {
-        toolbar.toolbarIcons.filter { $0.type == .color }
-    }
-
     @State private var intrinsicSize: CGSize = .zero
 
     var body: some View {
@@ -58,8 +50,8 @@ struct ToolbarCustomizationPreview: View {
     private func iconCount(_ section: ToolbarSection) -> Int {
         switch section {
         case .undoRedo: return 2
-        case .tools: return toolIcons.count
-        case .colors: return colorIcons.count
+        case .tools: return toolbar.toolIcons.count
+        case .colors: return toolbar.colorIcons.count
         }
     }
 
@@ -120,8 +112,8 @@ struct ToolbarCustomizationPreview: View {
     private func sectionHasContent(_ section: ToolbarSection) -> Bool {
         switch section {
         case .undoRedo: return toolbar.showUndoRedo
-        case .tools: return !toolIcons.isEmpty
-        case .colors: return !colorIcons.isEmpty
+        case .tools: return !toolbar.toolIcons.isEmpty
+        case .colors: return !toolbar.colorIcons.isEmpty
         }
     }
 
@@ -133,12 +125,12 @@ struct ToolbarCustomizationPreview: View {
             staticIcon("arrow.uturn.backward").modifier(LiftedModifier(lifted: sectionLifted))
             staticIcon("arrow.uturn.forward").modifier(LiftedModifier(lifted: sectionLifted))
         case .tools:
-            ForEach(toolIcons) { icon in
+            ForEach(toolbar.toolIcons) { icon in
                 cell(icon: icon)
                     .modifier(LiftedModifier(lifted: sectionLifted || toolbar.previewDraggedIconID == icon.id))
             }
         case .colors:
-            ForEach(colorIcons) { icon in
+            ForEach(toolbar.colorIcons) { icon in
                 cell(icon: icon)
                     .modifier(LiftedModifier(lifted: sectionLifted || toolbar.previewDraggedIconID == icon.id))
             }

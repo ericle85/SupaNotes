@@ -32,6 +32,16 @@ final class ToolbarState {
     var previewDraggedIconID: UUID?
     var previewDraggedSection: ToolbarSection?
 
+    /// All toolbar icons that are drawing tools (pen, eraser, highlighter) — not colors.
+    var toolIcons: [ToolbarIcon] {
+        toolbarIcons.filter { $0.type != .color }
+    }
+
+    /// All toolbar icons that are colors.
+    var colorIcons: [ToolbarIcon] {
+        toolbarIcons.filter { $0.type == .color }
+    }
+
     func switchToPreviousTool() {
         let currentTool = currentlyActiveTool
         currentlyActiveTool = toolUsedPreviously
