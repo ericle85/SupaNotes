@@ -34,9 +34,11 @@ struct PenCustomizationView: View {
     // Single stroke preview for the currently selected pen style,
     // updating in real time as tip sharpness and pressure sensitivity change.
     private var strokePreview: some View {
-        Canvas { context, size in
-            let midY = size.height * 0.5
-            let points = Self.syntheticStroke(in: size, midY: midY, amplitude: size.height * 0.25)
+        let penStyle = settings.penStyle
+        let tipSharpness = settings.tipSharpness
+        let pressureSensitivity = settings.pressureSensitivity
+        return Canvas { context, size in
+            let points = Self.syntheticStroke(in: size)
 
             let stroke = ExcalidrawPageStroke(
                 id: UUID(),
@@ -44,41 +46,81 @@ struct PenCustomizationView: View {
                 color: CodableColor(color: .white),
                 width: Self.previewStrokeWidth,
                 points: points,
-                penStyle: settings.penStyle,
-                tipSharpness: settings.tipSharpness,
-                pressureSensitivity: settings.pressureSensitivity
+                penStyle: penStyle,
+                tipSharpness: tipSharpness,
+                pressureSensitivity: pressureSensitivity
             )
 
             context.withCGContext { cgContext in
-                cgContext.setStrokeColor(UIColor.white.cgColor)
-                cgContext.setFillColor(UIColor.white.cgColor)
+                // Push CGContext onto UIGraphics stack so UIBezierPath.stroke()/fill() work.
+                UIGraphicsPushContext(cgContext)
+                defer { UIGraphicsPopContext() }
                 StrokeRenderer.drawStroke(stroke, in: cgContext)
             }
         }
-        .drawingGroup()
         .frame(maxWidth: .infinity)
         .frame(height: 160)
         .background(Color(white: 0.18), in: RoundedRectangle(cornerRadius: 12))
     }
 
-    // Build sample points along a wave with simulated pressure ramp.
-    private static func syntheticStroke(
-        in size: CGSize,
-        midY: CGFloat,
-        amplitude: CGFloat
-    ) -> [ExcalidrawPagePoint] {
-        let count = 30
-        let margin: CGFloat = 24
-        let usableWidth = size.width - margin * 2
-        return (0 ..< count).map { i in
-            let t = CGFloat(i) / CGFloat(count - 1)
-            let x = margin + t * usableWidth
-            // S-curve via sine wave.
-            let y = midY - sin(t * .pi * 2) * amplitude
-            // Pressure ramps up then tapers: peak in the middle.
+    // Euler spiral (Fresnel integrals) from t = -√π to 0, then cos(x) - 1
+    // from x = 0 to 3π/2. Joined at origin with matching tangent (1, 0).
+    private static func syntheticStroke(in size: CGSize) -> [ExcalidrawPagePoint] {
+        var raw: [(x: CGFloat, y: CGFloat)] = []
+
+        // Part 1: Euler spiral entry via Fresnel integrals.
+        let tMax = sqrt(CGFloat.pi)
+        let spiralN = 20
+        for i in 0 ..< spiralN {
+            let t = -tMax + CGFloat(i) / CGFloat(spiralN - 1) * tMax
+            let (c, s) = fresnel(t)
+            raw.append((x: c, y: s))
+        }
+
+        // Part 2: cos(x) - 1 from x = 0 to 3π/2 (starts at (0,0), tangent (1,0)).
+        let cosN = 30
+        let xEnd = 1.5 * CGFloat.pi
+        for i in 1 ... cosN {
+            let x = CGFloat(i) / CGFloat(cosN) * xEnd
+            raw.append((x: x, y: cos(x) - 1))
+        }
+
+        // Scale and center into the preview rect.
+        let xs = raw.map(\.x)
+        let ys = raw.map(\.y)
+        let minX = xs.min()!, maxX = xs.max()!
+        let minY = ys.min()!, maxY = ys.max()!
+        let pad: CGFloat = 24
+        let scale = min((size.width - pad * 2) / max(maxX - minX, 0.001),
+                        (size.height - pad * 2) / max(maxY - minY, 0.001))
+        let cx = size.width * 0.5
+        let cy = size.height * 0.5
+        let midRawX = (minX + maxX) * 0.5
+        let midRawY = (minY + maxY) * 0.5
+        let total = raw.count
+
+        return raw.enumerated().map { i, pt in
+            let x = cx + (pt.x - midRawX) * scale
+            let y = cy + (pt.y - midRawY) * scale
+            // Pressure peaks mid-stroke, tapers at ends.
+            let t = CGFloat(i) / CGFloat(total - 1)
             let pressure = 0.15 + 0.85 * sin(t * .pi)
             return ExcalidrawPagePoint(CGPoint(x: x, y: y), pressure: pressure)
         }
+    }
+
+    // Numerical Fresnel integrals: C(t) = ∫₀ᵗ cos(s²)ds, S(t) = ∫₀ᵗ sin(s²)ds.
+    private static func fresnel(_ t: CGFloat) -> (c: CGFloat, s: CGFloat) {
+        let n = 100
+        let dt = t / CGFloat(n)
+        var c: CGFloat = 0
+        var s: CGFloat = 0
+        for i in 0 ..< n {
+            let u = (CGFloat(i) + 0.5) * dt
+            c += cos(u * u) * dt
+            s += sin(u * u) * dt
+        }
+        return (c, s)
     }
 
     // MARK: - Pen Style Picker
