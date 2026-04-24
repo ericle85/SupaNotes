@@ -1,5 +1,27 @@
 import SwiftUI
 
+// Sidebar navigation items for the customization modal.
+private enum CustomizationPanel: String, CaseIterable, Identifiable {
+    case toolbar
+    case pen
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .toolbar: return "Toolbar"
+        case .pen: return "Pen"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .toolbar: return "slider.horizontal.3"
+        case .pen: return "pencil.tip"
+        }
+    }
+}
+
 struct ToolbarCustomizationView: View {
     @Bindable var toolbar: ToolbarState
     var onDismiss: () -> Void
@@ -8,8 +30,138 @@ struct ToolbarCustomizationView: View {
     @State private var showAddColor = false
     @State private var isRearranging = false
     @State private var positioning = ToolbarPositioning()
+    @State private var selectedPanel: CustomizationPanel = .toolbar
+
+    // Binding into the pen icon's instrument settings for the pen customization panel.
+    private var penSettings: Binding<WritingInstrumentSettings> {
+        Binding(
+            get: {
+                toolbar.toolbarIcons.first(where: { $0.type == .pen })?.instrumentSettings ?? .pen()
+            },
+            set: { newValue in
+                if let index = toolbar.toolbarIcons.firstIndex(where: { $0.type == .pen }) {
+                    toolbar.toolbarIcons[index].instrumentSettings = newValue
+                }
+            }
+        )
+    }
 
     var body: some View {
+        HStack(spacing: 0) {
+            sidebar
+            Divider()
+            panelContent
+        }
+        .frame(width: 720, height: 560)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(UIColor.systemBackground))
+                .shadow(color: .black.opacity(0.2), radius: 20, y: 10)
+        )
+        .sheet(isPresented: $showAddColor) {
+            AddColorView(
+                toolbarIcons: $toolbar.toolbarIcons,
+                selectedColor: $toolbar.colorSelectedByUser,
+                activeTool: $toolbar.currentlyActiveTool,
+                defaultColor: .blue,
+                onBack: { showAddColor = false }
+            )
+            .presentationDetents([.medium])
+        }
+    }
+
+    // MARK: - Sidebar
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // Title area matching header height.
+            Text("Settings")
+                .font(.headline)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+            ForEach(CustomizationPanel.allCases) { panel in
+                // Hide pen panel when pen tool isn't in the toolbar.
+                if panel == .pen, !toolbar.toolbarIcons.contains(where: { $0.type == .pen }) {
+                    EmptyView()
+                } else {
+                    sidebarRow(panel)
+                }
+            }
+            Spacer()
+        }
+        .frame(width: 160)
+        .background(Color.secondary.opacity(0.04))
+    }
+
+    private func sidebarRow(_ panel: CustomizationPanel) -> some View {
+        let isSelected = selectedPanel == panel
+        return Button {
+            withAnimation(.easeInOut(duration: 0.15)) { selectedPanel = panel }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: panel.iconName)
+                    .frame(width: 20)
+                Text(panel.displayName)
+                    .font(.subheadline)
+                Spacer()
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
+            )
+            .foregroundStyle(isSelected ? Color.accentColor : .primary)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 8)
+    }
+
+    // MARK: - Panel Content
+
+    // If pen tool was removed while pen panel is active, fall back to toolbar.
+    private var effectivePanel: CustomizationPanel {
+        if selectedPanel == .pen, !toolbar.toolbarIcons.contains(where: { $0.type == .pen }) {
+            return .toolbar
+        }
+        return selectedPanel
+    }
+
+    private var panelContent: some View {
+        Group {
+            switch effectivePanel {
+            case .toolbar:
+                toolbarContent
+            case .pen:
+                penContent
+            }
+        }
+    }
+
+    // MARK: - Pen Panel
+
+    private var penContent: some View {
+        VStack(spacing: 0) {
+            // Header matching toolbar panel style.
+            HStack {
+                Text("Pen Customization").font(.headline)
+                Spacer()
+                Button(action: { onDismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(16)
+            Divider()
+            PenCustomizationView(settings: penSettings)
+        }
+    }
+
+    // MARK: - Toolbar Panel (existing content)
+
+    private var toolbarContent: some View {
         VStack(spacing: 0) {
             header
             Divider()
@@ -33,22 +185,6 @@ struct ToolbarCustomizationView: View {
                 }
             }
         }
-        .frame(width: 640, height: 560)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color(UIColor.systemBackground))
-                .shadow(color: .black.opacity(0.2), radius: 20, y: 10)
-        )
-        .sheet(isPresented: $showAddColor) {
-            AddColorView(
-                toolbarIcons: $toolbar.toolbarIcons,
-                selectedColor: $toolbar.colorSelectedByUser,
-                activeTool: $toolbar.currentlyActiveTool,
-                defaultColor: .blue,
-                onBack: { showAddColor = false }
-            )
-            .presentationDetents([.medium])
-        }
     }
 
     private var settingsScroll: some View {
@@ -61,6 +197,8 @@ struct ToolbarCustomizationView: View {
                 if !isRearranging { resetButton }
             }
             .padding(20)
+            // Extra bottom space so deleting colors doesn't shrink content below scroll offset
+            .padding(.bottom, 50)
         }
     }
 
