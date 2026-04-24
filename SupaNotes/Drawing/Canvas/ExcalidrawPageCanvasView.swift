@@ -120,7 +120,8 @@ final class ExcalidrawPageCanvasView: UIView {
         /// US Letter in points (8.5 * 72 by 11 * 72).
         static let letterSize = CGSize(width: PageConstants.pageWidth, height: PageConstants.pageHeight)
         /// Minimum and maximum render scales used for vector-quality redraws while zooming.
-        static let renderScaleRange: ClosedRange<CGFloat> = 1 ... 6
+        /// Matches the design zoom max to ensure strokes stay sharp at all supported zoom levels.
+        static let renderScaleRange: ClosedRange<CGFloat> = 1 ... Design.Zoom.max
     }
 
     /// Delegate for interaction callbacks.

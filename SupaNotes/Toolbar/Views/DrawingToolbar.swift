@@ -107,16 +107,15 @@ struct DrawingToolbar: View {
     }
 
     private var addColorButton: some View {
-        Button {
-            guard !didRepositionToolbar else { return }
-            showColorPicker = true
-        } label: {
-            Image(systemName: "plus.circle.dashed")
-                .font(.system(size: Design.Layout.plusButtonSize * 0.75, weight: .regular))
-                .foregroundStyle(.primary)
-                .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
-                .contentShape(Circle())
-        }
+        Image(systemName: "plus.circle.dashed")
+            .font(.system(size: Design.Layout.plusButtonSize * 0.75, weight: .regular))
+            .foregroundStyle(.primary)
+            .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
+            .contentShape(Circle())
+            .onTapGesture {
+                guard !didRepositionToolbar else { return }
+                showColorPicker = true
+            }
         .popover(isPresented: $showColorPicker) {
             AddColorView(
                 toolbarIcons: $toolbar.toolbarIcons,
@@ -129,12 +128,11 @@ struct DrawingToolbar: View {
     }
 
     private var cogButton: some View {
-        Button {
-            guard !didRepositionToolbar else { return }
-            toolbar.showCustomization = true
-        } label: {
-            plusCogLabel(systemName: "gearshape.fill")
-        }
+        plusCogLabel(systemName: "gearshape.fill")
+            .onTapGesture {
+                guard !didRepositionToolbar else { return }
+                toolbar.showCustomization = true
+            }
     }
 
     private func plusCogLabel(systemName: String) -> some View {
