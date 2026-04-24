@@ -113,8 +113,9 @@ struct ToolbarIconButton: View {
                     iconIDBeingEdited.wrappedValue = icon.id
                 } else {
                     colorSelectedByUser = color
-                    // Color picking implies drawing, so move from erase to pen.
-                    if currentlyActiveTool == .eraser {
+                    // Color picking implies drawing, so move from erase to pen — but only if a pen exists.
+                    let hasPen = toolbarIcons.contains { $0.type == .pen }
+                    if currentlyActiveTool == .eraser, hasPen {
                         currentlyActiveTool = .pen
                     }
                 }

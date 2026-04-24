@@ -66,6 +66,8 @@ struct ToolbarCustomizationPreview: View {
                 HStack(spacing: 2) { sectionContent(section) }
                 if idx < visibleSections.count - 1 { dividerView }
             }
+            // Settings cog matches the live toolbar
+            cogIcon
         }
         .padding(Design.Spacing.toolbarPadding)
         .background(barBackground)
@@ -77,6 +79,8 @@ struct ToolbarCustomizationPreview: View {
                 VStack(spacing: 2) { sectionContent(section) }
                 if idx < visibleSections.count - 1 { dividerView }
             }
+            // Settings cog matches the live toolbar
+            cogIcon
         }
         .padding(Design.Spacing.toolbarPadding)
         .background(barBackground)
@@ -142,6 +146,22 @@ struct ToolbarCustomizationPreview: View {
             .font(.system(size: Design.FontSize.toolIcon))
             .foregroundStyle(.secondary)
             .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
+    }
+
+    // Mirrors the gear button shown in the live DrawingToolbar
+    private var cogIcon: some View {
+        ZStack {
+            Circle()
+                .fill(Color.secondary.opacity(0.15))
+                .frame(width: Design.Layout.plusButtonSize, height: Design.Layout.plusButtonSize)
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: Design.FontSize.plusIcon, weight: .bold))
+                .foregroundStyle(.primary)
+        }
+        .overlay {
+            Circle().stroke(Color.primary.opacity(0.3), lineWidth: 1)
+        }
+        .frame(width: ToolbarConstants.tapTargetSize, height: ToolbarConstants.tapTargetSize)
     }
 
     private func cell(icon: ToolbarIcon) -> some View {
