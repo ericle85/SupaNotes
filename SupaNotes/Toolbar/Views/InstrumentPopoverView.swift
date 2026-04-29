@@ -8,6 +8,31 @@ struct InstrumentPopoverView: View {
 
     @State private var selectedPresetIndex: Int?
 
+    // Exponent for power-curve slider: spreads out small sizes, compresses large ones
+    private let curveExponent: CGFloat = 2.5
+
+    // Maps a linear 0…1 slider position to an exponential width value
+    private func widthFromNormalized(_ t: CGFloat) -> CGFloat {
+        let lo = sliderRange.lowerBound
+        let hi = sliderRange.upperBound
+        return lo + (hi - lo) * pow(t, curveExponent)
+    }
+
+    // Inverse: converts a width back to the 0…1 slider position
+    private func normalizedFromWidth(_ w: CGFloat) -> CGFloat {
+        let lo = sliderRange.lowerBound
+        let hi = sliderRange.upperBound
+        return pow((w - lo) / (hi - lo), 1.0 / curveExponent)
+    }
+
+    // Two-way binding that sits between the linear slider and the exponential width
+    private var normalizedWidth: Binding<CGFloat> {
+        Binding(
+            get: { normalizedFromWidth(settings.width) },
+            set: { settings.width = widthFromNormalized($0) }
+        )
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             // Size preview
@@ -19,8 +44,8 @@ struct InstrumentPopoverView: View {
                 )
                 .frame(width: 50, height: 50)
 
-            // Width slider
-            Slider(value: $settings.width, in: sliderRange)
+            // Width slider — normalized 0…1 with power-curve mapping
+            Slider(value: normalizedWidth, in: 0 ... 1)
                 .frame(width: 200)
 
             Text("\(Int(settings.width)) pt")
