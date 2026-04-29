@@ -4,8 +4,9 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 enum NoteSortOrder: String, CaseIterable {
-    case name = "Name"
+    // Order here controls the segmented picker left-to-right
     case lastEdited = "Last Edited"
+    case name = "Name"
     case dateCreated = "Date Created"
 
     /// How to sort Note objects in the database for this order.
@@ -23,6 +24,15 @@ enum NoteSortOrder: String, CaseIterable {
         switch self {
         case .name: SortDescriptor(\Folder.name)
         case .lastEdited, .dateCreated: SortDescriptor(\Folder.createdAt, order: .reverse)
+        }
+    }
+
+    /// Short labels for the segmented picker in the grid filter bar
+    var shortLabel: String {
+        switch self {
+        case .name: "Name"
+        case .lastEdited: "Last Edited"
+        case .dateCreated: "Date Created"
         }
     }
 }
@@ -104,20 +114,65 @@ struct HomeView: View {
             TrashView()
         case .settings:
             SettingsView()
+        case .allNotes, .folder:
+            VStack(spacing: 0) {
+                // Filter bar stays fixed outside the transition
+                sortFilterBar
+
+                noteGridForCurrentView
+            }
+        }
+    }
+
+    /// Segmented sort picker — sits above the grid and stays static during folder transitions
+    private var sortFilterBar: some View {
+        HStack {
+            Spacer()
+            Picker("Sort", selection: $selectedNoteSortOrder) {
+                ForEach(NoteSortOrder.allCases, id: \.self) { order in
+                    Text(order.shortLabel).tag(order)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 280)
+            Spacer()
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 10)
+    }
+
+    /// Builds the correct NoteListView for root or folder
+    @ViewBuilder
+    private var noteGridForCurrentView: some View {
+        switch currentViewInApp {
         case .allNotes:
             NoteListView(
                 folder: nil,
                 sortOrder: selectedNoteSortOrder,
+
                 onOpenNote: { noteID in noteNavigationStack.append(noteID) },
-                onOpenFolder: { folder in currentViewInApp = .folder(folder) }
+                onOpenFolder: { folder in currentViewInApp = .folder(folder) },
+                onCreateNote: { createNewNote() },
+                onCreateFolder: {
+                    let newFolder = Folder()
+                    modelContext.insert(newFolder)
+                },
+                onImportPDF: { isShowingPDFPicker = true },
+                onImportImage: { isShowingPhotoPicker = true }
             )
         case let .folder(folder):
             NoteListView(
                 folder: folder,
                 sortOrder: selectedNoteSortOrder,
+
                 onOpenNote: { noteID in noteNavigationStack.append(noteID) },
-                onOpenFolder: { folder in currentViewInApp = .folder(folder) }
+                onOpenFolder: { folder in currentViewInApp = .folder(folder) },
+                onCreateNote: { createNewNote() },
+                onImportPDF: { isShowingPDFPicker = true },
+                onImportImage: { isShowingPhotoPicker = true }
             )
+        default:
+            EmptyView()
         }
     }
 
@@ -157,32 +212,10 @@ struct HomeView: View {
 
     @ViewBuilder
     private var noteRelatedActionButtons: some View {
-        sortOrderMenuButton
-
+        // Sort picker and create button have moved into the NoteListView grid
         goToTrashButton
 
         goToSettingsButton
-
-        createNewMenu
-    }
-
-    private var sortOrderMenuButton: some View {
-        Menu {
-            ForEach(NoteSortOrder.allCases, id: \.self) { order in
-                Button {
-                    selectedNoteSortOrder = order
-                } label: {
-                    HStack {
-                        Text(order.rawValue)
-                        if selectedNoteSortOrder == order {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-        } label: {
-            headerIcon("arrow.up.arrow.down")
-        }
     }
 
     private var goToTrashButton: some View {
@@ -203,54 +236,6 @@ struct HomeView: View {
             .font(.system(size: Design.FontSize.toolIcon))
             .foregroundStyle(.secondary)
             .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
-    }
-
-    // MARK: - Create New Menu
-
-    private var createNewMenu: some View {
-        Menu {
-            // New blank note.
-            Button {
-                createNewNote()
-            } label: {
-                Label("New Note", systemImage: "doc")
-            }
-
-            // New folder (only at root level).
-            if isShowingFolders {
-                Button {
-                    let newFolder = Folder()
-                    modelContext.insert(newFolder)
-                } label: {
-                    Label("New Folder", systemImage: "folder.badge.plus")
-                }
-            }
-
-            Divider()
-
-            // Import PDF via file picker.
-            Button {
-                isShowingPDFPicker = true
-            } label: {
-                Label("Import PDF", systemImage: "doc.richtext")
-            }
-
-            // Import image via photo picker.
-            Button {
-                isShowingPhotoPicker = true
-            } label: {
-                Label("Import Image", systemImage: "photo")
-            }
-        } label: {
-            Image(systemName: "plus")
-                .font(.system(size: Design.FontSize.headerIcon, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
-                .background(
-                    RoundedRectangle(cornerRadius: Design.CornerRadius.small)
-                        .fill(Color.accentColor)
-                )
-        }
     }
 
     /// Whether the current view shows folders (only at root level).

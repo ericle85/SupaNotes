@@ -1,6 +1,6 @@
 import Foundation
 
-enum SidebarDestination: Equatable {
+enum SidebarDestination: Hashable {
     case allNotes
     case folder(Folder)
     case trash
