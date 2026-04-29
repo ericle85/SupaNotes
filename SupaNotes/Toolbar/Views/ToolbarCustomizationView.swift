@@ -1,23 +1,24 @@
 import SwiftUI
 
 // Sidebar navigation items for the customization modal.
+// Pen panel commented out — ballpoint only, no pen customization.
 private enum CustomizationPanel: String, CaseIterable, Identifiable {
     case toolbar
-    case pen
+    // case pen
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
         case .toolbar: return "Toolbar"
-        case .pen: return "Pen"
+        // case .pen: return "Pen"
         }
     }
 
     var iconName: String {
         switch self {
         case .toolbar: return "slider.horizontal.3"
-        case .pen: return "pencil.tip"
+        // case .pen: return "pencil.tip"
         }
     }
 }
@@ -32,19 +33,8 @@ struct ToolbarCustomizationView: View {
     @State private var positioning = ToolbarPositioning()
     @State private var selectedPanel: CustomizationPanel = .toolbar
 
-    // Binding into the pen icon's instrument settings for the pen customization panel.
-    private var penSettings: Binding<WritingInstrumentSettings> {
-        Binding(
-            get: {
-                toolbar.toolbarIcons.first(where: { $0.type == .pen })?.instrumentSettings ?? .pen()
-            },
-            set: { newValue in
-                if let index = toolbar.toolbarIcons.firstIndex(where: { $0.type == .pen }) {
-                    toolbar.toolbarIcons[index].instrumentSettings = newValue
-                }
-            }
-        )
-    }
+    // Pen settings binding commented out — pen customization panel removed.
+    // private var penSettings: Binding<WritingInstrumentSettings> { ... }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -81,12 +71,7 @@ struct ToolbarCustomizationView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 12)
             ForEach(CustomizationPanel.allCases) { panel in
-                // Hide pen panel when pen tool isn't in the toolbar.
-                if panel == .pen, !toolbar.toolbarIcons.contains(where: { $0.type == .pen }) {
-                    EmptyView()
-                } else {
-                    sidebarRow(panel)
-                }
+                sidebarRow(panel)
             }
             Spacer()
         }
@@ -120,30 +105,20 @@ struct ToolbarCustomizationView: View {
 
     // MARK: - Panel Content
 
-    // If pen tool was removed while pen panel is active, fall back to toolbar.
-    private var effectivePanel: CustomizationPanel {
-        if selectedPanel == .pen, !toolbar.toolbarIcons.contains(where: { $0.type == .pen }) {
-            return .toolbar
-        }
-        return selectedPanel
-    }
-
     private var panelContent: some View {
         Group {
-            switch effectivePanel {
+            switch selectedPanel {
             case .toolbar:
                 toolbarContent
-            case .pen:
-                penContent
+            // case .pen: penContent  — pen customization panel commented out
             }
         }
     }
 
-    // MARK: - Pen Panel
-
+    // MARK: - Pen Panel (commented out — ballpoint only)
+    /*
     private var penContent: some View {
         VStack(spacing: 0) {
-            // Header matching toolbar panel style.
             HStack {
                 Text("Pen Customization").font(.headline)
                 Spacer()
@@ -158,6 +133,7 @@ struct ToolbarCustomizationView: View {
             PenCustomizationView(settings: penSettings)
         }
     }
+    */
 
     // MARK: - Toolbar Panel (existing content)
 

@@ -9,7 +9,7 @@ struct ExcalidrawPageDocument: Codable, Hashable {
     var strokes: [ExcalidrawPageStroke] = []
 }
 
-/// One drawn stroke: tool, color, thickness, pen style metadata, and all points.
+/// One drawn stroke: tool, color, thickness, and all points.
 struct ExcalidrawPageStroke: Identifiable, Codable, Hashable {
     /// Unique identity for this stroke.
     let id: UUID
@@ -20,12 +20,10 @@ struct ExcalidrawPageStroke: Identifiable, Codable, Hashable {
     let width: CGFloat
     /// Strokes are made up of a series of points.
     let points: [ExcalidrawPagePoint]
-    /// Pen style used when drawing (nil for legacy strokes).
-    let penStyle: PenStyle?
-    /// Tip sharpness at time of drawing (nil for legacy strokes).
-    let tipSharpness: CGFloat?
-    /// Pressure sensitivity at time of drawing (nil for legacy strokes).
-    let pressureSensitivity: CGFloat?
+    // Pen customization fields commented out — ballpoint only, no pressure variation.
+    // let penStyle: PenStyle?
+    // let tipSharpness: CGFloat?
+    // let pressureSensitivity: CGFloat?
 }
 
 /// These are the stroke tools we support right now.
@@ -79,7 +77,7 @@ enum ExcalidrawPageCodec {
 
 // MARK: - Tool Style
 
-/// Shared toolbar state (active tool, color, widths, pen settings).
+/// Shared toolbar state (active tool, color, widths).
 struct ExcalidrawToolStyle {
     /// Currently selected drawing tool.
     let selectedTool: ActiveTool
@@ -89,26 +87,19 @@ struct ExcalidrawToolStyle {
     let penWidth: CGFloat
     /// Width for eraser.
     let eraserWidth: CGFloat
-    /// Pen rendering style (fountain, ballpoint, brush).
-    let penStyle: PenStyle
-    /// How thin the stroke tapers at low pressure.
-    let tipSharpness: CGFloat
-    /// How much pencil pressure affects stroke width.
-    let pressureSensitivity: CGFloat
+    // Pen customization fields commented out — ballpoint only.
+    // let penStyle: PenStyle
+    // let tipSharpness: CGFloat
+    // let pressureSensitivity: CGFloat
 
     /// Build this style from the shared toolbar state.
     static func from(toolbar: ToolbarState) -> ExcalidrawToolStyle {
-        // Read pen-specific settings from the pen icon's instrument settings.
-        let penSettings = toolbar.toolbarIcons
-            .first(where: { $0.type == .pen })?.instrumentSettings ?? .pen()
         return ExcalidrawToolStyle(
             selectedTool: toolbar.currentlyActiveTool,
             selectedColor: toolbar.colorSelectedByUser,
             penWidth: toolbar.instrumentWidth(for: .pen),
-            eraserWidth: toolbar.instrumentWidth(for: .eraser),
-            penStyle: penSettings.penStyle,
-            tipSharpness: penSettings.tipSharpness,
-            pressureSensitivity: penSettings.pressureSensitivity
+            eraserWidth: toolbar.instrumentWidth(for: .eraser)
+            // penStyle, tipSharpness, pressureSensitivity commented out
         )
     }
 }
@@ -309,10 +300,8 @@ final class ExcalidrawPageCanvasView: UIView {
             tool: activeStrokeTool,
             color: CodableColor(color: toolStyle.selectedColor),
             width: activeLineWidth,
-            points: activePoints.map { ExcalidrawPagePoint($0.point, pressure: $0.pressure) },
-            penStyle: toolStyle.penStyle,
-            tipSharpness: toolStyle.tipSharpness,
-            pressureSensitivity: toolStyle.pressureSensitivity
+            points: activePoints.map { ExcalidrawPagePoint($0.point, pressure: $0.pressure) }
+            // penStyle, tipSharpness, pressureSensitivity commented out
         )
     }
 
@@ -387,10 +376,8 @@ final class ExcalidrawPageCanvasView: UIView {
                 tool: activeStrokeTool,
                 color: CodableColor(color: toolStyle.selectedColor),
                 width: activeLineWidth,
-                points: activePoints.map { ExcalidrawPagePoint($0.point, pressure: $0.pressure) },
-                penStyle: toolStyle.penStyle,
-                tipSharpness: toolStyle.tipSharpness,
-                pressureSensitivity: toolStyle.pressureSensitivity
+                points: activePoints.map { ExcalidrawPagePoint($0.point, pressure: $0.pressure) }
+                // penStyle, tipSharpness, pressureSensitivity commented out
             )
         )
         registerUndo(previous: previous, current: document, actionName: "Draw Stroke")

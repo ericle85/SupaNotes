@@ -26,7 +26,7 @@ enum StrokeRenderer {
         context.restoreGState()
     }
 
-    /// Draw a single stroke — used by the live canvas for the active preview.
+    /// Draw a single stroke — ballpoint only (uniform width).
     static func drawStroke(
         _ stroke: ExcalidrawPageStroke,
         in context: CGContext
@@ -37,135 +37,40 @@ enum StrokeRenderer {
         context.saveGState()
         let color = UIColor(stroke.color.toColor())
 
-        // Use variable-width rendering only for fountain pen with pressure data.
-        // Ballpoint and legacy strokes use uniform-width rendering (no pressure variation).
-        let hasPressure = points.contains { $0.pressure != nil }
-        if let penStyle = stroke.penStyle, penStyle == .fountain, hasPressure {
-            color.setFill()
-            variableWidthStroke(
-                points,
-                baseWidth: stroke.width,
-                penStyle: penStyle,
-                tipSharpness: stroke.tipSharpness ?? 0.5,
-                pressureSensitivity: stroke.pressureSensitivity ?? 0.5
-            )
-        } else {
-            // Ballpoint and legacy strokes — uniform width, no pressure variation.
-            color.setStroke()
-            uniformStroke(points.map(\.cgPoint), strokeWidth: stroke.width)
-        }
+        // Pen customization (fountain pen pressure-sensitive rendering) commented out.
+        // Always use ballpoint: uniform width, no pressure variation.
+        color.setStroke()
+        uniformStroke(points.map(\.cgPoint), strokeWidth: stroke.width)
 
         context.restoreGState()
     }
 
-    // MARK: - Pressure Width Calculation
-
-    /// Compute stroke width at a single point based on pen style, pressure, and sensitivity.
+    // MARK: - Pen Customization (commented out — fountain pen + pressure-sensitive rendering)
+    /*
     static func widthForPressure(
         _ pressure: CGFloat,
         baseWidth: CGFloat,
         penStyle: PenStyle,
         tipSharpness: CGFloat,
         pressureSensitivity: CGFloat = 0.5
-    ) -> CGFloat {
-        // Blend raw pressure toward 0.5 (neutral) based on sensitivity.
-        // At sensitivity=0, pressure is always 0.5 (uniform width).
-        // At sensitivity=1, raw pressure is used directly.
-        let raw = min(max(pressure, 0), 1)
-        let p = 0.5 + (raw - 0.5) * min(max(pressureSensitivity, 0), 1)
-        let multiplier: CGFloat
-        switch penStyle {
-        case .ballpoint:
-            // Ballpoint uses uniform width — no pressure variation.
-            multiplier = 1.0
-        case .fountain:
-            // Sharp contrast between light and heavy strokes.
-            let minScale = max(0.05, 0.5 - tipSharpness * 0.45)
-            multiplier = minScale + (1.0 - minScale) * pow(p, 1.5)
-        }
-        return baseWidth * multiplier
-    }
+    ) -> CGFloat { ... }
 
-    // MARK: - Variable Width Rendering
+    private static func smoothedPressures(from points: [ExcalidrawPagePoint], radius: Int = 4) -> [CGFloat] { ... }
 
-    /// Draw a pressure-sensitive stroke as a filled polygon ribbon.
     private static func variableWidthStroke(
         _ points: [ExcalidrawPagePoint],
         baseWidth: CGFloat,
         penStyle: PenStyle,
         tipSharpness: CGFloat,
         pressureSensitivity: CGFloat
-    ) {
-        guard !points.isEmpty else { return }
+    ) { ... }
 
-        let cgPoints = points.map(\.cgPoint)
+    private static func unitVector(from a: CGPoint, to b: CGPoint) -> CGPoint { ... }
 
-        // Single dot.
-        if cgPoints.count == 1 {
-            let w = widthForPressure(points[0].pressure ?? 0.5, baseWidth: baseWidth, penStyle: penStyle, tipSharpness: tipSharpness, pressureSensitivity: pressureSensitivity)
-            let dotRect = CGRect(x: cgPoints[0].x - w * 0.5, y: cgPoints[0].y - w * 0.5, width: w, height: w)
-            UIBezierPath(ovalIn: dotRect).fill()
-            return
-        }
+    private static func appendCatmullRom(to path: UIBezierPath, points: [CGPoint], move: Bool) { ... }
+    */
 
-        // Build left and right edge points for the ribbon outline.
-        var leftEdge: [CGPoint] = []
-        var rightEdge: [CGPoint] = []
-
-        for i in 0 ..< cgPoints.count {
-            let pressure = points[i].pressure ?? 0.5
-            let halfWidth = widthForPressure(pressure, baseWidth: baseWidth, penStyle: penStyle, tipSharpness: tipSharpness, pressureSensitivity: pressureSensitivity) * 0.5
-
-            // Compute tangent direction at this point.
-            let tangent: CGPoint
-            if i == 0 {
-                tangent = unitVector(from: cgPoints[0], to: cgPoints[1])
-            } else if i == cgPoints.count - 1 {
-                tangent = unitVector(from: cgPoints[i - 1], to: cgPoints[i])
-            } else {
-                // Average tangent from neighbors for smoother normals.
-                let t1 = unitVector(from: cgPoints[i - 1], to: cgPoints[i])
-                let t2 = unitVector(from: cgPoints[i], to: cgPoints[i + 1])
-                let avg = CGPoint(x: t1.x + t2.x, y: t1.y + t2.y)
-                let len = hypot(avg.x, avg.y)
-                tangent = len > 0.001 ? CGPoint(x: avg.x / len, y: avg.y / len) : t1
-            }
-
-            // Normal is perpendicular to tangent.
-            let normal = CGPoint(x: -tangent.y, y: tangent.x)
-            leftEdge.append(CGPoint(x: cgPoints[i].x + normal.x * halfWidth, y: cgPoints[i].y + normal.y * halfWidth))
-            rightEdge.append(CGPoint(x: cgPoints[i].x - normal.x * halfWidth, y: cgPoints[i].y - normal.y * halfWidth))
-        }
-
-        // Build filled polygon: left edge forward, right edge backward.
-        let path = UIBezierPath()
-        path.move(to: leftEdge[0])
-        for i in 1 ..< leftEdge.count {
-            path.addLine(to: leftEdge[i])
-        }
-        for i in stride(from: rightEdge.count - 1, through: 0, by: -1) {
-            path.addLine(to: rightEdge[i])
-        }
-        path.close()
-        path.fill()
-
-        // Draw round caps at start and end for clean endpoints.
-        let startW = widthForPressure(points[0].pressure ?? 0.5, baseWidth: baseWidth, penStyle: penStyle, tipSharpness: tipSharpness, pressureSensitivity: pressureSensitivity)
-        let endW = widthForPressure(points[points.count - 1].pressure ?? 0.5, baseWidth: baseWidth, penStyle: penStyle, tipSharpness: tipSharpness, pressureSensitivity: pressureSensitivity)
-        UIBezierPath(ovalIn: CGRect(x: cgPoints[0].x - startW * 0.5, y: cgPoints[0].y - startW * 0.5, width: startW, height: startW)).fill()
-        UIBezierPath(ovalIn: CGRect(x: cgPoints.last!.x - endW * 0.5, y: cgPoints.last!.y - endW * 0.5, width: endW, height: endW)).fill()
-    }
-
-    /// Unit vector from one point to another.
-    private static func unitVector(from a: CGPoint, to b: CGPoint) -> CGPoint {
-        let dx = b.x - a.x
-        let dy = b.y - a.y
-        let len = hypot(dx, dy)
-        guard len > 0.001 else { return CGPoint(x: 1, y: 0) }
-        return CGPoint(x: dx / len, y: dy / len)
-    }
-
-    // MARK: - Legacy Uniform Rendering
+    // MARK: - Uniform Rendering
 
     /// Draw one continuous segment using uniform-width cubic Bézier curves.
     private static func uniformStroke(_ points: [CGPoint], strokeWidth: CGFloat) {

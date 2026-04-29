@@ -1,7 +1,9 @@
 import SwiftUI
 
-// Pen settings panel: style picker, tip sharpness slider, pressure sensitivity slider,
-// and a live stroke preview rendered with the current settings.
+// PenCustomizationView commented out — pen customization removed, ballpoint only.
+// Re-enable by uncommenting and restoring PenStyle + related fields in WritingInstrumentSettings,
+// ExcalidrawPageStroke, ExcalidrawToolStyle, and StrokeRenderer.
+/*
 struct PenCustomizationView: View {
     @Binding var settings: WritingInstrumentSettings
 
@@ -9,7 +11,6 @@ struct PenCustomizationView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 strokePreview
-                // Floating island: dropdown + conditional sliders in one card.
                 VStack(alignment: .leading, spacing: 16) {
                     penStylePicker
                     if settings.penStyle == .fountain {
@@ -26,20 +27,14 @@ struct PenCustomizationView: View {
         }
     }
 
-    // MARK: - Stroke Preview
-
-    // Fixed preview width so strokes are always clearly visible regardless of user's pen width.
     private static let previewStrokeWidth: CGFloat = 6
 
-    // Single stroke preview for the currently selected pen style,
-    // updating in real time as tip sharpness and pressure sensitivity change.
     private var strokePreview: some View {
         let penStyle = settings.penStyle
         let tipSharpness = settings.tipSharpness
         let pressureSensitivity = settings.pressureSensitivity
         return Canvas { context, size in
             let points = Self.syntheticStroke(in: size)
-
             let stroke = ExcalidrawPageStroke(
                 id: UUID(),
                 tool: .pen,
@@ -50,9 +45,7 @@ struct PenCustomizationView: View {
                 tipSharpness: tipSharpness,
                 pressureSensitivity: pressureSensitivity
             )
-
             context.withCGContext { cgContext in
-                // Push CGContext onto UIGraphics stack so UIBezierPath.stroke()/fill() work.
                 UIGraphicsPushContext(cgContext)
                 defer { UIGraphicsPopContext() }
                 StrokeRenderer.drawStroke(stroke, in: cgContext)
@@ -63,12 +56,8 @@ struct PenCustomizationView: View {
         .background(Color(white: 0.18), in: RoundedRectangle(cornerRadius: 12))
     }
 
-    // Euler spiral (Fresnel integrals) from t = -√π to 0, then cos(x) - 1
-    // from x = 0 to 3π/2. Joined at origin with matching tangent (1, 0).
     private static func syntheticStroke(in size: CGSize) -> [ExcalidrawPagePoint] {
         var raw: [(x: CGFloat, y: CGFloat)] = []
-
-        // Part 1: Euler spiral entry via Fresnel integrals.
         let tMax = sqrt(CGFloat.pi)
         let spiralN = 20
         for i in 0 ..< spiralN {
@@ -76,16 +65,12 @@ struct PenCustomizationView: View {
             let (c, s) = fresnel(t)
             raw.append((x: c, y: s))
         }
-
-        // Part 2: cos(x) - 1 from x = 0 to 3π/2 (starts at (0,0), tangent (1,0)).
         let cosN = 30
         let xEnd = 1.5 * CGFloat.pi
         for i in 1 ... cosN {
             let x = CGFloat(i) / CGFloat(cosN) * xEnd
             raw.append((x: x, y: cos(x) - 1))
         }
-
-        // Scale and center into the preview rect.
         let xs = raw.map(\.x)
         let ys = raw.map(\.y)
         let minX = xs.min()!, maxX = xs.max()!
@@ -98,18 +83,15 @@ struct PenCustomizationView: View {
         let midRawX = (minX + maxX) * 0.5
         let midRawY = (minY + maxY) * 0.5
         let total = raw.count
-
         return raw.enumerated().map { i, pt in
             let x = cx + (pt.x - midRawX) * scale
             let y = cy + (pt.y - midRawY) * scale
-            // Pressure peaks mid-stroke, tapers at ends.
             let t = CGFloat(i) / CGFloat(total - 1)
             let pressure = 0.15 + 0.85 * sin(t * .pi)
             return ExcalidrawPagePoint(CGPoint(x: x, y: y), pressure: pressure)
         }
     }
 
-    // Numerical Fresnel integrals: C(t) = ∫₀ᵗ cos(s²)ds, S(t) = ∫₀ᵗ sin(s²)ds.
     private static func fresnel(_ t: CGFloat) -> (c: CGFloat, s: CGFloat) {
         let n = 100
         let dt = t / CGFloat(n)
@@ -122,8 +104,6 @@ struct PenCustomizationView: View {
         }
         return (c, s)
     }
-
-    // MARK: - Pen Style Picker
 
     private var penStylePicker: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -141,8 +121,6 @@ struct PenCustomizationView: View {
         }
     }
 
-    // MARK: - Tip Sharpness
-
     private var tipSharpnessSlider: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -158,8 +136,6 @@ struct PenCustomizationView: View {
             Slider(value: $settings.tipSharpness, in: 0 ... 1, step: 0.05)
         }
     }
-
-    // MARK: - Pressure Sensitivity
 
     private var pressureSensitivitySlider: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -177,3 +153,4 @@ struct PenCustomizationView: View {
         }
     }
 }
+*/
