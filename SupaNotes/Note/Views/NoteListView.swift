@@ -23,9 +23,12 @@ struct NoteListView: View {
     /// A function (closure) to call when the user taps on a folder
     var handleOpeningFolder: (Folder) -> Void
 
+    @State private var noteBeingRenamed: Note?
+    @State private var newNameForNote: String = ""
     @State private var folderBeingRenamed: Folder?
     @State private var newNameForFolder: String = ""
     @State private var folderThatIsAboutToBeDeleted: Folder?
+    @FocusState private var isRenamingFieldFocused: Bool
 
     init(
         folder: Folder?,
@@ -118,7 +121,31 @@ struct NoteListView: View {
         )
     }
 
+    @ViewBuilder
     private func noteRow(for note: Note) -> some View {
+        if noteBeingRenamed?.id == note.id {
+            // Inline text field for renaming, same pattern as folder rename
+            noteEditingRow(for: note)
+        } else {
+            noteNormalRow(for: note)
+        }
+    }
+
+    private func noteEditingRow(for note: Note) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "doc")
+                .foregroundStyle(.secondary)
+            TextField("Note name", text: $newNameForNote)
+                .focused($isRenamingFieldFocused)
+                .textFieldStyle(.plain)
+                .onSubmit {
+                    note.title = newNameForNote
+                    noteBeingRenamed = nil
+                }
+        }
+    }
+
+    private func noteNormalRow(for note: Note) -> some View {
         Button {
             handleOpeningNote(note.id)
         } label: {
@@ -132,8 +159,15 @@ struct NoteListView: View {
                 tabs.close(noteID: note.id)
                 note.moveToTrash()
             }
+            Button("Rename") {
+                beginRenamingNote(note)
+            }
+            .tint(.blue)
         }
         .contextMenu {
+            Button("Rename") {
+                beginRenamingNote(note)
+            }
             Button("Move to Trash", role: .destructive) {
                 tabs.close(noteID: note.id)
                 note.moveToTrash()
@@ -155,6 +189,7 @@ struct NoteListView: View {
             Image(systemName: "folder")
                 .foregroundStyle(.secondary)
             TextField("Folder name", text: $newNameForFolder)
+                .focused($isRenamingFieldFocused)
                 .textFieldStyle(.plain)
                 .onSubmit {
                     folder.name = newNameForFolder
@@ -200,9 +235,22 @@ struct NoteListView: View {
         }
     }
 
+    private func beginRenamingNote(_ note: Note) {
+        newNameForNote = note.title
+        noteBeingRenamed = note
+        // Small delay so the TextField is in the view hierarchy before requesting focus
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            isRenamingFieldFocused = true
+        }
+    }
+
     private func beginRenamingFolder(_ folder: Folder) {
         newNameForFolder = folder.name
         folderBeingRenamed = folder
+        // Small delay so the TextField is in the view hierarchy before requesting focus
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            isRenamingFieldFocused = true
+        }
     }
 
     private func countLiveNotesIn(_ folder: Folder) -> Int {
