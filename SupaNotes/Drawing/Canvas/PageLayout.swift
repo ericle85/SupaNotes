@@ -11,7 +11,13 @@ enum PageLayout {
         max(pageW + gap * 2, scrollWidth)
     }
 
-    /// Calculate the frame for a single page at a given index.
+    /// Container width for variable-size pages — uses the widest page.
+    static func containerWidth(pageSizes: [CGSize], gap: CGFloat, scrollWidth: CGFloat) -> CGFloat {
+        let maxWidth = pageSizes.map(\.width).max() ?? PageConstants.pageWidth
+        return containerWidth(pageW: maxWidth, gap: gap, scrollWidth: scrollWidth)
+    }
+
+    /// Calculate the frame for a single page at a given index (uniform size).
     static func pageFrame(index: Int, pageW: CGFloat, pageH: CGFloat, gap: CGFloat, containerWidth: CGFloat) -> CGRect {
         CGRect(
             x: (containerWidth - pageW) / 2, // Center the page horizontally in the container.
@@ -21,12 +27,31 @@ enum PageLayout {
         )
     }
 
-    /// Calculate frames for all pages in the document.
+    /// Calculate frames for all pages in the document (uniform size).
     static func pageFrames(count: Int, pageW: CGFloat, pageH: CGFloat, gap: CGFloat, containerWidth: CGFloat) -> [CGRect] {
         // Generate a frame for each page index.
         (0 ..< count).map {
             pageFrame(index: $0, pageW: pageW, pageH: pageH, gap: gap, containerWidth: containerWidth)
         }
+    }
+
+    /// Calculate frames for variable-size pages, stacking vertically with gaps.
+    static func pageFrames(pageSizes: [CGSize], gap: CGFloat, containerWidth: CGFloat) -> [CGRect] {
+        var frames: [CGRect] = []
+        var y = gap // Start after the top gap.
+        for size in pageSizes {
+            let x = (containerWidth - size.width) / 2 // Center each page horizontally.
+            frames.append(CGRect(x: x, y: y, width: size.width, height: size.height))
+            y += size.height + gap
+        }
+        return frames
+    }
+
+    /// Total container height for variable-size pages.
+    static func containerHeight(pageSizes: [CGSize], gap: CGFloat) -> CGFloat {
+        let totalPageHeight = pageSizes.map(\.height).reduce(0, +)
+        // Top gap + pages + gaps between pages + bottom gap.
+        return gap + totalPageHeight + CGFloat(max(0, pageSizes.count - 1)) * gap + gap
     }
 
     /// Center content when it is smaller than the visible scroll area.

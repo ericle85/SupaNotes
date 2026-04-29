@@ -1,3 +1,4 @@
+import PDFKit
 import SwiftUI
 import UIKit
 
@@ -126,8 +127,6 @@ private final class ExcalidrawUndoBridge: NSObject {
 final class ExcalidrawPageCanvasView: UIView {
     /// Constants for this canvas.
     private enum CanvasMetrics {
-        /// US Letter in points (8.5 * 72 by 11 * 72).
-        static let letterSize = CGSize(width: PageConstants.pageWidth, height: PageConstants.pageHeight)
         /// Minimum and maximum render scales used for vector-quality redraws while zooming.
         /// Matches the design zoom max to ensure strokes stay sharp at all supported zoom levels.
         static let renderScaleRange: ClosedRange<CGFloat> = 1 ... Design.Zoom.max
@@ -156,7 +155,9 @@ final class ExcalidrawPageCanvasView: UIView {
     private var toolStyle: ExcalidrawToolStyle
     /// Low-level drawing surface that filters for pencil input.
     private let drawingView = PencilFilteredDrawingUIView()
-    /// Background image view for PDF templates.
+    /// Vector PDF background that redraws at each zoom level.
+    private let pdfBackgroundView = VectorPDFBackgroundView()
+    /// Raster background for imported images.
     private let backgroundImageView = UIImageView()
     /// Callback for parent to update modified time, etc.
     private var onPageMutated: () -> Void
@@ -203,6 +204,11 @@ final class ExcalidrawPageCanvasView: UIView {
             forZoomScale: self.zoomScale,
             allowedRange: CanvasMetrics.renderScaleRange
         )
+        // Re-render the PDF background at the new zoom so it stays sharp.
+        pdfBackgroundView.updateRenderScale(
+            forZoomScale: self.zoomScale,
+            allowedRange: CanvasMetrics.renderScaleRange
+        )
     }
 
     /// Force a save before export/print.
@@ -215,13 +221,20 @@ final class ExcalidrawPageCanvasView: UIView {
         // Allow content to show outside bounds (for shadow effects).
         clipsToBounds = false
 
-        // Configure background image view for PDF templates.
+        // Vector PDF background — redraws sharply at any zoom level.
+        pdfBackgroundView.contentMode = .redraw
+        pdfBackgroundView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        pdfBackgroundView.frame = bounds
+        addSubview(pdfBackgroundView)
+
+        // Raster background for imported images.
         backgroundImageView.contentMode = .scaleToFill
         backgroundImageView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         backgroundImageView.frame = bounds
         addSubview(backgroundImageView)
 
-        // Configure drawing surface.
+        // Configure drawing surface with the page's coordinate space.
+        drawingView.pageSize = page.size
         drawingView.backgroundColor = .clear
         // Redraw ink whenever geometry changes so vector strokes remain sharp.
         drawingView.contentMode = .redraw
@@ -278,13 +291,23 @@ final class ExcalidrawPageCanvasView: UIView {
     }
 
     private func applyAppearance(for page: Page) {
-        // If page has a PDF template, show it as background.
-        if let image = PDFService.imageForPage(page) {
+        if let note = page.note, let pdfData = note.originalPdfData, let pageNum = page.pdfPageNumber,
+           let doc = PDFDocument(data: pdfData), let pdfPage = doc.page(at: pageNum)
+        {
+            // Vector PDF background — stays sharp at any zoom.
+            pdfBackgroundView.pdfPage = pdfPage
+            pdfBackgroundView.isHidden = false
+            backgroundImageView.isHidden = true
+            backgroundColor = .white
+        } else if let imageData = page.backgroundImageData, let image = UIImage(data: imageData) {
+            // Raster image background.
+            pdfBackgroundView.isHidden = true
             backgroundImageView.image = image
             backgroundImageView.isHidden = false
             backgroundColor = .clear
         } else {
-            // Otherwise use the template's solid color.
+            // Plain template color.
+            pdfBackgroundView.isHidden = true
             backgroundImageView.image = nil
             backgroundImageView.isHidden = true
             backgroundColor = page.template.backgroundColor
@@ -478,13 +501,66 @@ final class ExcalidrawPageCanvasView: UIView {
     }
 }
 
+// MARK: - Vector PDF Background
+
+/// Draws a PDFPage via Core Graphics so it stays sharp at any zoom level.
+private final class VectorPDFBackgroundView: UIView {
+    /// The PDF page to render. Set to nil to clear.
+    var pdfPage: PDFPage? {
+        didSet { setNeedsDisplay() }
+    }
+
+    /// Current effective render scale, tracked to avoid redundant redraws.
+    private var currentRenderScale: CGFloat = 0
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        contentMode = .redraw
+    }
+
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    /// Update pixel density to match zoom, same pattern as PencilFilteredDrawingUIView.
+    func updateRenderScale(
+        forZoomScale zoomScale: CGFloat,
+        allowedRange: ClosedRange<CGFloat>
+    ) {
+        let screenScale = window?.windowScene?.screen.scale ?? traitCollection.displayScale
+        let targetScale = min(max(screenScale * zoomScale, allowedRange.lowerBound), allowedRange.upperBound)
+        guard abs(targetScale - currentRenderScale) > 0.01 else { return }
+        currentRenderScale = targetScale
+        contentScaleFactor = targetScale
+        layer.contentsScale = targetScale
+        setNeedsDisplay()
+    }
+
+    override func draw(_ rect: CGRect) {
+        guard let pdfPage, let ctx = UIGraphicsGetCurrentContext() else { return }
+        let mediaBox = pdfPage.bounds(for: .mediaBox)
+        // White background behind the PDF content.
+        ctx.setFillColor(UIColor.white.cgColor)
+        ctx.fill(rect)
+        ctx.saveGState()
+        // Flip coordinate system and scale PDF to fill the view bounds.
+        ctx.translateBy(x: 0, y: bounds.height)
+        ctx.scaleBy(x: bounds.width / mediaBox.width, y: -bounds.height / mediaBox.height)
+        pdfPage.draw(with: .mediaBox, to: ctx)
+        ctx.restoreGState()
+    }
+}
+
 // MARK: - Pencil-Only Drawing Surface
 
 /// A drawing area that only responds to Apple Pencil, not finger touches.
 /// This connects the drawing display with the pencil touch detection.
 private final class PencilFilteredDrawingUIView: UIView {
     /// The standard paper size (letter) used for storing drawings.
-    private static let letterSize = CGSize(width: PageConstants.pageWidth, height: PageConstants.pageHeight)
+    // The coordinate space for strokes, set from the page's dimensions.
+    var pageSize = CGSize(width: PageConstants.pageWidth, height: PageConstants.pageHeight)
 
     /// All the drawings that have been saved.
     var document = ExcalidrawPageDocument()
@@ -575,13 +651,13 @@ private final class PencilFilteredDrawingUIView: UIView {
     override func draw(_: CGRect) {
         guard let context = UIGraphicsGetCurrentContext() else { return }
 
-        // Draw committed strokes via the shared renderer.
-        StrokeRenderer.drawStrokes(from: document, in: context, rect: bounds)
+        // Draw committed strokes via the shared renderer, using this page's coordinate space.
+        StrokeRenderer.drawStrokes(from: document, in: context, rect: bounds, pageSize: pageSize)
 
         // Draw the in-progress stroke on top (only exists during active touch).
         if let activeStroke {
             context.saveGState()
-            context.scaleBy(x: bounds.width / Self.letterSize.width, y: bounds.height / Self.letterSize.height)
+            context.scaleBy(x: bounds.width / pageSize.width, y: bounds.height / pageSize.height)
             StrokeRenderer.drawStroke(activeStroke, in: context)
             context.restoreGState()
         }
@@ -590,8 +666,8 @@ private final class PencilFilteredDrawingUIView: UIView {
         if let center = eraserCursorCenter {
             context.saveGState()
             // Scale from letter space to screen space.
-            let scaleX = bounds.width / Self.letterSize.width
-            let scaleY = bounds.height / Self.letterSize.height
+            let scaleX = bounds.width / pageSize.width
+            let scaleY = bounds.height / pageSize.height
             let screenCenter = CGPoint(x: center.x * scaleX, y: center.y * scaleY)
             let screenRadius = eraserCursorRadius * scaleX
             // Semi-transparent fill with a visible border.
@@ -670,7 +746,7 @@ private final class PencilFilteredDrawingUIView: UIView {
         let relativeX = bounds.width > 0 ? point.x / bounds.width : 0
         let relativeY = bounds.height > 0 ? point.y / bounds.height : 0
         // Apply that percentage to the standard paper size.
-        return CGPoint(x: relativeX * Self.letterSize.width, y: relativeY * Self.letterSize.height)
+        return CGPoint(x: relativeX * pageSize.width, y: relativeY * pageSize.height)
     }
 
 }

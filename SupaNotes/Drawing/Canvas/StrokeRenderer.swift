@@ -7,18 +7,19 @@ enum StrokeRenderer {
 
     // MARK: - Public
 
-    /// Draw all strokes from a document into a CGContext, scaling from letter
-    /// space (612×792) to the given rect.
+    /// Draw all strokes from a document into a CGContext, scaling from the
+    /// page's coordinate space to the given rect.
     static func drawStrokes(
         from document: ExcalidrawPageDocument,
         in context: CGContext,
-        rect: CGRect
+        rect: CGRect,
+        pageSize: CGSize = CGSize(width: PageConstants.pageWidth, height: PageConstants.pageHeight)
     ) {
         guard !document.strokes.isEmpty else { return }
         context.saveGState()
         context.scaleBy(
-            x: rect.width / PageConstants.pageWidth,
-            y: rect.height / PageConstants.pageHeight
+            x: rect.width / pageSize.width,
+            y: rect.height / pageSize.height
         )
         for stroke in document.strokes {
             drawStroke(stroke, in: context)
@@ -26,7 +27,7 @@ enum StrokeRenderer {
         context.restoreGState()
     }
 
-    /// Draw a single stroke — ballpoint only (uniform width).
+    /// Draw a single stroke with uniform width.
     static func drawStroke(
         _ stroke: ExcalidrawPageStroke,
         in context: CGContext
@@ -36,41 +37,12 @@ enum StrokeRenderer {
 
         context.saveGState()
         let color = UIColor(stroke.color.toColor())
-
-        // Pen customization (fountain pen pressure-sensitive rendering) commented out.
-        // Always use ballpoint: uniform width, no pressure variation.
         color.setStroke()
         uniformStroke(points.map(\.cgPoint), strokeWidth: stroke.width)
-
         context.restoreGState()
     }
 
-    // MARK: - Pen Customization (commented out — fountain pen + pressure-sensitive rendering)
-    /*
-    static func widthForPressure(
-        _ pressure: CGFloat,
-        baseWidth: CGFloat,
-        penStyle: PenStyle,
-        tipSharpness: CGFloat,
-        pressureSensitivity: CGFloat = 0.5
-    ) -> CGFloat { ... }
-
-    private static func smoothedPressures(from points: [ExcalidrawPagePoint], radius: Int = 4) -> [CGFloat] { ... }
-
-    private static func variableWidthStroke(
-        _ points: [ExcalidrawPagePoint],
-        baseWidth: CGFloat,
-        penStyle: PenStyle,
-        tipSharpness: CGFloat,
-        pressureSensitivity: CGFloat
-    ) { ... }
-
-    private static func unitVector(from a: CGPoint, to b: CGPoint) -> CGPoint { ... }
-
-    private static func appendCatmullRom(to path: UIBezierPath, points: [CGPoint], move: Bool) { ... }
-    */
-
-    // MARK: - Uniform Rendering
+    // MARK: - Private
 
     /// Draw one continuous segment using uniform-width cubic Bézier curves.
     private static func uniformStroke(_ points: [CGPoint], strokeWidth: CGFloat) {

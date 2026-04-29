@@ -17,9 +17,9 @@ final class PageLayoutManager {
     var canvasViews: [ExcalidrawPageCanvasView] = []
     var hasCompletedInitialLayout = false // Tracks whether we've done the initial layout pass.
 
-    private let pageWidth = PageConstants.pageWidth // Standard page width.
-    private let pageHeight = PageConstants.pageHeight // Standard page height.
     private let pageGap = PageConstants.pageGap // Gap between pages in the vertical stack.
+    // Cached page sizes from the last rebuild, used for viewport capture/restore.
+    private var cachedPageSizes: [CGSize] = []
 
     /// Rebuild all page views when pages change or need refresh. Page changes include:
     ///     - Adding new pages
@@ -41,12 +41,14 @@ final class PageLayoutManager {
 
         // Sort pages by their display order.
         let sortedPages = pages.sorted { $0.orderIndex < $1.orderIndex }
-        let containerWidth = PageLayout.containerWidth(pageW: pageWidth, gap: pageGap, scrollWidth: scrollView.bounds.width)
-        let totalSize = containerSize(pageCount: sortedPages.count, containerWidth: containerWidth)
-        let pageFrames = PageLayout.pageFrames(
-            count: sortedPages.count, pageW: pageWidth, pageH: pageHeight,
-            gap: pageGap, containerWidth: containerWidth
-        )
+        // Collect per-page sizes for variable layout.
+        let pageSizes = sortedPages.map(\.size)
+        cachedPageSizes = pageSizes
+
+        let containerWidth = PageLayout.containerWidth(pageSizes: pageSizes, gap: pageGap, scrollWidth: scrollView.bounds.width)
+        let totalHeight = PageLayout.containerHeight(pageSizes: pageSizes, gap: pageGap)
+        let totalSize = CGSize(width: containerWidth, height: totalHeight)
+        let pageFrames = PageLayout.pageFrames(pageSizes: pageSizes, gap: pageGap, containerWidth: containerWidth)
 
         // Rebuild canvas views and layout without animation to avoid flicker.
         replaceCanvasViews(
@@ -57,19 +59,9 @@ final class PageLayoutManager {
 
         // Post-rebuild setup: pull indicators, pending scroll, undo manager.
         pullController.setupIndicators(in: scrollView)
-        applyPendingScroll(&pendingScroll, pageCount: sortedPages.count)
+        applyPendingScroll(&pendingScroll, pageFrames: pageFrames)
         centerContainerIfNeeded()
         deliverUndoManager(onUndoManagerReady)
-    }
-
-    // MARK: - rebuildPages Helpers
-
-    /// Total container size needed to hold all pages vertically with gaps.
-    private func containerSize(pageCount: Int, containerWidth: CGFloat) -> CGSize {
-        CGSize(
-            width: containerWidth,
-            height: CGFloat(pageCount) * pageHeight + CGFloat(max(0, pageCount - 1)) * pageGap + pageGap * 2
-        )
     }
 
     /// Tear down old canvas views, create new ones, and apply viewport.
@@ -131,14 +123,11 @@ final class PageLayoutManager {
         scrollView.contentSize = PageLayout.scrollContentSize(containerSize: containerSize, zoomScale: zoomScale)
         centerContainerIfNeeded()
 
-        // Find the frame for the saved page index.
-        let pageFrame = PageLayout.pageFrame(
-            index: viewport.pageIndex,
-            pageW: pageWidth,
-            pageH: pageHeight,
-            gap: pageGap,
-            containerWidth: containerSize.width
-        )
+        // Find the frame for the saved page index using cached sizes.
+        let frames = PageLayout.pageFrames(pageSizes: cachedPageSizes, gap: pageGap, containerWidth: containerSize.width)
+        guard viewport.pageIndex < frames.count else { return }
+        let pageFrame = frames[viewport.pageIndex]
+
         // Convert page-relative anchor to container-relative.
         let anchorInContainer = CGPoint(
             x: pageFrame.minX + viewport.pageAnchor.x,
@@ -186,10 +175,10 @@ final class PageLayoutManager {
             y: (anchorInScrollContent.y - containerView.frame.minY) / zoomScale
         )
 
-        // Calculate frames for all pages.
-        let frames = (0 ..< pages.count).map {
-            PageLayout.pageFrame(index: $0, pageW: pageWidth, pageH: pageHeight, gap: pageGap, containerWidth: containerView.bounds.width)
-        }
+        // Calculate frames for all pages using per-page sizes.
+        let pageSizes = pages.sorted(by: { $0.orderIndex < $1.orderIndex }).map(\.size)
+        let frames = PageLayout.pageFrames(pageSizes: pageSizes, gap: pageGap, containerWidth: containerView.bounds.width)
+
         // Find the page closest to the anchor point.
         let pageIndex = frames.enumerated().min { lhs, rhs in
             distanceToFrame(anchorInContainer, frame: lhs.element) < distanceToFrame(anchorInContainer, frame: rhs.element)
@@ -239,7 +228,7 @@ final class PageLayoutManager {
     }
 
     /// Apply any pending scroll action after page rebuild.
-    private func applyPendingScroll(_ pendingScroll: inout MultipageCanvasContainer.ScrollAfterRebuild, pageCount: Int) {
+    private func applyPendingScroll(_ pendingScroll: inout MultipageCanvasContainer.ScrollAfterRebuild, pageFrames: [CGRect]) {
         guard let scrollView, let containerView else { return }
 
         // Take the pending action and reset it.
@@ -261,9 +250,9 @@ final class PageLayoutManager {
             // Scroll to top of document.
             target = CGPoint(x: preservedX, y: 0)
         case .scrollToLast:
-            // Scroll to bottom of document (last page).
-            let lastPageY = pageGap + CGFloat(pageCount - 1) * (pageHeight + pageGap)
-            let targetY = max(0, (containerView.frame.minY + lastPageY) * scrollView.zoomScale - 20)
+            // Scroll to the last page.
+            guard let lastFrame = pageFrames.last else { return }
+            let targetY = max(0, (containerView.frame.minY + lastFrame.minY) * scrollView.zoomScale - 20)
             let maxY = max(0, scrollView.contentSize.height - scrollView.bounds.height)
             target = CGPoint(x: preservedX, y: min(targetY, maxY))
         }
@@ -293,8 +282,10 @@ final class PageLayoutManager {
         scrollView.contentSize = PageLayout.scrollContentSize(containerSize: totalSize, zoomScale: 1.0)
         centerContainerIfNeeded()
 
-        // Calculate Y position of the target page at zoom 1.0.
-        let y = pageGap + CGFloat(index) * (pageHeight + pageGap)
+        // Calculate Y position of the target page using cached frames.
+        let frames = PageLayout.pageFrames(pageSizes: cachedPageSizes, gap: pageGap, containerWidth: totalSize.width)
+        guard index < frames.count else { return }
+        let y = frames[index].minY
         let maxY = max(0, scrollView.contentSize.height - scrollView.bounds.height)
         let targetY = min(max(0, containerView.frame.minY + y - 20), maxY)
 
@@ -316,12 +307,17 @@ final class PageLayoutManager {
 
     /// Update the current page index based on scroll position.
     func updateCurrentPage(pages: [Page], onCurrentPageChanged: ((Int) -> Void)?) {
-        guard let scrollView, let containerView else { return }
+        guard let scrollView, let containerView, !pages.isEmpty else { return }
 
         // Find the Y coordinate at the center of the visible area (unzoomed).
         let centerY = (scrollView.contentOffset.y + scrollView.bounds.height / 2) / max(scrollView.zoomScale, 0.001) - containerView.frame.minY
-        let pageIndex = max(0, Int((centerY - pageGap) / (pageHeight + pageGap))) // Convert Y coordinate to page index.
 
-        onCurrentPageChanged?(min(pageIndex, max(0, pages.count - 1))) // Clamp to valid page range and notify callback.
+        // Use cached frames to find which page the center Y falls in.
+        let frames = PageLayout.pageFrames(pageSizes: cachedPageSizes, gap: pageGap, containerWidth: containerView.bounds.width)
+        let pageIndex = frames.enumerated().min { lhs, rhs in
+            abs(lhs.element.midY - centerY) < abs(rhs.element.midY - centerY)
+        }?.offset ?? 0
+
+        onCurrentPageChanged?(min(pageIndex, max(0, pages.count - 1)))
     }
 }

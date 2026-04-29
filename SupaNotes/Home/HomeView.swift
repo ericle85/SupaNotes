@@ -1,5 +1,7 @@
+import PhotosUI
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum NoteSortOrder: String, CaseIterable {
     case name = "Name"
@@ -40,6 +42,13 @@ struct HomeView: View {
     /// Manages the state of currently open notes in tabs
     @State private var openTabsState = TabsState()
 
+    /// Whether the PDF file picker is showing.
+    @State private var isShowingPDFPicker = false
+    /// Whether the photo picker is showing.
+    @State private var isShowingPhotoPicker = false
+    /// The selected photo item from the picker.
+    @State private var selectedPhotoItem: PhotosPickerItem?
+
     var body: some View {
         // NavigationStack is the container that allows us to move between different screens
         NavigationStack(path: $noteNavigationStack) {
@@ -60,6 +69,32 @@ struct HomeView: View {
             }
         }
         .environment(openTabsState)
+        // PDF file picker.
+        .fileImporter(
+            isPresented: $isShowingPDFPicker,
+            allowedContentTypes: [UTType.pdf],
+            allowsMultipleSelection: false
+        ) { result in
+            if case let .success(urls) = result, let url = urls.first {
+                // Request access to the security-scoped resource.
+                guard url.startAccessingSecurityScopedResource() else { return }
+                defer { url.stopAccessingSecurityScopedResource() }
+                importPDF(from: url)
+            }
+        }
+        // Photo picker for image import.
+        .photosPicker(isPresented: $isShowingPhotoPicker, selection: $selectedPhotoItem, matching: .images)
+        .onChange(of: selectedPhotoItem) { _, newItem in
+            guard let newItem else { return }
+            Task {
+                if let data = try? await newItem.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data)
+                {
+                    importImage(image)
+                }
+            }
+            selectedPhotoItem = nil
+        }
     }
 
     @ViewBuilder
@@ -124,13 +159,11 @@ struct HomeView: View {
     private var noteRelatedActionButtons: some View {
         sortOrderMenuButton
 
-        createNewFolderButton
-
         goToTrashButton
 
         goToSettingsButton
 
-        createNewNoteButton
+        createNewMenu
     }
 
     private var sortOrderMenuButton: some View {
@@ -149,15 +182,6 @@ struct HomeView: View {
             }
         } label: {
             headerIcon("arrow.up.arrow.down")
-        }
-    }
-
-    private var createNewFolderButton: some View {
-        Button {
-            let newFolder = Folder()
-            modelContext.insert(newFolder)
-        } label: {
-            headerIcon("folder.badge.plus")
         }
     }
 
@@ -181,15 +205,42 @@ struct HomeView: View {
             .frame(width: Design.Layout.headerButtonSize, height: Design.Layout.headerButtonSize)
     }
 
-    private var createNewNoteButton: some View {
-        Button {
-            let newNote = Note()
-            // If we are currently inside a folder, the new note should be put there
-            if let folder = currentViewInApp.folder {
-                newNote.folder = folder
+    // MARK: - Create New Menu
+
+    private var createNewMenu: some View {
+        Menu {
+            // New blank note.
+            Button {
+                createNewNote()
+            } label: {
+                Label("New Note", systemImage: "doc")
             }
-            modelContext.insert(newNote)
-            noteNavigationStack.append(newNote.id)
+
+            // New folder (only at root level).
+            if isShowingFolders {
+                Button {
+                    let newFolder = Folder()
+                    modelContext.insert(newFolder)
+                } label: {
+                    Label("New Folder", systemImage: "folder.badge.plus")
+                }
+            }
+
+            Divider()
+
+            // Import PDF via file picker.
+            Button {
+                isShowingPDFPicker = true
+            } label: {
+                Label("Import PDF", systemImage: "doc.richtext")
+            }
+
+            // Import image via photo picker.
+            Button {
+                isShowingPhotoPicker = true
+            } label: {
+                Label("Import Image", systemImage: "photo")
+            }
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: Design.FontSize.headerIcon, weight: .semibold))
@@ -200,6 +251,46 @@ struct HomeView: View {
                         .fill(Color.accentColor)
                 )
         }
+    }
+
+    /// Whether the current view shows folders (only at root level).
+    private var isShowingFolders: Bool {
+        currentViewInApp == .allNotes
+    }
+
+    // MARK: - Create / Import Helpers
+
+    private func createNewNote() {
+        let newNote = Note()
+        // If we are currently inside a folder, the new note should be put there.
+        if let folder = currentViewInApp.folder {
+            newNote.folder = folder
+        }
+        modelContext.insert(newNote)
+        noteNavigationStack.append(newNote.id)
+    }
+
+    private func importPDF(from url: URL) {
+        let newNote = Note()
+        // Use the file name (without extension) as the note title.
+        newNote.title = url.deletingPathExtension().lastPathComponent
+        if let folder = currentViewInApp.folder {
+            newNote.folder = folder
+        }
+        modelContext.insert(newNote)
+        PDFService.importPDF(url: url, into: newNote, modelContext: modelContext)
+        noteNavigationStack.append(newNote.id)
+    }
+
+    private func importImage(_ image: UIImage) {
+        let newNote = Note()
+        newNote.title = "Imported Image"
+        if let folder = currentViewInApp.folder {
+            newNote.folder = folder
+        }
+        modelContext.insert(newNote)
+        PDFService.importImage(image, into: newNote, modelContext: modelContext)
+        noteNavigationStack.append(newNote.id)
     }
 
     private var titleForCurrentView: String {

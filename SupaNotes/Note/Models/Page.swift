@@ -13,6 +13,17 @@ final class Page {
     var templateRaw: String?
     var isBookmarked: Bool = false
     var note: Note?
+    // Per-page dimensions for imported content (nil = default letter size).
+    var customWidth: Double?
+    var customHeight: Double?
+
+    // The coordinate space for this page's strokes and layout.
+    var size: CGSize {
+        CGSize(
+            width: customWidth ?? Double(PageConstants.pageWidth),
+            height: customHeight ?? Double(PageConstants.pageHeight)
+        )
+    }
 
     var template: PageTemplate {
         get { PageTemplate(rawValue: templateRaw ?? "") ?? .white }

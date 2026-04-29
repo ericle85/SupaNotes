@@ -17,10 +17,10 @@ enum PDFService {
     static func importPDF(data: Data, into note: Note, modelContext: ModelContext) {
         guard let doc = PDFDocument(data: data) else { return }
 
-        // Option 1: Store the original PDF data once
+        // Store the original PDF data once on the note.
         note.originalPdfData = data
 
-        // Remove the default blank page if it's there and empty
+        // Remove the default blank page if it's there and empty.
         if note.pages.count == 1,
            let first = note.pages.first,
            first.drawingData.isEmpty,
@@ -32,10 +32,15 @@ enum PDFService {
 
         let startIndex = note.pages.count
         for i in 0 ..< doc.pageCount {
-            // Create a placeholder page that references the PDF
             let page = Page(orderIndex: startIndex + i, template: .white)
             page.note = note
             page.pdfPageNumber = i
+            // Store the PDF page's native dimensions so the canvas matches.
+            if let pdfPage = doc.page(at: i) {
+                let mediaBox = pdfPage.bounds(for: .mediaBox)
+                page.customWidth = Double(mediaBox.width)
+                page.customHeight = Double(mediaBox.height)
+            }
             modelContext.insert(page)
         }
 
@@ -47,15 +52,47 @@ enum PDFService {
         }
     }
 
+    // MARK: - Image Import
+
+    /// Import an image into a note, creating a single page sized to the image.
+    static func importImage(_ image: UIImage, into note: Note, modelContext: ModelContext) {
+        guard let imageData = image.pngData() ?? image.jpegData(compressionQuality: 0.9) else { return }
+
+        // Remove the default blank page if it's there and empty.
+        if note.pages.count == 1,
+           let first = note.pages.first,
+           first.drawingData.isEmpty,
+           first.backgroundImageData == nil
+        {
+            modelContext.delete(first)
+            note.pages = []
+        }
+
+        let page = Page(orderIndex: note.pages.count, template: .white)
+        page.note = note
+        page.backgroundImageData = imageData
+        // Set page dimensions to match the image's pixel size in points.
+        page.customWidth = Double(image.size.width)
+        page.customHeight = Double(image.size.height)
+        modelContext.insert(page)
+
+        note.updatedAt = .now
+        do {
+            try modelContext.save()
+        } catch {
+            assertionFailure("Failed to save after image import: \(error)")
+        }
+    }
+
     // MARK: - Rendering Helpers
 
     static func imageForPage(_ page: Page) -> UIImage? {
-        // 1. If PDF placeholder, render the PDF page to a bitmap for the UI
+        // 1. If PDF placeholder, render the PDF page to a bitmap for the UI.
         if let note = page.note, let pdfData = note.originalPdfData, let pageNum = page.pdfPageNumber {
             if let doc = PDFDocument(data: pdfData), let pdfPage = doc.page(at: pageNum) {
                 let pageRect = pdfPage.bounds(for: .mediaBox)
-                // Use a standard render scale for UI display
-                let targetSize = CGSize(width: pageSize.width * bgRenderScale, height: pageSize.height * bgRenderScale)
+                // Render at the page's own dimensions scaled for display quality.
+                let targetSize = CGSize(width: page.size.width * bgRenderScale, height: page.size.height * bgRenderScale)
                 let renderer = UIGraphicsImageRenderer(size: targetSize)
                 return renderer.image { ctx in
                     UIColor.white.setFill()
@@ -70,7 +107,7 @@ enum PDFService {
             }
         }
 
-        // 2. Fallback to bitmap
+        // 2. Fallback to bitmap.
         if let data = page.backgroundImageData {
             return UIImage(data: data)
         }
@@ -90,12 +127,15 @@ enum PDFService {
             return originalData
         }
 
-        let bounds = CGRect(origin: .zero, size: pageSize)
-        let renderer = UIGraphicsPDFRenderer(bounds: bounds)
+        // Use the first page's size for the renderer bounds; each page overrides via beginPage.
+        let defaultBounds = CGRect(origin: .zero, size: targetPages[0].size)
+        let renderer = UIGraphicsPDFRenderer(bounds: defaultBounds)
         let data = renderer.pdfData { ctx in
             for page in targetPages {
-                ctx.beginPage()
-                drawPage(page, in: ctx.cgContext, rect: bounds)
+                // Begin each page with its own dimensions.
+                let pageBounds = CGRect(origin: .zero, size: page.size)
+                ctx.beginPage(withBounds: pageBounds, pageInfo: [:])
+                drawPage(page, in: ctx.cgContext, rect: pageBounds)
             }
         }
 
@@ -124,15 +164,16 @@ enum PDFService {
             bg.draw(in: rect)
         }
 
-        // 3. Draw user strokes on top of the background
+        // 3. Draw user strokes on top of the background, using the page's coordinate space.
         let drawing = ExcalidrawPageCodec.decode(data: page.drawingData)
-        StrokeRenderer.drawStrokes(from: drawing, in: ctx, rect: rect)
+        StrokeRenderer.drawStrokes(from: drawing, in: ctx, rect: rect, pageSize: page.size)
     }
 
     // MARK: - Thumbnail
 
     static func thumbnail(for page: Page, width: CGFloat) -> UIImage {
-        let height = width * (pageSize.height / pageSize.width)
+        // Scale height proportionally to the page's actual aspect ratio.
+        let height = width * (page.size.height / page.size.width)
         let size = CGSize(width: width, height: height)
         let renderer = UIGraphicsImageRenderer(size: size)
         return renderer.image { ctx in
