@@ -1,145 +1,96 @@
 import SwiftUI
 import UIKit
 
-/// This is the main container for all pages in a note.
-/// Think of it like a physical notebook — all pages are stacked vertically and you
-/// scroll up/down to move between them. You can also pinch to zoom in or out on the whole notebook.
-///
-/// We use Apple's native UIKit scrolling here instead of SwiftUI because UIKit gives
-/// much smoother zoom and scroll on iPad, which matters a lot for a drawing app.
+/// Main container for all pages in a note — a vertically-scrolling, zoomable UIKit scroll view
+/// bridged into SwiftUI. Apple Pencil draws; fingers scroll and zoom.
 struct MultipageCanvasContainer: UIViewRepresentable {
-    /// The list of pages in this note, in order. Each one will become a drawing surface on screen.
     @Binding var pages: [Page]
-
-    /// The current toolbar settings — which tool is selected, what color, how thick the line is, etc.
-    /// All pages share the same toolbar so switching tools affects every page.
     var toolbar: ToolbarState
-
-    /// Called when the drawing surfaces are ready so the undo/redo buttons
-    /// can be wired up to the correct page.
     var onUndoManagerReady: (UndoManager?) -> Void
-
-    /// Called when the user double-taps the barrel of the Apple Pencil.
-    /// We use this to switch back to whatever tool they were using before (e.g. pen → eraser → pen).
     var onPencilDoubleTap: (() -> Void)?
-
-    /// Called whenever the user scrolls to a different page.
-    /// The parent uses this to update the "Page 2 of 5" counter shown at the bottom.
     var onCurrentPageChanged: ((Int) -> Void)?
-
-    /// Called when the user pulls down past the bottom of the last page and releases.
-    /// Adds a new blank page at the end of the note.
     var addPage: () -> Void
-
-    /// Called when the user pulls up past the top of the first page and releases.
-    /// Adds a new blank page before the first page.
     var addPageAbove: (() -> Void)?
-
-    /// Called whenever the user draws or erases a stroke on any page.
-    /// The parent uses this to mark the note as recently modified.
     var onPageMutated: () -> Void
 
-    /// Sets up the scrollable area and all drawing surfaces the very first time this appears on screen.
     func makeUIView(context: Context) -> UIScrollView {
         let scrollView = UIScrollView()
         scrollView.backgroundColor = UIColor(named: "PaperBackground") ?? UIColor.systemGroupedBackground
         scrollView.showsVerticalScrollIndicator = true
         scrollView.showsHorizontalScrollIndicator = false
-        // Bouncing at the top and bottom makes the pull-to-add-page gesture feel natural,
-        // like pulling a rubber band.
         scrollView.alwaysBounceVertical = true
         scrollView.delegate = context.coordinator
         scrollView.minimumZoomScale = Design.Zoom.min
         scrollView.maximumZoomScale = Design.Zoom.max
-        // Only fingers can scroll or zoom — the Apple Pencil is reserved exclusively for drawing.
-        // Without this, a drawing stroke could accidentally scroll the page.
+        // Only fingers scroll/zoom — Apple Pencil is reserved for drawing.
         scrollView.panGestureRecognizer.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
         scrollView.pinchGestureRecognizer?.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
 
-        // This invisible wrapper holds all the page drawing surfaces.
-        // When the user pinches to zoom, this whole wrapper scales up or down together.
-        // Tag 999 lets other parts of the code find this wrapper by number if needed.
+        // Invisible wrapper that zooms as a unit.
         let containerView = UIView()
         containerView.tag = 999
         scrollView.addSubview(containerView)
 
         let coordinator = context.coordinator
-        coordinator.layoutManager.scrollView = scrollView
-        coordinator.layoutManager.containerView = containerView
+        coordinator.scrollView = scrollView
+        coordinator.containerView = containerView
 
-        // Register to hear Apple Pencil double-tap events (barrel button press).
+        // Apple Pencil barrel double-tap.
         let pencilInteraction = UIPencilInteraction()
         pencilInteraction.delegate = coordinator
         scrollView.addInteraction(pencilInteraction)
 
-        // Create and position all the drawing surfaces for the first time.
-        coordinator.rebuildPages(pages: pages, toolbar: toolbar, viewport: nil, onPageMutated: onPageMutated)
+        coordinator.rebuildPages(pages: pages, toolbar: toolbar, viewport: nil)
         return scrollView
     }
 
-    /// Called automatically whenever something the view depends on changes —
-    /// for example, when a new page is added, or the user picks a new pen color.
     func updateUIView(_ scrollView: UIScrollView, context: Context) {
-        let coordinator = context.coordinator
-        // Make sure the coordinator has the latest versions of all the callbacks and data.
-        coordinator.pages = pages
-        coordinator.toolbar = toolbar
-        coordinator.onPencilDoubleTap = onPencilDoubleTap
-        coordinator.onCurrentPageChanged = onCurrentPageChanged
-        coordinator.addPage = addPage
-        coordinator.addPageAbove = addPageAbove
-        coordinator.onPageMutated = onPageMutated
+        let c = context.coordinator
+        c.pages = pages
+        c.toolbar = toolbar
+        c.onPencilDoubleTap = onPencilDoubleTap
+        c.onCurrentPageChanged = onCurrentPageChanged
+        c.addPage = addPage
+        c.addPageAbove = addPageAbove
+        c.onPageMutated = onPageMutated
 
-        // Tell every drawing surface about the latest tool settings so they all stay in sync.
-        let currentStyle = ExcalidrawToolStyle.from(toolbar: toolbar)
-        coordinator.layoutManager.canvasViews.forEach { $0.updateToolStyle(currentStyle) }
+        // Sync toolbar to every canvas.
+        let style = ExcalidrawToolStyle.from(toolbar: toolbar)
+        c.canvasViews.forEach { $0.updateToolStyle(style) }
 
-        // Check whether we need to tear everything down and rebuild from scratch.
-        // This is needed when a page is added or deleted, or on the very first appearance
-        // when the screen finally tells us how wide it is.
-        let containerWidth = coordinator.layoutManager.containerView?.frame.width ?? 0
-        let needsRebuild = coordinator.layoutManager.canvasViews.count != pages.count
-            || (!coordinator.layoutManager.hasCompletedInitialLayout
-                && scrollView.bounds.width > 0
-                && abs(containerWidth - scrollView.bounds.width) > 1)
+        // Rebuild when page count changes or on first real layout.
+        let containerWidth = c.containerView?.frame.width ?? 0
+        let needsRebuild = c.canvasViews.count != pages.count
+            || (!c.hasCompletedInitialLayout && scrollView.bounds.width > 0 && abs(containerWidth - scrollView.bounds.width) > 1)
 
         if needsRebuild {
-            coordinator.layoutManager.hasCompletedInitialLayout = scrollView.bounds.width > 0
-            // Remember where the user was scrolled to and how far they were zoomed in,
-            // so we can put them back in the same spot after rebuilding.
-            let viewport = coordinator.layoutManager.captureViewportState(pages: pages)
-            coordinator.rebuildPages(pages: pages, toolbar: toolbar, viewport: viewport, onPageMutated: onPageMutated)
+            c.hasCompletedInitialLayout = scrollView.bounds.width > 0
+            let viewport = c.captureViewport()
+            c.rebuildPages(pages: pages, toolbar: toolbar, viewport: viewport)
         }
 
-        // If the pages are narrower than the screen, keep them centered left-to-right.
-        coordinator.layoutManager.centerContainerIfNeeded()
+        c.centerContainerIfNeeded()
     }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
-            pages: pages,
-            toolbar: toolbar,
-            onUndoManagerReady: onUndoManagerReady,
-            onPencilDoubleTap: onPencilDoubleTap,
-            onCurrentPageChanged: onCurrentPageChanged,
-            addPage: addPage,
-            addPageAbove: addPageAbove,
-            onPageMutated: onPageMutated
+            pages: pages, toolbar: toolbar,
+            onUndoManagerReady: onUndoManagerReady, onPencilDoubleTap: onPencilDoubleTap,
+            onCurrentPageChanged: onCurrentPageChanged, addPage: addPage,
+            addPageAbove: addPageAbove, onPageMutated: onPageMutated
         )
     }
 
-    /// After rebuilding the page list, this tells the app which page to jump to.
-    enum ScrollAfterRebuild: Equatable {
-        case none
-        /// Jump to the first page — used when a page is added above the current first page.
-        case scrollToFirst
-        /// Jump to the last page — used when a new page is added at the bottom.
-        case scrollToLast
-    }
+    /// After rebuilding, optionally scroll to first or last page.
+    enum ScrollAfterRebuild: Equatable { case none, scrollToFirst, scrollToLast }
 
-    /// The coordinator is the middleman between the scrollable area (UIKit) and the rest of the app (SwiftUI).
-    /// It listens for scroll, zoom, and pencil events from UIKit and passes the important ones back to SwiftUI.
+    // MARK: - Coordinator
+
+    /// UIKit bridge: owns scroll/zoom delegation, canvas views, pencil interaction, and pull-to-add.
     final class Coordinator: NSObject, UIScrollViewDelegate, UIPencilInteractionDelegate, ExcalidrawPageCanvasInteractionDelegate {
+
+        // MARK: External state (updated each SwiftUI pass)
+
         var pages: [Page]
         var toolbar: ToolbarState
         var onUndoManagerReady: (UndoManager?) -> Void
@@ -149,16 +100,26 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         var addPageAbove: (() -> Void)?
         var onPageMutated: () -> Void
 
-        /// Responsible for measuring and placing each page drawing surface in the right position on screen.
-        let layoutManager = PageLayoutManager()
-        /// Watches how far the user has pulled past the top or bottom edge to trigger adding a new page.
+        // MARK: UIKit refs
+
+        weak var scrollView: UIScrollView?
+        weak var containerView: UIView?
+
+        // MARK: Canvas state
+
+        var canvasViews: [ExcalidrawPageCanvasView] = []
+        var hasCompletedInitialLayout = false
         let pullController = PullToAddController()
-        /// After the pages are rebuilt, jump to first or last page if needed.
         var pendingScroll: ScrollAfterRebuild = .none
 
+        /// Cached page sizes from last rebuild (for viewport math).
+        private var cachedPageSizes: [CGSize] = []
+        private let pageGap = PageConstants.pageGap
+
+        // MARK: Init / deinit
+
         init(
-            pages: [Page],
-            toolbar: ToolbarState,
+            pages: [Page], toolbar: ToolbarState,
             onUndoManagerReady: @escaping (UndoManager?) -> Void,
             onPencilDoubleTap: (() -> Void)?,
             onCurrentPageChanged: ((Int) -> Void)?,
@@ -176,136 +137,211 @@ struct MultipageCanvasContainer: UIViewRepresentable {
             self.onPageMutated = onPageMutated
             super.init()
 
-            // When the user taps a bookmark, the bookmark list sends a message here
-            // telling us which page number to scroll to.
-            NotificationCenter.default.addObserver(
-                forName: .scrollToPage,
-                object: nil,
-                queue: .main
-            ) { [weak self] note in
+            NotificationCenter.default.addObserver(forName: .scrollToPage, object: nil, queue: .main) { [weak self] note in
                 guard let index = note.object as? Int else { return }
-                self?.layoutManager.scrollToPage(index: index)
+                self?.scrollToPage(index: index)
             }
-
-            // Before exporting or printing, the app sends a message here asking us to
-            // make sure all drawn strokes are saved. Without this, the last few strokes
-            // might not appear in the exported PDF.
-            NotificationCenter.default.addObserver(
-                forName: .flushDrawings,
-                object: nil,
-                queue: .main
-            ) { [weak self] _ in
-                self?.flushDrawings()
+            NotificationCenter.default.addObserver(forName: .flushDrawings, object: nil, queue: .main) { [weak self] _ in
+                self?.canvasViews.forEach { $0.flushToModel() }
             }
         }
 
-        deinit {
-            // Unregister all message listeners when this object is destroyed
-            // to avoid receiving messages after it no longer exists.
-            NotificationCenter.default.removeObserver(self)
+        deinit { NotificationCenter.default.removeObserver(self) }
+
+        // MARK: Page rebuild
+
+        func rebuildPages(pages: [Page], toolbar: ToolbarState, viewport: ViewportState?) {
+            guard let containerView, let scrollView else { return }
+
+            let sorted = pages.sorted { $0.orderIndex < $1.orderIndex }
+            let pageSizes = sorted.map(\.size)
+            cachedPageSizes = pageSizes
+
+            let cw = PageLayout.containerWidth(pageSizes: pageSizes, gap: pageGap, scrollWidth: scrollView.bounds.width)
+            let totalHeight = PageLayout.containerHeight(pageSizes: pageSizes, gap: pageGap)
+            let totalSize = CGSize(width: cw, height: totalHeight)
+            let frames = PageLayout.pageFrames(pageSizes: pageSizes, gap: pageGap, containerWidth: cw)
+            let style = ExcalidrawToolStyle.from(toolbar: toolbar)
+
+            UIView.performWithoutAnimation {
+                // Tear down old views.
+                canvasViews.forEach { $0.removeFromSuperview() }
+                canvasViews.removeAll()
+                containerView.bounds.size = totalSize
+
+                // Create new canvas views.
+                canvasViews = frames.enumerated().map { i, frame in
+                    let canvas = ExcalidrawPageCanvasView(
+                        page: sorted[i], frame: frame, toolStyle: style, onPageMutated: onPageMutated
+                    )
+                    canvas.tag = i
+                    canvas.interactionDelegate = self
+                    canvas.layer.shadowColor = UIColor.black.cgColor
+                    canvas.layer.shadowOpacity = Float(Design.Shadow.page.opacity)
+                    canvas.layer.shadowOffset = CGSize(width: Design.Shadow.page.x, height: Design.Shadow.page.y)
+                    canvas.layer.shadowRadius = Design.Shadow.page.radius
+                    containerView.addSubview(canvas)
+                    return canvas
+                }
+
+                canvasViews.forEach { $0.updateZoomScale(scrollView.zoomScale) }
+
+                // Restore viewport or set initial layout.
+                if let viewport {
+                    restoreViewport(viewport, containerSize: totalSize, frames: frames)
+                } else {
+                    scrollView.contentSize = PageLayout.scrollContentSize(containerSize: totalSize, zoomScale: scrollView.zoomScale)
+                    centerContainerIfNeeded()
+                }
+
+                containerView.layoutIfNeeded()
+                scrollView.layoutIfNeeded()
+            }
+
+            pullController.setupIndicators(in: scrollView)
+            applyPendingScroll(frames: frames)
+            centerContainerIfNeeded()
+
+            // Deliver first page's undo manager on next run loop.
+            if let first = canvasViews.first {
+                DispatchQueue.main.async { [weak self] in self?.onUndoManagerReady(first.undoManagerForPage) }
+            }
         }
 
-        /// Destroys all the current drawing surfaces and recreates them from scratch.
-        /// This is needed when the page list changes (e.g. a page is added or deleted).
-        /// The viewport parameter lets us restore the user's scroll position and zoom level afterwards.
-        func rebuildPages(
-            pages: [Page],
-            toolbar: ToolbarState,
-            viewport: PageLayoutManager.ViewportState?,
-            onPageMutated: @escaping () -> Void
-        ) {
-            layoutManager.rebuildPages(
-                pages: pages,
-                toolStyle: ExcalidrawToolStyle.from(toolbar: toolbar),
-                interactionDelegate: self,
-                pullController: pullController,
-                pendingScroll: &pendingScroll,
-                viewport: viewport,
-                onUndoManagerReady: onUndoManagerReady,
-                onPageMutated: onPageMutated
+        // MARK: Viewport
+
+        func captureViewport() -> ViewportState? {
+            guard let scrollView, let containerView, !pages.isEmpty else { return nil }
+            let frames = currentPageFrames()
+            return PageLayout.captureViewport(
+                scrollOffset: scrollView.contentOffset,
+                scrollBoundsSize: scrollView.bounds.size,
+                containerOrigin: containerView.frame.origin,
+                zoomScale: scrollView.zoomScale,
+                pageFrames: frames
             )
         }
 
-        /// Makes sure all drawing surfaces have saved their latest strokes to the note model.
-        /// Called right before exporting or printing so nothing is left out.
-        private func flushDrawings() {
-            layoutManager.canvasViews.forEach { $0.flushToModel() }
+        private func restoreViewport(_ viewport: ViewportState, containerSize: CGSize, frames: [CGRect]) {
+            guard let scrollView, let containerView else { return }
+            let zoom = min(Design.Zoom.max, max(Design.Zoom.min, viewport.zoomScale))
+            scrollView.zoomScale = zoom
+            scrollView.contentSize = PageLayout.scrollContentSize(containerSize: containerSize, zoomScale: zoom)
+            centerContainerIfNeeded()
+            guard let target = PageLayout.viewportRestorationOffset(
+                viewport: viewport, containerOrigin: containerView.frame.origin, pageFrames: frames
+            ) else { return }
+            scrollView.contentOffset = PageLayout.clampedOffset(target, contentSize: scrollView.contentSize, boundsSize: scrollView.bounds.size)
         }
 
-        // MARK: - Scroll and zoom events
+        // MARK: Layout helpers
 
-        /// When the user pinches to zoom, this tells the system to zoom the page container
-        /// (and everything inside it) rather than the scroll view itself.
-        func viewForZooming(in _: UIScrollView) -> UIView? {
-            layoutManager.containerView
+        func centerContainerIfNeeded() {
+            guard let scrollView, let containerView else { return }
+            containerView.frame.origin = PageLayout.centeringOrigin(
+                contentSize: containerView.frame.size, scrollBounds: scrollView.bounds.size
+            )
         }
+
+        private func currentPageFrames() -> [CGRect] {
+            let cw = containerView?.bounds.width ?? 0
+            return PageLayout.pageFrames(pageSizes: cachedPageSizes, gap: pageGap, containerWidth: cw)
+        }
+
+        private func visibleCanvasViews() -> [ExcalidrawPageCanvasView] {
+            guard let scrollView, let containerView else { return canvasViews }
+            let visibleRect = scrollView.convert(scrollView.bounds, to: containerView)
+            return canvasViews.filter { $0.frame.intersects(visibleRect) }
+        }
+
+        private func updateCurrentPage() {
+            guard let scrollView, let containerView, !pages.isEmpty else { return }
+            let centerY = (scrollView.contentOffset.y + scrollView.bounds.height / 2)
+                / max(scrollView.zoomScale, 0.001) - containerView.frame.minY
+            let index = PageLayout.currentPageIndex(centerY: centerY, pageFrames: currentPageFrames())
+            onCurrentPageChanged?(min(index, max(0, pages.count - 1)))
+        }
+
+        // MARK: Scroll-to-page
+
+        private func scrollToPage(index: Int) {
+            guard let scrollView, let containerView, canvasViews.indices.contains(index) else { return }
+            scrollView.zoomScale = 1.0
+            scrollView.contentSize = PageLayout.scrollContentSize(containerSize: containerView.bounds.size, zoomScale: 1.0)
+            centerContainerIfNeeded()
+            let frames = currentPageFrames()
+            guard index < frames.count else { return }
+            let maxY = max(0, scrollView.contentSize.height - scrollView.bounds.height)
+            let targetY = min(max(0, containerView.frame.minY + frames[index].minY - 20), maxY)
+            UIView.animate(withDuration: 0.3) {
+                scrollView.contentOffset = CGPoint(x: 0, y: targetY)
+            } completion: { [weak self] _ in
+                self?.visibleCanvasViews().forEach { $0.updateZoomScale(1.0) }
+            }
+        }
+
+        private func applyPendingScroll(frames: [CGRect]) {
+            guard let scrollView, let containerView else { return }
+            let action = pendingScroll
+            pendingScroll = .none
+            guard action != .none else { return }
+
+            let preservedX = min(max(0, scrollView.contentOffset.x), max(0, scrollView.contentSize.width - scrollView.bounds.width))
+            let target: CGPoint
+            switch action {
+            case .none: return
+            case .scrollToFirst:
+                target = CGPoint(x: preservedX, y: 0)
+            case .scrollToLast:
+                guard let last = frames.last else { return }
+                let maxY = max(0, scrollView.contentSize.height - scrollView.bounds.height)
+                target = CGPoint(x: preservedX, y: min(max(0, containerView.frame.minY + last.minY * scrollView.zoomScale - 20), maxY))
+            }
+            UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut) { scrollView.contentOffset = target }
+        }
+
+        // MARK: UIScrollViewDelegate
+
+        func viewForZooming(in _: UIScrollView) -> UIView? { containerView }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
-            // As the user scrolls, figure out which page is in the center of the screen
-            // and update the page counter badge at the bottom.
-            layoutManager.updateCurrentPage(pages: pages, onCurrentPageChanged: onCurrentPageChanged)
-            // Also let the pull-to-add indicator react to how far the user has pulled.
+            updateCurrentPage()
             pullController.update(for: scrollView)
         }
 
         func scrollViewDidZoom(_: UIScrollView) {
-            // After zooming, make sure the pages are still centered left-to-right on screen.
-            layoutManager.centerContainerIfNeeded()
-            layoutManager.updateCurrentPage(pages: pages, onCurrentPageChanged: onCurrentPageChanged)
+            centerContainerIfNeeded()
+            updateCurrentPage()
         }
 
         func scrollViewDidEndZooming(_: UIScrollView, with _: UIView?, atScale scale: CGFloat) {
-            // Once pinch zoom finishes, redraw only visible pages at the final zoom scale.
-            // Off-screen pages keep their cached bitmap until scrolled into view.
-            layoutManager.visibleCanvasViews().forEach { $0.updateZoomScale(scale) }
+            visibleCanvasViews().forEach { $0.updateZoomScale(scale) }
         }
 
         func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-            // The user just lifted their finger. Check if they pulled far enough
-            // to trigger adding a new page at the top or bottom.
             let scroll = pullController.handleEndDragging(addPage: addPage, addPageAbove: addPageAbove)
-            if scroll != .none {
-                pendingScroll = scroll
-            }
-            // If scroll stopped immediately (no momentum), update newly-visible pages.
-            if !decelerate {
-                updateVisiblePagesRenderScale(scrollView)
-            }
+            if scroll != .none { pendingScroll = scroll }
+            if !decelerate { visibleCanvasViews().forEach { $0.updateZoomScale(scrollView.zoomScale) } }
         }
 
         func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
-            // Momentum scroll finished — update any newly-visible pages' render scale.
-            updateVisiblePagesRenderScale(scrollView)
+            visibleCanvasViews().forEach { $0.updateZoomScale(scrollView.zoomScale) }
         }
 
-        /// Update render scale on pages that scrolled into view since the last zoom.
-        private func updateVisiblePagesRenderScale(_ scrollView: UIScrollView) {
-            let scale = scrollView.zoomScale
-            layoutManager.visibleCanvasViews().forEach { $0.updateZoomScale(scale) }
-        }
-
-        // MARK: - Drawing surface events
+        // MARK: Canvas interaction
 
         func pageCanvasViewDidBeginUsingTool(_ view: ExcalidrawPageCanvasView) {
-            // The user started drawing on a page. Disable scrolling so the drawing stroke
-            // doesn't accidentally move the page instead of leaving ink.
-            layoutManager.scrollView?.isScrollEnabled = false
-            // Point the undo/redo buttons at the page currently being drawn on.
+            scrollView?.isScrollEnabled = false
             onUndoManagerReady(view.undoManagerForPage)
         }
 
         func pageCanvasViewDidEndUsingTool(_: ExcalidrawPageCanvasView) {
-            // The user lifted the Pencil. Re-enable scrolling so they can navigate again.
-            layoutManager.scrollView?.isScrollEnabled = true
+            scrollView?.isScrollEnabled = true
         }
 
-        // MARK: - Apple Pencil events
+        // MARK: Pencil
 
-        func pencilInteractionDidTap(_: UIPencilInteraction) {
-            // The user double-tapped the barrel button on the Apple Pencil.
-            // Switch back to the tool they were using before (e.g. if they switched to eraser, go back to pen).
-            onPencilDoubleTap?()
-        }
+        func pencilInteractionDidTap(_: UIPencilInteraction) { onPencilDoubleTap?() }
     }
 }
 
