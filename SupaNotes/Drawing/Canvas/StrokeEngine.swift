@@ -234,12 +234,11 @@ final class StrokeEngine {
     }
 
     /// Register a symmetric undo/redo pair for a document state change.
+    /// Each side re-registers the opposite so undo/redo can loop indefinitely.
     private func registerUndo(previous: ExcalidrawPageDocument, current: ExcalidrawPageDocument, actionName: String) {
         undoManager.registerUndo(withTarget: undoBridge) { [weak self] bridge in
             bridge.apply?(previous)
-            self?.undoManager.registerUndo(withTarget: bridge) { redoBridge in
-                redoBridge.apply?(current)
-            }
+            self?.registerUndo(previous: current, current: previous, actionName: actionName)
         }
         undoManager.setActionName(actionName)
     }

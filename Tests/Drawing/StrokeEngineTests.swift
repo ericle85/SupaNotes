@@ -105,6 +105,20 @@ struct StrokeEngineTests {
         #expect(ctx.engine.document.strokes.count == 1)
     }
 
+    // 3.6b — Undo/redo can loop indefinitely.
+    @Test func undoRedo_loopsIndefinitely() throws {
+        let ctx = try makeEngineContext()
+        drawStroke(on: ctx.engine)
+
+        // Should be able to undo/redo as many times as we want.
+        for _ in 0 ..< 5 {
+            ctx.engine.undoManager.undo()
+            #expect(ctx.engine.document.strokes.isEmpty)
+            ctx.engine.undoManager.redo()
+            #expect(ctx.engine.document.strokes.count == 1)
+        }
+    }
+
     // 3.7 — Multiple strokes: undo removes only the last.
     @Test func undo_multipleStrokes_removesOnlyLast() throws {
         let ctx = try makeEngineContext()
