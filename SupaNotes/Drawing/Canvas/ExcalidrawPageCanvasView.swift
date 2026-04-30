@@ -494,8 +494,6 @@ private final class PencilFilteredDrawingUIView: UIView {
 
     /// Convert a screen position to a position on the standard paper size.
     private func toLetterSpace(_ point: CGPoint) -> CGPoint {
-        let relativeX = bounds.width > 0 ? point.x / bounds.width : 0
-        let relativeY = bounds.height > 0 ? point.y / bounds.height : 0
-        return CGPoint(x: relativeX * pageSize.width, y: relativeY * pageSize.height)
+        PageLayout.toLetterSpace(point, viewSize: bounds.size, pageSize: pageSize)
     }
 }
