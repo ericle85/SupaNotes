@@ -6,7 +6,7 @@ import Foundation
 /// Tests for CodableColor
 /// CodableColor is a wrapper around SwiftUI's Color that can be saved to JSON
 /// We need this because SwiftUI's Color can't be directly saved to files
-struct CodableColorTests {
+@Suite struct CodableColorTests {
 
     @Test func roundTrip_preservesRGBValues() throws {
         // Create a color with specific RGB values

@@ -2,7 +2,7 @@ import SwiftUI
 
 // PenCustomizationView commented out — pen customization removed, ballpoint only.
 // Re-enable by uncommenting and restoring PenStyle + related fields in WritingInstrumentSettings,
-// ExcalidrawPageStroke, ExcalidrawToolStyle, and StrokeRenderer.
+// Stroke, ToolStyle, and StrokeRenderer.
 /*
 struct PenCustomizationView: View {
     @Binding var settings: WritingInstrumentSettings
@@ -35,7 +35,7 @@ struct PenCustomizationView: View {
         let pressureSensitivity = settings.pressureSensitivity
         return Canvas { context, size in
             let points = Self.syntheticStroke(in: size)
-            let stroke = ExcalidrawPageStroke(
+            let stroke = Stroke(
                 id: UUID(),
                 tool: .pen,
                 color: CodableColor(color: .white),
@@ -56,7 +56,7 @@ struct PenCustomizationView: View {
         .background(Color(white: 0.18), in: RoundedRectangle(cornerRadius: 12))
     }
 
-    private static func syntheticStroke(in size: CGSize) -> [ExcalidrawPagePoint] {
+    private static func syntheticStroke(in size: CGSize) -> [StrokePoint] {
         var raw: [(x: CGFloat, y: CGFloat)] = []
         let tMax = sqrt(CGFloat.pi)
         let spiralN = 20
@@ -88,7 +88,7 @@ struct PenCustomizationView: View {
             let y = cy + (pt.y - midRawY) * scale
             let t = CGFloat(i) / CGFloat(total - 1)
             let pressure = 0.15 + 0.85 * sin(t * .pi)
-            return ExcalidrawPagePoint(CGPoint(x: x, y: y), pressure: pressure)
+            return StrokePoint(CGPoint(x: x, y: y), pressure: pressure)
         }
     }
 

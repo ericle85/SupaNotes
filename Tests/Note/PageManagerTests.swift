@@ -5,7 +5,7 @@ import SwiftData
 
 /// Tests for PageManager — pure data contract for adding pages to a Note.
 @MainActor
-struct PageManagerTests {
+@Suite struct PageManagerTests {
 
     private func makeContainer() throws -> ModelContainer {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)

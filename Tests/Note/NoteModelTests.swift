@@ -6,7 +6,7 @@ import SwiftData
 /// A Note contains multiple Pages and can be moved to trash or restored
 /// SwiftData is the framework we use to save notes to the database
 @MainActor
-struct NoteModelTests {
+@Suite struct NoteModelTests {
 
     /// Helper function that creates an in-memory database for testing
     /// (so we don't have to save to the real database during tests)

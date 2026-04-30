@@ -55,7 +55,7 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         c.onPageMutated = onPageMutated
 
         // Sync toolbar to every canvas.
-        let style = ExcalidrawToolStyle.from(toolbar: toolbar)
+        let style = ToolStyle.from(toolbar: toolbar)
         c.canvasViews.forEach { $0.updateToolStyle(style) }
 
         // Rebuild when page count changes or on first real layout.
@@ -87,7 +87,7 @@ struct MultipageCanvasContainer: UIViewRepresentable {
     // MARK: - Coordinator
 
     /// UIKit bridge: owns scroll/zoom delegation, canvas views, pencil interaction, and pull-to-add.
-    final class Coordinator: NSObject, UIScrollViewDelegate, UIPencilInteractionDelegate, ExcalidrawPageCanvasInteractionDelegate {
+    final class Coordinator: NSObject, UIScrollViewDelegate, UIPencilInteractionDelegate, DrawingCanvasDelegate {
 
         // MARK: External state (updated each SwiftUI pass)
 
@@ -107,7 +107,7 @@ struct MultipageCanvasContainer: UIViewRepresentable {
 
         // MARK: Canvas state
 
-        var canvasViews: [ExcalidrawPageCanvasView] = []
+        var canvasViews: [DrawingCanvasView] = []
         var hasCompletedInitialLayout = false
         let pullController = PullToAddController()
         var pendingScroll: ScrollAfterRebuild = .none
@@ -157,11 +157,11 @@ struct MultipageCanvasContainer: UIViewRepresentable {
             let pageSizes = sorted.map(\.size)
             cachedPageSizes = pageSizes
 
-            let cw = PageLayout.containerWidth(pageSizes: pageSizes, gap: pageGap, scrollWidth: scrollView.bounds.width)
-            let totalHeight = PageLayout.containerHeight(pageSizes: pageSizes, gap: pageGap)
+            let cw = PageLayout.getCanvasWidth(pageSizes: pageSizes, gap: pageGap, scrollWidth: scrollView.bounds.width)
+            let totalHeight = PageLayout.getContainerHeight(pageSizes: pageSizes, gap: pageGap)
             let totalSize = CGSize(width: cw, height: totalHeight)
-            let frames = PageLayout.pageFrames(pageSizes: pageSizes, gap: pageGap, containerWidth: cw)
-            let style = ExcalidrawToolStyle.from(toolbar: toolbar)
+            let frames = PageLayout.getPageFramesAsCGRects(pageSizes: pageSizes, gap: pageGap, containerWidth: cw)
+            let style = ToolStyle.from(toolbar: toolbar)
 
             UIView.performWithoutAnimation {
                 // Tear down old views.
@@ -171,7 +171,7 @@ struct MultipageCanvasContainer: UIViewRepresentable {
 
                 // Create new canvas views.
                 canvasViews = frames.enumerated().map { i, frame in
-                    let canvas = ExcalidrawPageCanvasView(
+                    let canvas = DrawingCanvasView(
                         page: sorted[i], frame: frame, toolStyle: style, onPageMutated: onPageMutated
                     )
                     canvas.tag = i
@@ -190,7 +190,7 @@ struct MultipageCanvasContainer: UIViewRepresentable {
                 if let viewport {
                     restoreViewport(viewport, containerSize: totalSize, frames: frames)
                 } else {
-                    scrollView.contentSize = PageLayout.scrollContentSize(containerSize: totalSize, zoomScale: scrollView.zoomScale)
+                    scrollView.contentSize = PageLayout.getScrollContentSize(containerSize: totalSize, zoomScale: scrollView.zoomScale)
                     centerContainerIfNeeded()
                 }
 
@@ -226,29 +226,29 @@ struct MultipageCanvasContainer: UIViewRepresentable {
             guard let scrollView, let containerView else { return }
             let zoom = min(Design.Zoom.max, max(Design.Zoom.min, viewport.zoomScale))
             scrollView.zoomScale = zoom
-            scrollView.contentSize = PageLayout.scrollContentSize(containerSize: containerSize, zoomScale: zoom)
+            scrollView.contentSize = PageLayout.getScrollContentSize(containerSize: containerSize, zoomScale: zoom)
             centerContainerIfNeeded()
-            guard let target = PageLayout.viewportRestorationOffset(
+            guard let target = PageLayout.getViewportRestorationOffset(
                 viewport: viewport, containerOrigin: containerView.frame.origin, pageFrames: frames
             ) else { return }
-            scrollView.contentOffset = PageLayout.clampedOffset(target, contentSize: scrollView.contentSize, boundsSize: scrollView.bounds.size)
+            scrollView.contentOffset = PageLayout.getClampedOffset(target, contentSize: scrollView.contentSize, boundsSize: scrollView.bounds.size)
         }
 
         // MARK: Layout helpers
 
         func centerContainerIfNeeded() {
             guard let scrollView, let containerView else { return }
-            containerView.frame.origin = PageLayout.centeringOrigin(
+            containerView.frame.origin = PageLayout.getCenteringOrigin(
                 contentSize: containerView.frame.size, scrollBounds: scrollView.bounds.size
             )
         }
 
         private func currentPageFrames() -> [CGRect] {
             let cw = containerView?.bounds.width ?? 0
-            return PageLayout.pageFrames(pageSizes: cachedPageSizes, gap: pageGap, containerWidth: cw)
+            return PageLayout.getPageFramesAsCGRects(pageSizes: cachedPageSizes, gap: pageGap, containerWidth: cw)
         }
 
-        private func visibleCanvasViews() -> [ExcalidrawPageCanvasView] {
+        private func visibleCanvasViews() -> [DrawingCanvasView] {
             guard let scrollView, let containerView else { return canvasViews }
             let visibleRect = scrollView.convert(scrollView.bounds, to: containerView)
             return canvasViews.filter { $0.frame.intersects(visibleRect) }
@@ -258,7 +258,7 @@ struct MultipageCanvasContainer: UIViewRepresentable {
             guard let scrollView, let containerView, !pages.isEmpty else { return }
             let centerY = (scrollView.contentOffset.y + scrollView.bounds.height / 2)
                 / max(scrollView.zoomScale, 0.001) - containerView.frame.minY
-            let index = PageLayout.currentPageIndex(centerY: centerY, pageFrames: currentPageFrames())
+            let index = PageLayout.getCurrentPageIndex(centerY: centerY, pageFrames: currentPageFrames())
             onCurrentPageChanged?(min(index, max(0, pages.count - 1)))
         }
 
@@ -267,7 +267,7 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         private func scrollToPage(index: Int) {
             guard let scrollView, let containerView, canvasViews.indices.contains(index) else { return }
             scrollView.zoomScale = 1.0
-            scrollView.contentSize = PageLayout.scrollContentSize(containerSize: containerView.bounds.size, zoomScale: 1.0)
+            scrollView.contentSize = PageLayout.getScrollContentSize(containerSize: containerView.bounds.size, zoomScale: 1.0)
             centerContainerIfNeeded()
             let frames = currentPageFrames()
             guard index < frames.count else { return }
@@ -330,12 +330,12 @@ struct MultipageCanvasContainer: UIViewRepresentable {
 
         // MARK: Canvas interaction
 
-        func pageCanvasViewDidBeginUsingTool(_ view: ExcalidrawPageCanvasView) {
+        func pageCanvasViewDidBeginUsingTool(_ view: DrawingCanvasView) {
             scrollView?.isScrollEnabled = false
             onUndoManagerReady(view.undoManagerForPage)
         }
 
-        func pageCanvasViewDidEndUsingTool(_: ExcalidrawPageCanvasView) {
+        func pageCanvasViewDidEndUsingTool(_: DrawingCanvasView) {
             scrollView?.isScrollEnabled = true
         }
 

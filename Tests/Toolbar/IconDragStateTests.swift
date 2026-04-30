@@ -6,7 +6,7 @@ import SwiftUI
 /// This tests the logic for tracking when a user drags toolbar icons around
 /// and calculating how other icons should move to make room
 @MainActor
-struct IconDragStateTests {
+@Suite struct IconDragStateTests {
 
     // MARK: - reset()
 

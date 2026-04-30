@@ -5,7 +5,7 @@ import Foundation
 /// Tests for WritingInstrumentSettings
 /// Each tool (pen, eraser, highlighter) has settings like width and preset sizes
 /// Users can quickly switch between preset widths for each tool
-struct WritingInstrumentSettingsTests {
+@Suite struct WritingInstrumentSettingsTests {
 
     // MARK: - Factory defaults
     // Tests that each tool has the correct default width and preset options

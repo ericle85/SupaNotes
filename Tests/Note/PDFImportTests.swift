@@ -4,7 +4,7 @@ import Foundation
 @testable import SupaNotes
 
 @MainActor
-struct PDFImportTests {
+@Suite struct PDFImportTests {
     private func makeContainer() throws -> ModelContainer {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         return try ModelContainer(for: Note.self, Page.self, Folder.self, configurations: config)

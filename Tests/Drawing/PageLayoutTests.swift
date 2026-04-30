@@ -3,7 +3,7 @@ import CoreGraphics
 @testable import SupaNotes
 
 // Tests for the pure math that positions pages inside the scrollable notebook.
-struct PageLayoutTests {
+@Suite struct PageLayoutTests {
 
     // Standard letter-size page used across most tests.
     private let letter = CGSize(width: 612, height: 792)
@@ -12,39 +12,39 @@ struct PageLayoutTests {
     // MARK: - Container width
 
     // 1.1 — Pick the wider of the page or scroll view.
-    @Test func containerWidth_picksWiderOption() {
+    @Test func getCanvasWidth_picksWiderOption() {
         // Page wider than scroll view → use page width + gaps.
-        let wide = PageLayout.containerWidth(
+        let wide = PageLayout.getCanvasWidth(
             pageSizes: [CGSize(width: 800, height: 500)], gap: 24, scrollWidth: 600
         )
         #expect(wide == CGFloat(848))
 
         // Scroll view wider than page → use scroll view width.
-        let narrow = PageLayout.containerWidth(
+        let narrow = PageLayout.getCanvasWidth(
             pageSizes: [CGSize(width: 300, height: 500)], gap: 24, scrollWidth: 600
         )
         #expect(narrow == CGFloat(600))
     }
 
     // 1.2 — Variable pages: container fits the widest page.
-    @Test func containerWidth_variablePages_usesWidest() {
+    @Test func getCanvasWidth_variablePages_usesWidest() {
         let sizes: [CGSize] = [
             CGSize(width: 400, height: 500),
             CGSize(width: 700, height: 500),
             CGSize(width: 500, height: 500),
         ]
         // 700 + 24*2 = 748, scroll is 600, so 748 wins.
-        let result = PageLayout.containerWidth(pageSizes: sizes, gap: 24, scrollWidth: 600)
+        let result = PageLayout.getCanvasWidth(pageSizes: sizes, gap: 24, scrollWidth: 600)
         #expect(result == 748)
     }
 
     // MARK: - Page frame positioning
 
     // 1.3 — Pages stack vertically with gaps.
-    @Test func pageFrames_stackVertically() {
+    @Test func getPageFramesAsCGRects_stackVertically() {
         let sizes = [letter, letter, letter]
-        let cw = PageLayout.containerWidth(pageSizes: sizes, gap: gap, scrollWidth: 700)
-        let frames = PageLayout.pageFrames(pageSizes: sizes, gap: gap, containerWidth: cw)
+        let cw = PageLayout.getCanvasWidth(pageSizes: sizes, gap: gap, scrollWidth: 700)
+        let frames = PageLayout.getPageFramesAsCGRects(pageSizes: sizes, gap: gap, containerWidth: cw)
 
         // Each page starts one (pageH + gap) lower than the previous.
         #expect(frames[0].origin.y == gap)
@@ -53,21 +53,21 @@ struct PageLayoutTests {
     }
 
     // 1.4 — Pages are centered horizontally.
-    @Test func pageFrames_centeredHorizontally() {
+    @Test func getPageFramesAsCGRects_centeredHorizontally() {
         let cw: CGFloat = 1000
-        let frames = PageLayout.pageFrames(pageSizes: [letter], gap: gap, containerWidth: cw)
+        let frames = PageLayout.getPageFramesAsCGRects(pageSizes: [letter], gap: gap, containerWidth: cw)
         // x should be half the leftover space.
         #expect(frames[0].origin.x == (cw - letter.width) / 2)
     }
 
     // 1.5 — Variable-size pages: tall page pushes next one further down.
-    @Test func pageFrames_variableSizes_stackCorrectly() {
+    @Test func getPageFramesAsCGRects_variableSizes_stackCorrectly() {
         let sizes: [CGSize] = [
             CGSize(width: 612, height: 400),
             CGSize(width: 612, height: 800),
             CGSize(width: 612, height: 300),
         ]
-        let frames = PageLayout.pageFrames(pageSizes: sizes, gap: gap, containerWidth: 700)
+        let frames = PageLayout.getPageFramesAsCGRects(pageSizes: sizes, gap: gap, containerWidth: 700)
 
         #expect(frames[0].origin.y == gap)
         #expect(frames[1].origin.y == gap + 400 + gap)
@@ -77,22 +77,22 @@ struct PageLayoutTests {
     // MARK: - Container height
 
     // 1.6 — Total height = top gap + all pages + between-gaps + bottom gap.
-    @Test func containerHeight_addsAllPagesAndGaps() {
+    @Test func getContainerHeight_addsAllPagesAndGaps() {
         let sizes: [CGSize] = [
             CGSize(width: 612, height: 400),
             CGSize(width: 612, height: 600),
         ]
         // top gap (24) + 400 + gap (24) + 600 + bottom gap (24) = 1072
-        let height = PageLayout.containerHeight(pageSizes: sizes, gap: gap)
+        let height = PageLayout.getContainerHeight(pageSizes: sizes, gap: gap)
         #expect(height == CGFloat(1072))
     }
 
     // MARK: - Centering origin
 
     // 1.7 — Small content centers, large content stays at (0,0).
-    @Test func centeringOrigin_centersSmallContent() {
+    @Test func getCenteringOrigin_centersSmallContent() {
         // Content smaller than scroll area → centered.
-        let small = PageLayout.centeringOrigin(
+        let small = PageLayout.getCenteringOrigin(
             contentSize: CGSize(width: 400, height: 300),
             scrollBounds: CGSize(width: 800, height: 600)
         )
@@ -100,7 +100,7 @@ struct PageLayoutTests {
         #expect(small.y == 150)
 
         // Content larger than scroll area → (0, 0).
-        let big = PageLayout.centeringOrigin(
+        let big = PageLayout.getCenteringOrigin(
             contentSize: CGSize(width: 1000, height: 900),
             scrollBounds: CGSize(width: 800, height: 600)
         )
@@ -111,13 +111,13 @@ struct PageLayoutTests {
     // MARK: - Scroll content size
 
     // 1.8 — Zooming 2x doubles the scrollable area.
-    @Test func scrollContentSize_scalesWithZoom() {
+    @Test func getScrollContentSize_scalesWithZoom() {
         let base = CGSize(width: 700, height: 1000)
-        let at1x = PageLayout.scrollContentSize(containerSize: base, zoomScale: 1)
+        let at1x = PageLayout.getScrollContentSize(containerSize: base, zoomScale: 1)
         #expect(at1x.width == 700)
         #expect(at1x.height == 1000)
 
-        let at2x = PageLayout.scrollContentSize(containerSize: base, zoomScale: 2)
+        let at2x = PageLayout.getScrollContentSize(containerSize: base, zoomScale: 2)
         #expect(at2x.width == 1400)
         #expect(at2x.height == 2000)
     }

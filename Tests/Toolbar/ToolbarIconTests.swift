@@ -5,7 +5,7 @@ import SwiftUI
 /// Tests for ToolbarIcon
 /// Icons in the toolbar represent either tools (pen, eraser) or colors
 @MainActor
-struct ToolbarIconTests {
+@Suite struct ToolbarIconTests {
 
     // MARK: - Static factories
 

@@ -5,32 +5,32 @@ import UIKit
 // MARK: - Data Format
 
 /// Entire drawing document for one page.
-struct ExcalidrawPageDocument: Codable, Hashable {
+struct DrawingPage: Codable, Hashable {
     /// List of all strokes on the page.
-    var strokes: [ExcalidrawPageStroke] = []
+    var strokes: [Stroke] = []
 }
 
 /// One drawn stroke: tool, color, thickness, and all points.
-struct ExcalidrawPageStroke: Identifiable, Codable, Hashable {
+struct Stroke: Identifiable, Codable, Hashable {
     /// Unique identity for this stroke.
     let id: UUID
     /// Which tool created this stroke.
-    let tool: ExcalidrawPageTool
+    let tool: DrawingTool
     /// Stroke color and width.
     let color: CodableColor
     let width: CGFloat
     /// Strokes are made up of a series of points.
-    let points: [ExcalidrawPagePoint]
+    let points: [StrokePoint]
 }
 
 /// These are the stroke tools we support right now.
-enum ExcalidrawPageTool: String, Codable {
+enum DrawingTool: String, Codable {
     /// Normal ink pen.
     case pen
 }
 
 /// A single 2D point for a stroke path, with optional pressure from Apple Pencil.
-struct ExcalidrawPagePoint: Codable, Hashable {
+struct StrokePoint: Codable, Hashable {
     /// XY coordinates.
     let pointX: CGFloat
     let pointY: CGFloat
@@ -51,19 +51,19 @@ struct ExcalidrawPagePoint: Codable, Hashable {
 }
 
 /// This helper turns raw bytes from the database into drawing objects, and back again.
-enum ExcalidrawPageCodec {
+enum DrawingCodec {
     /// Convert saved bytes into a document we can draw.
-    static func decode(data: Data) -> ExcalidrawPageDocument {
+    static func decode(data: Data) -> DrawingPage {
         // If there is no data yet, return a brand-new empty drawing.
-        guard !data.isEmpty else { return ExcalidrawPageDocument() }
+        guard !data.isEmpty else { return DrawingPage() }
         // Try to decode JSON; if decoding fails, return an empty drawing safely.
-        return (try? JSONDecoder().decode(ExcalidrawPageDocument.self, from: data)) ?? ExcalidrawPageDocument()
+        return (try? JSONDecoder().decode(DrawingPage.self, from: data)) ?? DrawingPage()
     }
 
     /// Convert a drawing document into bytes so it can be saved.
-    static func encode(document: ExcalidrawPageDocument) -> Data {
+    static func encode(currentPage: DrawingPage) -> Data {
         do {
-            return try JSONEncoder().encode(document)
+            return try JSONEncoder().encode(currentPage)
         } catch {
             // Surface encoding failures during development so data-loss bugs are caught early.
             assertionFailure("Failed to encode drawing: \(error)")
@@ -75,7 +75,7 @@ enum ExcalidrawPageCodec {
 // MARK: - Tool Style
 
 /// Shared toolbar state (active tool, color, widths).
-struct ExcalidrawToolStyle {
+struct ToolStyle {
     /// Currently selected drawing tool.
     let selectedTool: ActiveTool
     /// Currently selected color.
@@ -86,8 +86,8 @@ struct ExcalidrawToolStyle {
     let eraserWidth: CGFloat
 
     /// Build this style from the shared toolbar state.
-    static func from(toolbar: ToolbarState) -> ExcalidrawToolStyle {
-        return ExcalidrawToolStyle(
+    static func from(toolbar: ToolbarState) -> ToolStyle {
+        return ToolStyle(
             selectedTool: toolbar.currentlyActiveTool,
             selectedColor: toolbar.colorSelectedByUser,
             penWidth: toolbar.instrumentWidth(for: .pen),
@@ -99,17 +99,17 @@ struct ExcalidrawToolStyle {
 // MARK: - Interaction Callbacks
 
 /// Callbacks to notify parent when drawing starts/ends.
-protocol ExcalidrawPageCanvasInteractionDelegate: AnyObject {
+protocol DrawingCanvasDelegate: AnyObject {
     /// Called when user starts using a tool on this page.
-    func pageCanvasViewDidBeginUsingTool(_ view: ExcalidrawPageCanvasView)
+    func pageCanvasViewDidBeginUsingTool(_ view: DrawingCanvasView)
     /// Called when user stops using a tool on this page.
-    func pageCanvasViewDidEndUsingTool(_ view: ExcalidrawPageCanvasView)
+    func pageCanvasViewDidEndUsingTool(_ view: DrawingCanvasView)
 }
 
 // MARK: - Main Drawing View (Thin UI Shell)
 
 /// Main drawing view for one page — delegates all stroke logic to StrokeEngine.
-final class ExcalidrawPageCanvasView: UIView, StrokeEngineDelegate {
+final class DrawingCanvasView: UIView, StrokeEngineDelegate {
     /// Constants for this canvas.
     private enum CanvasMetrics {
         /// Minimum and maximum render scales used for vector-quality redraws while zooming.
@@ -117,7 +117,7 @@ final class ExcalidrawPageCanvasView: UIView, StrokeEngineDelegate {
     }
 
     /// Delegate for interaction callbacks.
-    weak var interactionDelegate: ExcalidrawPageCanvasInteractionDelegate?
+    weak var interactionDelegate: DrawingCanvasDelegate?
 
     /// The page model where drawing bytes are saved.
     private(set) var page: Page
@@ -135,7 +135,7 @@ final class ExcalidrawPageCanvasView: UIView, StrokeEngineDelegate {
     private var zoomScale: CGFloat = 1
 
     /// Set up the view with page data and callbacks.
-    init(page: Page, frame: CGRect, toolStyle: ExcalidrawToolStyle, onPageMutated: @escaping () -> Void) {
+    init(page: Page, frame: CGRect, toolStyle: ToolStyle, onPageMutated: @escaping () -> Void) {
         self.page = page
         self.engine = StrokeEngine(page: page, toolStyle: toolStyle, onPageMutated: onPageMutated)
         super.init(frame: frame)
@@ -160,7 +160,7 @@ final class ExcalidrawPageCanvasView: UIView, StrokeEngineDelegate {
     }
 
     /// Update toolbar settings when they change.
-    func updateToolStyle(_ style: ExcalidrawToolStyle) {
+    func updateToolStyle(_ style: ToolStyle) {
         engine.updateToolStyle(style)
     }
 
@@ -196,7 +196,7 @@ final class ExcalidrawPageCanvasView: UIView, StrokeEngineDelegate {
 
     /// Push current engine state into the drawing view and trigger a redraw.
     private func syncRenderState() {
-        drawingView.document = engine.document
+        drawingView.currentPage = engine.currentPage
         drawingView.activeStroke = engine.activeStroke
         drawingView.eraserCursorCenter = engine.eraserCursorCenter
         drawingView.eraserCursorRadius = engine.eraserCursorRadius
@@ -232,11 +232,11 @@ final class ExcalidrawPageCanvasView: UIView, StrokeEngineDelegate {
         }
         // Forward pencil movement to the engine.
         drawingView.onChangedInLetterSpace = { [weak self] pointAndPressure in
-            self?.engine.handleChanged(at: pointAndPressure.0, pressure: pointAndPressure.1)
+            self?.engine.extendActiveStroke(at: pointAndPressure.0, pressure: pointAndPressure.1)
         }
         // Forward pencil lift to the engine, then notify delegate.
         drawingView.onEndedInLetterSpace = { [weak self] pointAndPressure in
-            self?.engine.handleEnded(at: pointAndPressure.0, pressure: pointAndPressure.1)
+            self?.engine.commitActiveStroke(at: pointAndPressure.0, pressure: pointAndPressure.1)
             guard let self else { return }
             interactionDelegate?.pageCanvasViewDidEndUsingTool(self)
         }
@@ -341,9 +341,9 @@ private final class PencilFilteredDrawingUIView: UIView {
     var pageSize = CGSize(width: PageConstants.pageWidth, height: PageConstants.pageHeight)
 
     /// All the drawings that have been saved.
-    var document = ExcalidrawPageDocument()
+    var currentPage = DrawingPage()
     /// The line currently being drawn before it's saved.
-    var activeStroke: ExcalidrawPageStroke?
+    var activeStroke: Stroke?
     /// Center of the eraser cursor circle in letter space (nil when not erasing).
     var eraserCursorCenter: CGPoint?
     /// Radius of the eraser cursor in letter-space points.
@@ -416,7 +416,7 @@ private final class PencilFilteredDrawingUIView: UIView {
         guard let context = UIGraphicsGetCurrentContext() else { return }
 
         // Draw committed strokes via the shared renderer.
-        StrokeRenderer.drawStrokes(from: document, in: context, rect: bounds, pageSize: pageSize)
+        StrokeRenderer.drawStrokes(from: currentPage, in: context, rect: bounds, pageSize: pageSize)
 
         // Draw the in-progress stroke on top (only exists during active touch).
         if let activeStroke {

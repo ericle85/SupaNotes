@@ -165,7 +165,7 @@ enum PDFService {
         }
 
         // 3. Draw user strokes on top of the background, using the page's coordinate space.
-        let drawing = ExcalidrawPageCodec.decode(data: page.drawingData)
+        let drawing = DrawingCodec.decode(data: page.drawingData)
         StrokeRenderer.drawStrokes(from: drawing, in: ctx, rect: rect, pageSize: page.size)
     }
 

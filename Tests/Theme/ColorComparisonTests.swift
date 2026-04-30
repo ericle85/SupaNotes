@@ -5,7 +5,7 @@ import SwiftUI
 /// Tests for color comparison functions
 /// These tests verify that we can correctly convert colors to RGB values,
 /// determine if a color is light or dark, and check if two colors are similar.
-struct ColorComparisonTests {
+@Suite struct ColorComparisonTests {
 
     // MARK: - resolveRGB
     // This section tests converting a SwiftUI Color to its red, green, blue components

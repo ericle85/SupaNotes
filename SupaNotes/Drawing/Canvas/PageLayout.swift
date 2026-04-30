@@ -17,14 +17,14 @@ enum PageLayout {
 
     // MARK: Container sizing
 
-    /// Container width for variable-size pages — uses the widest page.
-    static func containerWidth(pageSizes: [CGSize], gap: CGFloat, scrollWidth: CGFloat) -> CGFloat {
+    /// Canvas width for variable-size pages — uses the widest page plus side margins, floored at scroll view width.
+    static func getCanvasWidth(pageSizes: [CGSize], gap: CGFloat, scrollWidth: CGFloat) -> CGFloat {
         let maxWidth = pageSizes.map(\.width).max() ?? PageConstants.pageWidth
         return max(maxWidth + gap * 2, scrollWidth)
     }
 
     /// Total container height for variable-size pages.
-    static func containerHeight(pageSizes: [CGSize], gap: CGFloat) -> CGFloat {
+    static func getContainerHeight(pageSizes: [CGSize], gap: CGFloat) -> CGFloat {
         let totalPageHeight = pageSizes.map(\.height).reduce(0, +)
         return gap + totalPageHeight + CGFloat(max(0, pageSizes.count - 1)) * gap + gap
     }
@@ -32,7 +32,7 @@ enum PageLayout {
     // MARK: Page frames
 
     /// Frames for variable-size pages, stacked vertically with gaps.
-    static func pageFrames(pageSizes: [CGSize], gap: CGFloat, containerWidth: CGFloat) -> [CGRect] {
+    static func getPageFramesAsCGRects(pageSizes: [CGSize], gap: CGFloat, containerWidth: CGFloat) -> [CGRect] {
         var frames: [CGRect] = []
         var y = gap
         for size in pageSizes {
@@ -45,12 +45,12 @@ enum PageLayout {
     // MARK: Scroll helpers
 
     /// Expected scrollable content size after zoom.
-    static func scrollContentSize(containerSize: CGSize, zoomScale: CGFloat) -> CGSize {
+    static func getScrollContentSize(containerSize: CGSize, zoomScale: CGFloat) -> CGSize {
         CGSize(width: containerSize.width * zoomScale, height: containerSize.height * zoomScale)
     }
 
     /// Origin that centers content when it is smaller than the visible scroll area.
-    static func centeringOrigin(contentSize: CGSize, scrollBounds: CGSize) -> CGPoint {
+    static func getCenteringOrigin(contentSize: CGSize, scrollBounds: CGSize) -> CGPoint {
         CGPoint(
             x: max(0, (scrollBounds.width - contentSize.width) / 2),
             y: max(0, (scrollBounds.height - contentSize.height) / 2)
@@ -58,7 +58,7 @@ enum PageLayout {
     }
 
     /// Clamp a content offset to valid scroll bounds.
-    static func clampedOffset(_ offset: CGPoint, contentSize: CGSize, boundsSize: CGSize) -> CGPoint {
+    static func getClampedOffset(_ offset: CGPoint, contentSize: CGSize, boundsSize: CGSize) -> CGPoint {
         let maxX = max(0, contentSize.width - boundsSize.width)
         let maxY = max(0, contentSize.height - boundsSize.height)
         return CGPoint(x: min(max(0, offset.x), maxX), y: min(max(0, offset.y), maxY))
@@ -67,7 +67,7 @@ enum PageLayout {
     // MARK: Current page
 
     /// Index of the page closest to a given vertical center (in container coords).
-    static func currentPageIndex(centerY: CGFloat, pageFrames: [CGRect]) -> Int {
+    static func getCurrentPageIndex(centerY: CGFloat, pageFrames: [CGRect]) -> Int {
         pageFrames.enumerated().min { lhs, rhs in
             abs(lhs.element.midY - centerY) < abs(rhs.element.midY - centerY)
         }?.offset ?? 0
@@ -105,7 +105,7 @@ enum PageLayout {
     }
 
     /// Compute the content offset that restores a saved viewport.
-    static func viewportRestorationOffset(
+    static func getViewportRestorationOffset(
         viewport: ViewportState,
         containerOrigin: CGPoint,
         pageFrames: [CGRect]

@@ -3,7 +3,7 @@ import CoreGraphics
 
 // MARK: - Delegate
 
-/// Notifies the view layer when render state changes (document, active stroke, eraser cursor).
+/// Notifies the view layer when render state changes (currentPage, active stroke, eraser cursor).
 protocol StrokeEngineDelegate: AnyObject {
     /// Called whenever the engine's visible state changes and the view should redraw.
     func strokeEngineDidChangeRenderState(_ engine: StrokeEngine)
@@ -13,8 +13,8 @@ protocol StrokeEngineDelegate: AnyObject {
 
 /// Tiny NSObject target for UndoManager registration (UndoManager requires an ObjC-compatible target).
 private final class UndoBridge: NSObject {
-    /// Closure that restores a document snapshot.
-    var apply: ((ExcalidrawPageDocument) -> Void)?
+    /// Closure that restores a page snapshot.
+    var apply: ((DrawingPage) -> Void)?
 }
 
 // MARK: - Stroke Engine
@@ -31,10 +31,10 @@ final class StrokeEngine {
     // MARK: Read-only render state
 
     /// Current committed strokes.
-    private(set) var document: ExcalidrawPageDocument
+    private(set) var currentPage: DrawingPage
 
     /// In-progress stroke preview (nil when not drawing).
-    private(set) var activeStroke: ExcalidrawPageStroke?
+    private(set) var activeStroke: Stroke?
 
     /// Center of the eraser cursor in page-space (nil when not erasing).
     private(set) var eraserCursorCenter: CGPoint?
@@ -55,11 +55,11 @@ final class StrokeEngine {
     /// Stroke IDs removed during the current eraser drag.
     private var erasingIDs = Set<UUID>()
 
-    /// Document snapshot taken at the start of an erase gesture (for undo).
-    private var documentBeforeErasing = ExcalidrawPageDocument()
+    /// Page snapshot taken at the start of an erase gesture (for undo).
+    private var pageBeforeErasing = DrawingPage()
 
     /// Current toolbar settings (tool, color, widths).
-    private var toolStyle: ExcalidrawToolStyle
+    private var toolStyle: ToolStyle
 
     /// Page model reference for persistence.
     private let page: Page
@@ -73,17 +73,17 @@ final class StrokeEngine {
     // MARK: Init
 
     /// Create an engine for a given page, loading any existing drawing data.
-    init(page: Page, toolStyle: ExcalidrawToolStyle, onPageMutated: @escaping () -> Void) {
+    init(page: Page, toolStyle: ToolStyle, onPageMutated: @escaping () -> Void) {
         self.page = page
         self.toolStyle = toolStyle
         self.onPageMutated = onPageMutated
-        // Decode persisted drawing (empty document if no data yet).
-        self.document = ExcalidrawPageCodec.decode(data: page.drawingData)
+        // Decode persisted drawing (empty page if no data yet).
+        self.currentPage = DrawingCodec.decode(data: page.drawingData)
 
         // Wire up the undo bridge to restore snapshots through the engine.
         undoBridge.apply = { [weak self] restored in
             guard let self else { return }
-            document = restored
+            currentPage = restored
             activeStroke = nil
             persist()
             delegate?.strokeEngineDidChangeRenderState(self)
@@ -93,27 +93,27 @@ final class StrokeEngine {
     // MARK: Tool style
 
     /// Update toolbar settings when the user changes tool/color/width.
-    func updateToolStyle(_ style: ExcalidrawToolStyle) {
+    func updateToolStyle(_ style: ToolStyle) {
         toolStyle = style
     }
 
     // MARK: Touch dispatch
 
     /// Route a moved-touch to the correct handler based on active tool.
-    func handleChanged(at point: CGPoint, pressure: CGFloat) {
+    func extendActiveStroke(at point: CGPoint, pressure: CGFloat) {
         if toolStyle.selectedTool == .eraser {
-            handleEraserChanged(at: point)
+            eraseAtPoint(at: point)
         } else {
             handleDrawChanged(at: point, pressure: pressure)
         }
     }
 
     /// Route a ended-touch to the correct handler based on active tool.
-    func handleEnded(at point: CGPoint, pressure: CGFloat) {
+    func commitActiveStroke(at point: CGPoint, pressure: CGFloat) {
         if toolStyle.selectedTool == .eraser {
-            handleEraserEnded(at: point)
+            finalizeEraseStroke(at: point)
         } else {
-            handleDrawEnded(at: point, pressure: pressure)
+            finalizeDrawingStroke(at: point, pressure: pressure)
         }
     }
 
@@ -141,8 +141,8 @@ final class StrokeEngine {
         delegate?.strokeEngineDidChangeRenderState(self)
     }
 
-    /// Commit the completed stroke to the document.
-    private func handleDrawEnded(at point: CGPoint, pressure: CGFloat) {
+    /// Commit the completed stroke to the current page.
+    private func finalizeDrawingStroke(at point: CGPoint, pressure: CGFloat) {
         // Append final point if meaningful.
         if activePoints.isEmpty {
             activePoints = [(point, pressure)]
@@ -158,26 +158,26 @@ final class StrokeEngine {
         guard !activePoints.isEmpty else { return }
 
         // Snapshot for undo, then append new stroke.
-        let previous = document
-        let newStroke = ExcalidrawPageStroke(
+        let previous = currentPage
+        let newStroke = Stroke(
             id: UUID(),
             tool: .pen,
             color: CodableColor(color: toolStyle.selectedColor),
             width: toolStyle.penWidth,
-            points: activePoints.map { ExcalidrawPagePoint($0.point, pressure: $0.pressure) }
+            points: activePoints.map { StrokePoint($0.point, pressure: $0.pressure) }
         )
-        document.strokes.append(newStroke)
-        registerUndo(previous: previous, current: document, actionName: "Draw Stroke")
+        currentPage.strokes.append(newStroke)
+        registerUndo(previous: previous, current: currentPage, actionName: "Draw Stroke")
         persist()
     }
 
     // MARK: - Erasing
 
     /// Remove strokes that intersect the eraser cursor as it moves.
-    private func handleEraserChanged(at point: CGPoint) {
+    private func eraseAtPoint(at point: CGPoint) {
         // Snapshot at the start of the erase gesture.
         if erasingIDs.isEmpty {
-            documentBeforeErasing = document
+            pageBeforeErasing = currentPage
         }
 
         let radius = max(toolStyle.eraserWidth, 6)
@@ -185,7 +185,7 @@ final class StrokeEngine {
         eraserCursorRadius = radius
 
         // Find strokes that intersect the eraser circle.
-        let hitIDs = document.strokes
+        let hitIDs = currentPage.strokes
             .filter { !erasingIDs.contains($0.id) && intersects(stroke: $0, point: point, radius: radius) }
             .map(\.id)
 
@@ -196,46 +196,46 @@ final class StrokeEngine {
         }
 
         erasingIDs.formUnion(hitIDs)
-        document.strokes.removeAll { erasingIDs.contains($0.id) }
+        currentPage.strokes.removeAll { erasingIDs.contains($0.id) }
         delegate?.strokeEngineDidChangeRenderState(self)
     }
 
     /// Finish the erase gesture and register undo if anything was removed.
-    private func handleEraserEnded(at point: CGPoint) {
+    private func finalizeEraseStroke(at point: CGPoint) {
         // One last intersection pass at the lift-off point.
-        handleEraserChanged(at: point)
+        eraseAtPoint(at: point)
         // Hide cursor.
         eraserCursorCenter = nil
         delegate?.strokeEngineDidChangeRenderState(self)
 
         defer {
             erasingIDs.removeAll()
-            documentBeforeErasing = ExcalidrawPageDocument()
+            pageBeforeErasing = DrawingPage()
         }
 
         // Skip undo/persist if nothing changed.
-        guard documentBeforeErasing != document else { return }
-        registerUndo(previous: documentBeforeErasing, current: document, actionName: "Erase Stroke")
+        guard pageBeforeErasing != currentPage else { return }
+        registerUndo(previous: pageBeforeErasing, current: currentPage, actionName: "Erase Stroke")
         persist()
     }
 
     // MARK: - Helpers
 
     /// Build a temporary stroke from the points collected so far (for live preview).
-    private func buildActiveStrokePreview() -> ExcalidrawPageStroke? {
+    private func buildActiveStrokePreview() -> Stroke? {
         guard activePoints.count > 1 else { return nil }
-        return ExcalidrawPageStroke(
+        return Stroke(
             id: UUID(),
             tool: .pen,
             color: CodableColor(color: toolStyle.selectedColor),
             width: toolStyle.penWidth,
-            points: activePoints.map { ExcalidrawPagePoint($0.point, pressure: $0.pressure) }
+            points: activePoints.map { StrokePoint($0.point, pressure: $0.pressure) }
         )
     }
 
-    /// Register a symmetric undo/redo pair for a document state change.
+    /// Register a symmetric undo/redo pair for a page state change.
     /// Each side re-registers the opposite so undo/redo can loop indefinitely.
-    private func registerUndo(previous: ExcalidrawPageDocument, current: ExcalidrawPageDocument, actionName: String) {
+    private func registerUndo(previous: DrawingPage, current: DrawingPage, actionName: String) {
         undoManager.registerUndo(withTarget: undoBridge) { [weak self] bridge in
             bridge.apply?(previous)
             self?.registerUndo(previous: current, current: previous, actionName: actionName)
@@ -243,14 +243,14 @@ final class StrokeEngine {
         undoManager.setActionName(actionName)
     }
 
-    /// Encode document to bytes and write to the page model.
+    /// Encode current page to bytes and write to the page model.
     private func persist() {
-        page.drawingData = ExcalidrawPageCodec.encode(document: document)
+        page.drawingData = DrawingCodec.encode(currentPage: currentPage)
         onPageMutated()
     }
 
     /// True if any point in the stroke falls within the eraser radius.
-    private func intersects(stroke: ExcalidrawPageStroke, point: CGPoint, radius: CGFloat) -> Bool {
+    private func intersects(stroke: Stroke, point: CGPoint, radius: CGFloat) -> Bool {
         stroke.points.contains { distance($0.cgPoint, point) <= radius }
     }
 

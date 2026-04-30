@@ -7,21 +7,21 @@ enum StrokeRenderer {
 
     // MARK: - Public
 
-    /// Draw all strokes from a document into a CGContext, scaling from the
+    /// Draw all strokes from a page into a CGContext, scaling from the
     /// page's coordinate space to the given rect.
     static func drawStrokes(
-        from document: ExcalidrawPageDocument,
+        from currentPage: DrawingPage,
         in context: CGContext,
         rect: CGRect,
         pageSize: CGSize = CGSize(width: PageConstants.pageWidth, height: PageConstants.pageHeight)
     ) {
-        guard !document.strokes.isEmpty else { return }
+        guard !currentPage.strokes.isEmpty else { return }
         context.saveGState()
         context.scaleBy(
             x: rect.width / pageSize.width,
             y: rect.height / pageSize.height
         )
-        for stroke in document.strokes {
+        for stroke in currentPage.strokes {
             drawStroke(stroke, in: context)
         }
         context.restoreGState()
@@ -29,7 +29,7 @@ enum StrokeRenderer {
 
     /// Draw a single stroke with uniform width.
     static func drawStroke(
-        _ stroke: ExcalidrawPageStroke,
+        _ stroke: Stroke,
         in context: CGContext
     ) {
         let points = stroke.points

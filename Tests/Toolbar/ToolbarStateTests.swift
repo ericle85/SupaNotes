@@ -5,7 +5,7 @@ import SwiftUI
 /// Tests for ToolbarState
 /// This tracks which tool is currently active and provides information about tool settings
 @MainActor
-struct ToolbarStateTests {
+@Suite struct ToolbarStateTests {
 
     // MARK: - switchToPreviousTool
     // Tests for swapping between the current tool and the previously used tool

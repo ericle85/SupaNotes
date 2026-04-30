@@ -7,7 +7,7 @@ import CoreGraphics
 
 // Tests for the drawing brain — stroke creation, erasing, undo, redo.
 @MainActor
-struct StrokeEngineTests {
+@Suite struct StrokeEngineTests {
 
     // MARK: - Helpers
 
@@ -28,7 +28,7 @@ struct StrokeEngineTests {
         let context = container.mainContext
         let page = Page(orderIndex: 0)
         context.insert(page)
-        let style = ExcalidrawToolStyle(
+        let style = ToolStyle(
             selectedTool: tool,
             selectedColor: .black,
             penWidth: penWidth,
@@ -44,10 +44,10 @@ struct StrokeEngineTests {
         points: [(CGFloat, CGFloat)] = [(10, 10), (20, 20), (30, 30), (40, 40)]
     ) {
         for pt in points {
-            engine.handleChanged(at: CGPoint(x: pt.0, y: pt.1), pressure: 0.5)
+            engine.extendActiveStroke(at: CGPoint(x: pt.0, y: pt.1), pressure: 0.5)
         }
         if let last = points.last {
-            engine.handleEnded(at: CGPoint(x: last.0, y: last.1), pressure: 0.5)
+            engine.commitActiveStroke(at: CGPoint(x: last.0, y: last.1), pressure: 0.5)
         }
     }
 
@@ -57,21 +57,21 @@ struct StrokeEngineTests {
     @Test func drawStroke_commitsToDocument() throws {
         let ctx = try makeEngineContext()
         drawStroke(on: ctx.engine)
-        #expect(ctx.engine.document.strokes.count == 1)
+        #expect(ctx.engine.currentPage.strokes.count == 1)
     }
 
-    // 3.3 — Preview exists during drawing, gone after.
+    // 3.3 — An in-progress stroke (pencil still down) is held in activeStroke; lifting commits and clears it.
     @Test func activeStroke_existsDuringDrawing_nilAfter() throws {
         let ctx = try makeEngineContext()
 
-        // First point alone doesn't produce a preview (need >1 point).
-        ctx.engine.handleChanged(at: CGPoint(x: 10, y: 10), pressure: 0.5)
-        // Second point creates preview.
-        ctx.engine.handleChanged(at: CGPoint(x: 20, y: 20), pressure: 0.5)
+        // First point alone doesn't create an in-progress stroke (need >1 point to form a line).
+        ctx.engine.extendActiveStroke(at: CGPoint(x: 10, y: 10), pressure: 0.5)
+        // Second point: pencil still down, so the in-progress stroke exists.
+        ctx.engine.extendActiveStroke(at: CGPoint(x: 20, y: 20), pressure: 0.5)
         #expect(ctx.engine.activeStroke != nil)
 
-        // Lifting clears the preview.
-        ctx.engine.handleEnded(at: CGPoint(x: 30, y: 30), pressure: 0.5)
+        // Lifting the pencil commits the stroke to the page and clears activeStroke.
+        ctx.engine.commitActiveStroke(at: CGPoint(x: 30, y: 30), pressure: 0.5)
         #expect(ctx.engine.activeStroke == nil)
     }
 
@@ -79,7 +79,7 @@ struct StrokeEngineTests {
     @Test func drawStroke_usesToolSettings() throws {
         let ctx = try makeEngineContext(penWidth: 8)
         drawStroke(on: ctx.engine)
-        #expect(ctx.engine.document.strokes[0].width == 8)
+        #expect(ctx.engine.currentPage.strokes[0].width == 8)
     }
 
     // MARK: - Undo / Redo
@@ -88,10 +88,10 @@ struct StrokeEngineTests {
     @Test func undo_removesLastStroke() throws {
         let ctx = try makeEngineContext()
         drawStroke(on: ctx.engine)
-        #expect(ctx.engine.document.strokes.count == 1)
+        #expect(ctx.engine.currentPage.strokes.count == 1)
 
         ctx.engine.undoManager.undo()
-        #expect(ctx.engine.document.strokes.isEmpty)
+        #expect(ctx.engine.currentPage.strokes.isEmpty)
     }
 
     // 3.6 — Redo brings back an undone stroke.
@@ -99,10 +99,10 @@ struct StrokeEngineTests {
         let ctx = try makeEngineContext()
         drawStroke(on: ctx.engine)
         ctx.engine.undoManager.undo()
-        #expect(ctx.engine.document.strokes.isEmpty)
+        #expect(ctx.engine.currentPage.strokes.isEmpty)
 
         ctx.engine.undoManager.redo()
-        #expect(ctx.engine.document.strokes.count == 1)
+        #expect(ctx.engine.currentPage.strokes.count == 1)
     }
 
     // 3.6b — Undo/redo can loop indefinitely.
@@ -113,9 +113,9 @@ struct StrokeEngineTests {
         // Should be able to undo/redo as many times as we want.
         for _ in 0 ..< 5 {
             ctx.engine.undoManager.undo()
-            #expect(ctx.engine.document.strokes.isEmpty)
+            #expect(ctx.engine.currentPage.strokes.isEmpty)
             ctx.engine.undoManager.redo()
-            #expect(ctx.engine.document.strokes.count == 1)
+            #expect(ctx.engine.currentPage.strokes.count == 1)
         }
     }
 
@@ -139,13 +139,13 @@ struct StrokeEngineTests {
         drawStroke(on: ctx.engine, points: [(500, 500), (600, 600), (700, 700)])
         um.endUndoGrouping()
 
-        #expect(ctx.engine.document.strokes.count == 3)
+        #expect(ctx.engine.currentPage.strokes.count == 3)
 
         um.undo()
-        #expect(ctx.engine.document.strokes.count == 2)
+        #expect(ctx.engine.currentPage.strokes.count == 2)
         // First two strokes still intact.
-        #expect(ctx.engine.document.strokes[0].points[0].pointX == 10)
-        #expect(ctx.engine.document.strokes[1].points[0].pointX == 100)
+        #expect(ctx.engine.currentPage.strokes[0].points[0].pointX == 10)
+        #expect(ctx.engine.currentPage.strokes[1].points[0].pointX == 100)
     }
 
     // MARK: - Erasing
@@ -158,18 +158,18 @@ struct StrokeEngineTests {
         drawStroke(on: ctx.engine, points: [(10, 10), (20, 20), (30, 30)])
         // Draw a stroke far away.
         drawStroke(on: ctx.engine, points: [(500, 500), (510, 510), (520, 520)])
-        #expect(ctx.engine.document.strokes.count == 2)
+        #expect(ctx.engine.currentPage.strokes.count == 2)
 
         // Switch to eraser and wipe over the first stroke.
-        ctx.engine.updateToolStyle(ExcalidrawToolStyle(
+        ctx.engine.updateToolStyle(ToolStyle(
             selectedTool: .eraser, selectedColor: .black, penWidth: 3, eraserWidth: 40
         ))
-        ctx.engine.handleChanged(at: CGPoint(x: 15, y: 15), pressure: 0)
-        ctx.engine.handleEnded(at: CGPoint(x: 25, y: 25), pressure: 0)
+        ctx.engine.extendActiveStroke(at: CGPoint(x: 15, y: 15), pressure: 0)
+        ctx.engine.commitActiveStroke(at: CGPoint(x: 25, y: 25), pressure: 0)
 
         // Only the far stroke survives.
-        #expect(ctx.engine.document.strokes.count == 1)
-        #expect(ctx.engine.document.strokes[0].points[0].pointX == 500)
+        #expect(ctx.engine.currentPage.strokes.count == 1)
+        #expect(ctx.engine.currentPage.strokes[0].points[0].pointX == 500)
     }
 
     // 3.9 — Undo restores erased strokes.
@@ -181,31 +181,31 @@ struct StrokeEngineTests {
         um.beginUndoGrouping()
         drawStroke(on: ctx.engine, points: [(10, 10), (20, 20), (30, 30)])
         um.endUndoGrouping()
-        #expect(ctx.engine.document.strokes.count == 1)
+        #expect(ctx.engine.currentPage.strokes.count == 1)
 
         // Erase.
-        ctx.engine.updateToolStyle(ExcalidrawToolStyle(
+        ctx.engine.updateToolStyle(ToolStyle(
             selectedTool: .eraser, selectedColor: .black, penWidth: 3, eraserWidth: 40
         ))
         um.beginUndoGrouping()
-        ctx.engine.handleChanged(at: CGPoint(x: 15, y: 15), pressure: 0)
-        ctx.engine.handleEnded(at: CGPoint(x: 25, y: 25), pressure: 0)
+        ctx.engine.extendActiveStroke(at: CGPoint(x: 15, y: 15), pressure: 0)
+        ctx.engine.commitActiveStroke(at: CGPoint(x: 25, y: 25), pressure: 0)
         um.endUndoGrouping()
-        #expect(ctx.engine.document.strokes.isEmpty)
+        #expect(ctx.engine.currentPage.strokes.isEmpty)
 
         // Undo brings erased stroke back.
         um.undo()
-        #expect(ctx.engine.document.strokes.count == 1)
+        #expect(ctx.engine.currentPage.strokes.count == 1)
     }
 
     // 3.10 — Eraser cursor visible during erasing, hidden after.
     @Test func eraserCursor_visibleDuringErasing_hiddenAfter() throws {
         let ctx = try makeEngineContext(tool: .eraser)
 
-        ctx.engine.handleChanged(at: CGPoint(x: 50, y: 50), pressure: 0)
+        ctx.engine.extendActiveStroke(at: CGPoint(x: 50, y: 50), pressure: 0)
         #expect(ctx.engine.eraserCursorCenter != nil)
 
-        ctx.engine.handleEnded(at: CGPoint(x: 60, y: 60), pressure: 0)
+        ctx.engine.commitActiveStroke(at: CGPoint(x: 60, y: 60), pressure: 0)
         #expect(ctx.engine.eraserCursorCenter == nil)
     }
 
@@ -214,8 +214,8 @@ struct StrokeEngineTests {
         let ctx = try makeEngineContext(tool: .eraser)
 
         // Wave eraser over empty space.
-        ctx.engine.handleChanged(at: CGPoint(x: 100, y: 100), pressure: 0)
-        ctx.engine.handleEnded(at: CGPoint(x: 200, y: 200), pressure: 0)
+        ctx.engine.extendActiveStroke(at: CGPoint(x: 100, y: 100), pressure: 0)
+        ctx.engine.commitActiveStroke(at: CGPoint(x: 200, y: 200), pressure: 0)
 
         #expect(ctx.engine.undoManager.canUndo == false)
     }
