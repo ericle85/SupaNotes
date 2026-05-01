@@ -13,9 +13,6 @@ struct MultipageCanvasContainer: UIViewRepresentable {
     var addPage: () -> Void
     var addPageAbove: (() -> Void)?
     var onPageMutated: () -> Void
-    // Used purely for UI-test accessibility identifiers so XCUITest can verify
-    // which note's pages are currently rendered. Not shown to users.
-    var noteTitle: String = ""
 
     func makeUIView(context: Context) -> UIScrollView {
         let scrollView = UIScrollView()
@@ -44,25 +41,12 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         pencilInteraction.delegate = coordinator
         scrollView.addInteraction(pencilInteraction)
 
-        // Defer rebuild to the next runloop. At this point scrollView has zero
-        // bounds; calling rebuild now would mount nothing. SwiftUI normally
-        // re-fires updateUIView after navigation transitions, which then
-        // rebuilds with real bounds — but that doesn't happen on tab switches
-        // where the parent view is already on-screen and no SwiftUI state
-        // changes after the new representable is mounted.
-        DispatchQueue.main.async { [weak coordinator] in
-            guard let coordinator else { return }
-            coordinator.rebuildPages(pages: coordinator.pages, toolbar: coordinator.toolbar, viewport: nil)
-        }
+        coordinator.rebuildPages(pages: pages, toolbar: toolbar, viewport: nil)
         return scrollView
     }
 
     func updateUIView(_ scrollView: UIScrollView, context: Context) {
         let c = context.coordinator
-        // Detect note swap (e.g. user tapped a different tab). Page identities
-        // alone aren't enough — a stale Coordinator may be reused across tab
-        // switches, and we must tear down and rebuild before pushing new pages.
-        let noteChanged = c.noteTitle != noteTitle && !c.noteTitle.isEmpty
         c.pages = pages
         c.toolbar = toolbar
         c.onPencilDoubleTap = onPencilDoubleTap
@@ -70,22 +54,16 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         c.addPage = addPage
         c.addPageAbove = addPageAbove
         c.onPageMutated = onPageMutated
-        c.noteTitle = noteTitle
 
         // Sync toolbar to every active canvas.
         let style = ToolStyle.from(toolbar: toolbar)
         c.recycler.allActiveCanvases.forEach { $0.updateToolStyle(style) }
 
-        // Rebuild when pages change (count, identity), on note swap, or on first real layout.
+        // Rebuild when pages change (count, identity) or on first real layout.
         let containerWidth = c.containerView?.frame.width ?? 0
         let pageIDs = pages.map(\.persistentModelID)
-        let needsRebuild = noteChanged
-            || pageIDs != c.cachedPageIDs
+        let needsRebuild = pageIDs != c.cachedPageIDs
             || (!c.hasCompletedInitialLayout && scrollView.bounds.width > 0 && abs(containerWidth - scrollView.bounds.width) > 1)
-            // Recovery path: layout completed but no canvases mounted (e.g.
-            // makeUIView ran while bounds were zero, then layout settled but
-            // page IDs didn't change so the cache-equality check skipped rebuild).
-            || (c.recycler.activeViews.isEmpty && !pages.isEmpty && scrollView.bounds.width > 0)
 
         if needsRebuild {
             c.hasCompletedInitialLayout = scrollView.bounds.width > 0
@@ -97,14 +75,12 @@ struct MultipageCanvasContainer: UIViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        let c = Coordinator(
+        Coordinator(
             pages: pages, toolbar: toolbar,
             onUndoManagerReady: onUndoManagerReady, onPencilDoubleTap: onPencilDoubleTap,
             onCurrentPageChanged: onCurrentPageChanged, addPage: addPage,
             addPageAbove: addPageAbove, onPageMutated: onPageMutated
         )
-        c.noteTitle = noteTitle
-        return c
     }
 
     /// After rebuilding, optionally scroll to first or last page.
@@ -132,8 +108,6 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         var addPage: () -> Void
         var addPageAbove: (() -> Void)?
         var onPageMutated: () -> Void
-        // Mirrors the SwiftUI struct prop for accessibility tagging during canvas creation.
-        var noteTitle: String = ""
 
         // MARK: UIKit refs
 
@@ -221,10 +195,6 @@ struct MultipageCanvasContainer: UIViewRepresentable {
                     canvas.layer.shadowOffset = CGSize(width: Design.Shadow.page.x, height: Design.Shadow.page.y)
                     canvas.layer.shadowRadius = Design.Shadow.page.radius
                     canvas.updateZoomScale(scrollView.zoomScale)
-                    // Tag the canvas with the owning note's title so XCUITest can
-                    // assert "the canvas for note X is on screen" after a tab switch.
-                    canvas.accessibilityIdentifier = "canvas.\(self.noteTitle)"
-                    canvas.isAccessibilityElement = true
                     return canvas
                 }
                 recycler.willRemoveCanvas = { canvas in canvas.flushToModel() }
