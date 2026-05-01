@@ -101,7 +101,8 @@ struct ToolStyle {
 /// Callbacks to notify parent when drawing starts/ends.
 protocol DrawingCanvasDelegate: AnyObject {
     /// Called when user starts using a tool on this page.
-    func pageCanvasViewDidBeginUsingTool(_ view: DrawingCanvasView)
+    /// Return false to consume this touch as a scroll-stop only (no draw/erase for this touch).
+    func pageCanvasViewDidBeginUsingTool(_ view: DrawingCanvasView) -> Bool
     /// Called when user stops using a tool on this page.
     func pageCanvasViewDidEndUsingTool(_ view: DrawingCanvasView)
 }
@@ -137,7 +138,7 @@ final class DrawingCanvasView: UIView, StrokeEngineDelegate {
     /// Set up the view with page data and callbacks.
     init(page: Page, frame: CGRect, toolStyle: ToolStyle, onPageMutated: @escaping () -> Void) {
         self.page = page
-        self.engine = StrokeEngine(page: page, toolStyle: toolStyle, onPageMutated: onPageMutated)
+        engine = StrokeEngine(page: page, toolStyle: toolStyle, onPageMutated: onPageMutated)
         super.init(frame: frame)
         // Wire engine delegate so we redraw on state changes.
         engine.delegate = self
@@ -188,7 +189,7 @@ final class DrawingCanvasView: UIView, StrokeEngineDelegate {
     // MARK: StrokeEngineDelegate
 
     /// Called by the engine whenever visible state changes — sync to drawing view and redraw.
-    func strokeEngineDidChangeRenderState(_ engine: StrokeEngine) {
+    func strokeEngineDidChangeRenderState(_: StrokeEngine) {
         syncRenderState()
     }
 
@@ -227,8 +228,8 @@ final class DrawingCanvasView: UIView, StrokeEngineDelegate {
         drawingView.translatesAutoresizingMaskIntoConstraints = false
         // Notify delegate when drawing starts.
         drawingView.onGestureBegan = { [weak self] in
-            guard let self else { return }
-            interactionDelegate?.pageCanvasViewDidBeginUsingTool(self)
+            guard let self else { return false }
+            return interactionDelegate?.pageCanvasViewDidBeginUsingTool(self) ?? true
         }
         // Forward pencil movement to the engine.
         drawingView.onChangedInLetterSpace = { [weak self] pointAndPressure in
@@ -337,7 +338,7 @@ private final class VectorPDFBackgroundView: UIView {
 /// A drawing area that only responds to Apple Pencil, not finger touches.
 /// This connects the drawing display with the pencil touch detection.
 private final class PencilFilteredDrawingUIView: UIView {
-    // The coordinate space for strokes, set from the page's dimensions.
+    /// The coordinate space for strokes, set from the page's dimensions.
     var pageSize = CGSize(width: PageConstants.pageWidth, height: PageConstants.pageHeight)
 
     /// All the drawings that have been saved.
@@ -349,7 +350,8 @@ private final class PencilFilteredDrawingUIView: UIView {
     /// Radius of the eraser cursor in letter-space points.
     var eraserCursorRadius: CGFloat = 0
     /// What to do when the pencil first touches.
-    var onGestureBegan: (() -> Void)?
+    /// Return false to consume this touch without drawing/erasing.
+    var onGestureBegan: (() -> Bool)?
     /// What to do when the pencil moves (point in letter space + pressure).
     var onChangedInLetterSpace: (((CGPoint, CGFloat)) -> Void)?
     /// What to do when the pencil stops drawing (point in letter space + pressure).
@@ -357,6 +359,8 @@ private final class PencilFilteredDrawingUIView: UIView {
 
     /// The pencil touch we're currently tracking.
     private var activePencilTouch: UITouch?
+    /// Pencil touch currently being ignored (used when first touch should only stop scroll momentum).
+    private var suppressedPencilTouch: UITouch?
     /// Last effective pixel scale used for redraw so we avoid redundant invalidations.
     private var currentRenderScale: CGFloat = 0
 
@@ -453,8 +457,12 @@ private final class PencilFilteredDrawingUIView: UIView {
         super.touchesBegan(touches, with: event)
         guard activePencilTouch == nil else { return }
         guard let touch = touches.first(where: { $0.type == .pencil }) else { return }
+        // If parent requests "stop scrolling only", keep this touch fully suppressed.
+        if onGestureBegan?() == false {
+            suppressedPencilTouch = touch
+            return
+        }
         activePencilTouch = touch
-        onGestureBegan?()
         let point = toLetterSpace(touch.location(in: self))
         let pressure: CGFloat = touch.force > 0 ? touch.force : 0.5
         onChangedInLetterSpace?((point, pressure))
@@ -463,6 +471,7 @@ private final class PencilFilteredDrawingUIView: UIView {
     /// Called when the pencil moves across the screen while drawing.
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesMoved(touches, with: event)
+        if let suppressedPencilTouch, touches.contains(suppressedPencilTouch) { return }
         guard let activePencilTouch else { return }
         guard touches.contains(activePencilTouch) else { return }
         let location = activePencilTouch.location(in: self)
@@ -473,6 +482,10 @@ private final class PencilFilteredDrawingUIView: UIView {
     /// Called when the pencil lifts off the screen.
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesEnded(touches, with: event)
+        if let suppressedPencilTouch, touches.contains(suppressedPencilTouch) {
+            self.suppressedPencilTouch = nil
+            return
+        }
         guard let activePencilTouch else { return }
         guard touches.contains(activePencilTouch) else { return }
         let location = activePencilTouch.location(in: self)
@@ -484,6 +497,10 @@ private final class PencilFilteredDrawingUIView: UIView {
     /// Called if the drawing is interrupted (like a phone call).
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesCancelled(touches, with: event)
+        if let suppressedPencilTouch, touches.contains(suppressedPencilTouch) {
+            self.suppressedPencilTouch = nil
+            return
+        }
         guard let activePencilTouch else { return }
         guard touches.contains(activePencilTouch) else { return }
         let location = activePencilTouch.location(in: self)

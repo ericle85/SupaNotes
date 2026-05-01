@@ -87,15 +87,14 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         )
     }
 
-    // After rebuilding, optionally scroll to first or last page.
+    /// After rebuilding, optionally scroll to first or last page.
     enum ScrollAfterRebuild: Equatable { case none, scrollToFirst, scrollToLast }
 
     // MARK: - Coordinator
 
-    // UIKit bridge: owns scroll/zoom delegation, the single live canvas, page slots,
-    // pencil interaction, and pull-to-add.
+    /// UIKit bridge: owns scroll/zoom delegation, the single live canvas, page slots,
+    /// pencil interaction, and pull-to-add.
     final class Coordinator: NSObject, UIScrollViewDelegate, UIPencilInteractionDelegate, DrawingCanvasDelegate {
-
         // MARK: External state (updated each SwiftUI pass)
 
         var pages: [Page] {
@@ -106,6 +105,7 @@ struct MultipageCanvasContainer: UIViewRepresentable {
                 rebuildPages(pages: pages, toolbar: toolbar, viewport: viewport)
             }
         }
+
         var toolbar: ToolbarState
         var onUndoManagerReady: (UndoManager?) -> Void
         var onPencilDoubleTap: (() -> Void)?
@@ -121,13 +121,13 @@ struct MultipageCanvasContainer: UIViewRepresentable {
 
         // MARK: Canvas state
 
-        // The interactive canvas for the focused page — nil until first focus.
+        /// The interactive canvas for the focused page — nil until first focus.
         private(set) var liveCanvas: DrawingCanvasView?
-        // Page index the live canvas is mounted on (-1 = none).
+        /// Page index the live canvas is mounted on (-1 = none).
         private(set) var canvasPageIndex: Int = -1
-        // Display-only canvases on adjacent pages for vector-sharp rendering.
+        /// Display-only canvases on adjacent pages for vector-sharp rendering.
         private(set) var adjacentCanvases: [Int: DrawingCanvasView] = [:]
-        // All page slots in order.
+        /// All page slots in order.
         private(set) var slots: [PageSlotView] = []
         // Sorted pages and their frames from the last rebuild.
         private(set) var sortedPages: [Page] = []
@@ -137,6 +137,9 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         var hasCompletedInitialLayout = false
         let pullController = PullToAddController()
         var pendingScroll: ScrollAfterRebuild = .none
+        /// Test seam + future hook: called when we intentionally stop in-flight scroll motion.
+        /// Default is nil so production behavior stays simple.
+        var onRequestStopScrollMomentum: ((UIScrollView) -> Void)?
 
         private let pageGap = PageConstants.pageGap
 
@@ -174,7 +177,7 @@ struct MultipageCanvasContainer: UIViewRepresentable {
 
         // MARK: Page rebuild
 
-        func rebuildPages(pages: [Page], toolbar: ToolbarState, viewport: ViewportState?) {
+        func rebuildPages(pages: [Page], toolbar _: ToolbarState, viewport: ViewportState?) {
             guard let containerView, let scrollView else { return }
 
             let sorted = pages.sorted { $0.orderIndex < $1.orderIndex }
@@ -233,7 +236,7 @@ struct MultipageCanvasContainer: UIViewRepresentable {
 
         // MARK: Focus management
 
-        // Mount a fresh live canvas on the given page index.
+        /// Mount a fresh live canvas on the given page index.
         private func mountCanvas(on index: Int) {
             guard index >= 0, index < sortedPages.count, index < slots.count else { return }
             let page = sortedPages[index]
@@ -251,8 +254,8 @@ struct MultipageCanvasContainer: UIViewRepresentable {
             canvasPageIndex = index
         }
 
-        // Swap focus from current page to a new page. Snapshots outgoing, destroys old canvas,
-        // mounts new canvas on target slot.
+        /// Swap focus from current page to a new page. Snapshots outgoing, destroys old canvas,
+        /// mounts new canvas on target slot.
         private func swapFocus(to newIndex: Int) {
             guard newIndex != canvasPageIndex, newIndex >= 0, newIndex < sortedPages.count else { return }
 
@@ -280,7 +283,7 @@ struct MultipageCanvasContainer: UIViewRepresentable {
 
         // MARK: Bitmap fill
 
-        // Render bitmaps for any visible slots that don't have one yet (and aren't the live canvas slot).
+        /// Render bitmaps for any visible slots that don't have one yet (and aren't the live canvas slot).
         private func fillVisibleBitmaps() {
             guard let scrollView, let containerView else { return }
             let visibleRect = scrollView.convert(scrollView.bounds, to: containerView)
@@ -292,14 +295,16 @@ struct MultipageCanvasContainer: UIViewRepresentable {
 
         // MARK: Teardown
 
-        // Remove all slots and the live canvas from the view hierarchy.
+        /// Remove all slots and the live canvas from the view hierarchy.
         private func tearDown() {
             tearDownAdjacentCanvases()
             liveCanvas?.flushToModel()
             liveCanvas?.removeFromSuperview()
             liveCanvas = nil
             canvasPageIndex = -1
-            for slot in slots { slot.removeFromSuperview() }
+            for slot in slots {
+                slot.removeFromSuperview()
+            }
             slots.removeAll()
             sortedPages = []
             pageFrames = []
@@ -339,7 +344,7 @@ struct MultipageCanvasContainer: UIViewRepresentable {
             )
         }
 
-        // Compute current page index from scroll position.
+        /// Compute current page index from scroll position.
         private func currentPageIndex() -> Int {
             guard let scrollView, let containerView, !pageFrames.isEmpty else { return 0 }
             let centerY = (scrollView.contentOffset.y + scrollView.bounds.height / 2)
@@ -358,7 +363,7 @@ struct MultipageCanvasContainer: UIViewRepresentable {
             }
         }
 
-        // Handle scroll settling — swap focus if needed + fill bitmaps.
+        /// Handle scroll settling — swap focus if needed + fill bitmaps.
         private func handleScrollSettle() {
             let target = currentPageIndex()
             if target != canvasPageIndex {
@@ -369,7 +374,7 @@ struct MultipageCanvasContainer: UIViewRepresentable {
             liveCanvas?.updateZoomScale(scrollView?.zoomScale ?? 1.0)
         }
 
-        // Mount display-only canvases on pages adjacent to the live canvas for vector-sharp rendering.
+        /// Mount display-only canvases on pages adjacent to the live canvas for vector-sharp rendering.
         private func mountAdjacentCanvases() {
             let center = canvasPageIndex
             guard center >= 0, center < sortedPages.count else { return }
@@ -395,7 +400,7 @@ struct MultipageCanvasContainer: UIViewRepresentable {
             }
         }
 
-        // Remove all adjacent display canvases, optionally snapshotting them to bitmaps.
+        /// Remove all adjacent display canvases, optionally snapshotting them to bitmaps.
         private func tearDownAdjacentCanvases() {
             for (index, canvas) in adjacentCanvases {
                 canvas.removeFromSuperview()
@@ -444,7 +449,9 @@ struct MultipageCanvasContainer: UIViewRepresentable {
 
         // MARK: UIScrollViewDelegate
 
-        func viewForZooming(in _: UIScrollView) -> UIView? { containerView }
+        func viewForZooming(in _: UIScrollView) -> UIView? {
+            containerView
+        }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             updateCurrentPage()
@@ -474,9 +481,24 @@ struct MultipageCanvasContainer: UIViewRepresentable {
 
         // MARK: Canvas interaction
 
-        func pageCanvasViewDidBeginUsingTool(_ view: DrawingCanvasView) {
-            scrollView?.isScrollEnabled = false
+        func pageCanvasViewDidBeginUsingTool(_ view: DrawingCanvasView) -> Bool {
+            // Stop any in-flight momentum immediately so Pencil-down behaves like finger-down.
+            if let scrollView {
+                // Detect if the page was still moving when Pencil touched down.
+                let wasInMotion = scrollView.isDecelerating || scrollView.isScrollAnimating
+                scrollView.stopScrollingAndZooming()
+                // Notify the test seam that a momentum stop was requested.
+                onRequestStopScrollMomentum?(scrollView)
+                onUndoManagerReady(view.undoManagerForPage)
+                // If touch is only used to stop motion, do not disable finger scrolling.
+                guard !wasInMotion else { return false }
+                // While drawing is active, keep scrolling disabled.
+                scrollView.isScrollEnabled = false
+                // If we were still moving, consume this touch so it only stops motion.
+                return true
+            }
             onUndoManagerReady(view.undoManagerForPage)
+            return true
         }
 
         func pageCanvasViewDidEndUsingTool(_: DrawingCanvasView) {
@@ -485,7 +507,9 @@ struct MultipageCanvasContainer: UIViewRepresentable {
 
         // MARK: Pencil
 
-        func pencilInteractionDidTap(_: UIPencilInteraction) { onPencilDoubleTap?() }
+        func pencilInteractionDidTap(_: UIPencilInteraction) {
+            onPencilDoubleTap?()
+        }
     }
 }
 
