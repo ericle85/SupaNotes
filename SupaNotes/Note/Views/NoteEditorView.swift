@@ -49,7 +49,8 @@ struct NoteEditorView: View {
                 onCurrentPageChanged: { currentPageIndex = $0 },
                 addPage: { pageManager.addPage(to: note) },
                 addPageAbove: { pageManager.addPageAbove(in: note) },
-                onPageMutated: { note.updatedAt = .now }
+                onPageMutated: { note.updatedAt = .now },
+                noteTitle: note.title
             )
             .ignoresSafeArea()
 

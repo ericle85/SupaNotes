@@ -14,11 +14,19 @@
 			remoteGlobalIDString = BFE730DD2F3CCEC200F5DD1D;
 			remoteInfo = SupaNotes;
 		};
+		AA0100000000000000000A02 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BFE730D62F3CCEC200F5DD1D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BFE730DD2F3CCEC200F5DD1D;
+			remoteInfo = SupaNotes;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		BFAF52142F41429F0038730F /* Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BFE730DE2F3CCEC200F5DD1D /* SupaNotes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SupaNotes.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0100000000000000000A03 /* UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -30,6 +38,11 @@
 		BFE730E02F3CCEC200F5DD1D /* SupaNotes */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = SupaNotes;
+			sourceTree = "<group>";
+		};
+		AA0100000000000000000A04 /* UITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = UITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -49,6 +62,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA0100000000000000000A06 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -57,6 +77,7 @@
 			children = (
 				BFE730E02F3CCEC200F5DD1D /* SupaNotes */,
 				BFAF52152F41429F0038730F /* Tests */,
+				AA0100000000000000000A04 /* UITests */,
 				BFE730DF2F3CCEC200F5DD1D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -66,6 +87,7 @@
 			children = (
 				BFE730DE2F3CCEC200F5DD1D /* SupaNotes.app */,
 				BFAF52142F41429F0038730F /* Tests.xctest */,
+				AA0100000000000000000A03 /* UITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -118,6 +140,29 @@
 			productReference = BFE730DE2F3CCEC200F5DD1D /* SupaNotes.app */;
 			productType = "com.apple.product-type.application";
 		};
+		AA0100000000000000000A01 /* UITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0100000000000000000B01 /* Build configuration list for PBXNativeTarget "UITests" */;
+			buildPhases = (
+				AA0100000000000000000A05 /* Sources */,
+				AA0100000000000000000A06 /* Frameworks */,
+				AA0100000000000000000A07 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA0100000000000000000A08 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AA0100000000000000000A04 /* UITests */,
+			);
+			name = UITests;
+			packageProductDependencies = (
+			);
+			productName = UITests;
+			productReference = AA0100000000000000000A03 /* UITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -129,6 +174,10 @@
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
 					BFAF52132F41429F0038730F = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = BFE730DD2F3CCEC200F5DD1D;
+					};
+					AA0100000000000000000A01 = {
 						CreatedOnToolsVersion = 26.2;
 						TestTargetID = BFE730DD2F3CCEC200F5DD1D;
 					};
@@ -153,6 +202,7 @@
 			targets = (
 				BFE730DD2F3CCEC200F5DD1D /* SupaNotes */,
 				BFAF52132F41429F0038730F /* Tests */,
+				AA0100000000000000000A01 /* UITests */,
 			);
 		};
 /* End PBXProject section */
@@ -166,6 +216,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		BFE730DC2F3CCEC200F5DD1D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA0100000000000000000A07 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -189,6 +246,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA0100000000000000000A05 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -196,6 +260,11 @@
 			isa = PBXTargetDependency;
 			target = BFE730DD2F3CCEC200F5DD1D /* SupaNotes */;
 			targetProxy = BFAF52182F41429F0038730F /* PBXContainerItemProxy */;
+		};
+		AA0100000000000000000A08 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BFE730DD2F3CCEC200F5DD1D /* SupaNotes */;
+			targetProxy = AA0100000000000000000A02 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -239,6 +308,46 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SupaNotes.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SupaNotes";
+			};
+			name = Release;
+		};
+		AA0100000000000000000A09 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7ARN6P5ZCL;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ericle.UITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SupaNotes;
+			};
+			name = Debug;
+		};
+		AA0100000000000000000A10 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7ARN6P5ZCL;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ericle.UITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SupaNotes;
 			};
 			name = Release;
 		};
@@ -459,6 +568,15 @@
 			buildConfigurations = (
 				BFE730EA2F3CCEC300F5DD1D /* Debug */,
 				BFE730EB2F3CCEC300F5DD1D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA0100000000000000000B01 /* Build configuration list for PBXNativeTarget "UITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0100000000000000000A09 /* Debug */,
+				AA0100000000000000000A10 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

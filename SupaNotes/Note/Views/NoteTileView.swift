@@ -55,6 +55,8 @@ struct NoteTileView: View {
                 )
         }
         .buttonStyle(.plain)
+        // Stable identifier for XCUITest to tap a specific tile by note title.
+        .accessibilityIdentifier("noteTile.\(note.title)")
     }
 
     /// Shows the rendered thumbnail or a gray placeholder while loading

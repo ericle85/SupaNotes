@@ -37,7 +37,9 @@ struct NoteTabsBar: View {
         // Check if this tab is the currently active one.
         let isActive = tabs.activeTabID == note.id
         HStack(spacing: 6) {
-            // Tab title button - activates the tab when tapped.
+            // Tab title button - activates the tab when tapped. Uses a fixed
+            // 32pt hit target so XCUITest taps (and fingers) reliably land on
+            // the button instead of slipping through to the underlying scroll view.
             Button {
                 tabs.activate(note.id)
             } label: {
@@ -45,7 +47,11 @@ struct NoteTabsBar: View {
                     .font(.system(size: 13, weight: isActive ? .semibold : .regular))
                     .lineLimit(1)
                     .foregroundStyle(isActive ? Color.primary : Color.secondary) // Use primary color for active tab, secondary for inactive.
+                    .frame(minHeight: 32)
+                    .contentShape(Rectangle())
             }
+            // Stable identifier for XCUITest — title is shown to users; identifier is for tests.
+            .accessibilityIdentifier("tab.\(note.title)")
             // Close button - removes the tab when tapped.
             Button {
                 tabs.close(noteID: note.id)

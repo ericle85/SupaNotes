@@ -144,6 +144,39 @@ import SwiftData
         #expect(callbackUndoManager != nil)
     }
 
+    // Switching notes must replace canvases for the new note's pages, not keep
+    // the previous note's canvases mounted. Mimics the tab-switch flow where
+    // SwiftUI re-uses the same Coordinator and pushes new pages via the
+    // `pages` setter rather than going through makeCoordinator + makeUIView.
+    @Test func switchNote_samePageCount_rendersNewNoteImmediately() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        // Two notes with the same page count but distinct Page identities.
+        let pagesA = try makePages(in: context, count: 3)
+        let pagesB = try makePages(in: context, count: 3)
+        #expect(pagesA.map(\.persistentModelID) != pagesB.map(\.persistentModelID))
+
+        let harness = makeCoordinatorHarness(pages: pagesA)
+        harness.coordinator.rebuildPages(pages: pagesA, toolbar: ToolbarState(), viewport: nil)
+
+        let pageIDsA = Set(pagesA.map(\.persistentModelID))
+        let mountedAfterA = harness.coordinator.recycler.activeViews.values
+            .map { $0.page.persistentModelID }
+        #expect(Set(mountedAfterA).isSubset(of: pageIDsA))
+        #expect(!mountedAfterA.isEmpty)
+
+        // Simulate the SwiftUI binding update that fires on tab switch.
+        harness.coordinator.pages = pagesB
+
+        let pageIDsB = Set(pagesB.map(\.persistentModelID))
+        let mountedAfterB = harness.coordinator.recycler.activeViews.values
+            .map { $0.page.persistentModelID }
+        #expect(!mountedAfterB.isEmpty, "Expected new note's canvases to be mounted after pages switch")
+        #expect(Set(mountedAfterB).isSubset(of: pageIDsB), "Mounted canvases must belong to the new note")
+        #expect(Set(mountedAfterB).isDisjoint(with: pageIDsA), "No canvases from previous note should remain")
+    }
+
     // Zoom-end updates should only target active canvases (window stays bounded).
     @Test func zoomEnd_keepsActiveWindowBounded() throws {
         let container = try makeContainer()
