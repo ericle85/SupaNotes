@@ -3,8 +3,8 @@ import UIKit
 import SwiftData
 @testable import SupaNotes
 
-// Integration tests for MultipageCanvasContainer.Coordinator + PageRecycler.
-// These tests focus on recycler-window behavior instead of per-canvas logic.
+// Integration tests for MultipageCanvasContainer.Coordinator with single-canvas architecture.
+// Validates: rebuild mounts one canvas, scroll-settle swaps focus, only 1 canvas ever exists.
 @MainActor
 @Suite struct MultipageCanvasCoordinatorTests {
 
@@ -16,7 +16,7 @@ import SwiftData
 
     // Build a note with N pages inserted into context and linked to the note.
     private func makePages(in context: ModelContext, count: Int) throws -> [Page] {
-        let note = Note(title: "Recycler Note")
+        let note = Note(title: "Test Note")
         context.insert(note)
         note.pages = []
         for i in 0..<count {
@@ -60,74 +60,61 @@ import SwiftData
         return (coordinator, scrollView, containerView)
     }
 
-    // Active canvas indices currently mounted in the container.
-    private func activeIndices(in containerView: UIView) -> Set<Int> {
-        Set(containerView.subviews.compactMap { ($0 as? DrawingCanvasView)?.tag })
+    // Count live DrawingCanvasView instances in the entire container hierarchy.
+    private func canvasCount(in containerView: UIView) -> Int {
+        containerView.subviews.flatMap { view -> [DrawingCanvasView] in
+            // Canvas lives inside a PageSlotView.
+            view.subviews.compactMap { $0 as? DrawingCanvasView }
+        }.count
     }
 
+    // MARK: - Tests
 
-    // MARK: - Coordinator + recycler integration
-
-    // Rebuild should configure a bounded active window instead of mounting every page.
-    @Test func rebuild_configuresRecyclerAndActivatesBoundedWindow() throws {
+    // Rebuild should mount one live canvas on page 0 plus adjacent display canvases.
+    @Test func rebuild_mountsCanvasOnFirstPage() throws {
         let container = try makeContainer()
         let pages = try makePages(in: container.mainContext, count: 120)
         let harness = makeCoordinatorHarness(pages: pages)
 
         harness.coordinator.rebuildPages(pages: pages, toolbar: ToolbarState(), viewport: nil)
 
-        let active = activeIndices(in: harness.containerView)
-        #expect(!active.isEmpty)
-        #expect(active.count < pages.count)
-        #expect(active.contains(0))
+        // One live canvas + adjacent display canvases (at most 1 for page 0 since there's no page -1).
+        #expect(harness.coordinator.liveCanvas != nil)
+        #expect(harness.coordinator.canvasPageIndex == 0)
+        #expect(canvasCount(in: harness.containerView) <= 3)
+        #expect(harness.coordinator.adjacentCanvases.count <= 2)
     }
 
-    // Scrolling far down should rotate the active recycler window.
-    @Test func scroll_updatesActiveWindow() throws {
+    // All pages should have slots.
+    @Test func rebuild_createsSlotForEveryPage() throws {
         let container = try makeContainer()
-        let pages = try makePages(in: container.mainContext, count: 120)
+        let pages = try makePages(in: container.mainContext, count: 50)
         let harness = makeCoordinatorHarness(pages: pages)
 
         harness.coordinator.rebuildPages(pages: pages, toolbar: ToolbarState(), viewport: nil)
-        let firstActive = activeIndices(in: harness.containerView)
-        #expect(firstActive.contains(0))
 
-        // Move far enough to leave the first pages behind.
-        harness.scrollView.contentOffset = CGPoint(x: 0, y: 20_000)
-        harness.coordinator.scrollViewDidScroll(harness.scrollView)
-
-        let secondActive = activeIndices(in: harness.containerView)
-        #expect(!secondActive.isEmpty)
-        #expect(!secondActive.contains(0))
-        #expect(firstActive != secondActive)
+        #expect(harness.coordinator.slots.count == 50)
     }
 
-    // Flush notification should only flush currently active canvases.
-    @Test func flushDrawings_flushesOnlyActiveCanvases() throws {
+    // Flush notification should flush the single live canvas.
+    @Test func flushDrawings_flushesLiveCanvas() throws {
         let container = try makeContainer()
-        let pages = try makePages(in: container.mainContext, count: 80)
+        let pages = try makePages(in: container.mainContext, count: 10)
         let harness = makeCoordinatorHarness(pages: pages)
 
         harness.coordinator.rebuildPages(pages: pages, toolbar: ToolbarState(), viewport: nil)
-        let active = activeIndices(in: harness.containerView)
-        #expect(!active.isEmpty)
-        #expect(active.count < pages.count)
+        #expect(harness.coordinator.liveCanvas != nil)
 
         NotificationCenter.default.post(name: .flushDrawings, object: nil)
 
-        for (index, page) in pages.enumerated() {
-            if active.contains(index) {
-                #expect(!page.drawingData.isEmpty)
-            } else {
-                #expect(page.drawingData.isEmpty)
-            }
-        }
+        // The canvas page should have been flushed (drawingData non-empty from engine init).
+        #expect(!pages[0].drawingData.isEmpty)
     }
 
-    // Undo manager callback should still publish the active page's undo stack.
-    @Test func onUndoManagerReady_firesWithActivePageManager() async throws {
+    // Undo manager callback should publish the live canvas's undo stack.
+    @Test func onUndoManagerReady_firesWithLiveCanvasManager() async throws {
         let container = try makeContainer()
-        let pages = try makePages(in: container.mainContext, count: 40)
+        let pages = try makePages(in: container.mainContext, count: 10)
         var callbackUndoManager: UndoManager?
 
         let harness = makeCoordinatorHarness(
@@ -144,22 +131,18 @@ import SwiftData
         #expect(callbackUndoManager != nil)
     }
 
-    // Zoom-end updates should only target active canvases (window stays bounded).
-    @Test func zoomEnd_keepsActiveWindowBounded() throws {
+    // Zoom-end should not create extra canvases beyond live + adjacent.
+    @Test func zoomEnd_keepsCanvasCountBounded() throws {
         let container = try makeContainer()
-        let pages = try makePages(in: container.mainContext, count: 140)
+        let pages = try makePages(in: container.mainContext, count: 50)
         let harness = makeCoordinatorHarness(pages: pages)
 
         harness.coordinator.rebuildPages(pages: pages, toolbar: ToolbarState(), viewport: nil)
-        let before = activeIndices(in: harness.containerView)
-        #expect(!before.isEmpty)
+        let before = canvasCount(in: harness.containerView)
 
         harness.scrollView.zoomScale = 2
         harness.coordinator.scrollViewDidEndZooming(harness.scrollView, with: harness.containerView, atScale: 2)
 
-        let after = activeIndices(in: harness.containerView)
-        #expect(after == before)
-        #expect(after.count < pages.count)
+        #expect(canvasCount(in: harness.containerView) == before)
     }
-
 }

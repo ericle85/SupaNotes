@@ -2,8 +2,11 @@ import SwiftData
 import SwiftUI
 import UIKit
 
-/// Main container for all pages in a note — a vertically-scrolling, zoomable UIKit scroll view
-/// bridged into SwiftUI. Apple Pencil draws; fingers scroll and zoom.
+// Main container for all pages in a note — a vertically-scrolling, zoomable UIKit scroll view
+// bridged into SwiftUI. Apple Pencil draws; fingers scroll and zoom.
+//
+// Architecture: only ONE live DrawingCanvasView exists at a time (the focused page). Every other
+// page is a lightweight PageSlotView showing a low-res bitmap snapshot. No preloading, no recycler.
 struct MultipageCanvasContainer: UIViewRepresentable {
     @Binding var pages: [Page]
     var toolbar: ToolbarState
@@ -55,9 +58,10 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         c.addPageAbove = addPageAbove
         c.onPageMutated = onPageMutated
 
-        // Sync toolbar to every active canvas.
+        // Sync toolbar to all mounted canvases.
         let style = ToolStyle.from(toolbar: toolbar)
-        c.recycler.allActiveCanvases.forEach { $0.updateToolStyle(style) }
+        c.liveCanvas?.updateToolStyle(style)
+        c.adjacentCanvases.values.forEach { $0.updateToolStyle(style) }
 
         // Rebuild when pages change (count, identity) or on first real layout.
         let containerWidth = c.containerView?.frame.width ?? 0
@@ -83,12 +87,13 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         )
     }
 
-    /// After rebuilding, optionally scroll to first or last page.
+    // After rebuilding, optionally scroll to first or last page.
     enum ScrollAfterRebuild: Equatable { case none, scrollToFirst, scrollToLast }
 
     // MARK: - Coordinator
 
-    /// UIKit bridge: owns scroll/zoom delegation, canvas views, pencil interaction, and pull-to-add.
+    // UIKit bridge: owns scroll/zoom delegation, the single live canvas, page slots,
+    // pencil interaction, and pull-to-add.
     final class Coordinator: NSObject, UIScrollViewDelegate, UIPencilInteractionDelegate, DrawingCanvasDelegate {
 
         // MARK: External state (updated each SwiftUI pass)
@@ -116,14 +121,23 @@ struct MultipageCanvasContainer: UIViewRepresentable {
 
         // MARK: Canvas state
 
-        let recycler = PageRecycler()
+        // The interactive canvas for the focused page — nil until first focus.
+        private(set) var liveCanvas: DrawingCanvasView?
+        // Page index the live canvas is mounted on (-1 = none).
+        private(set) var canvasPageIndex: Int = -1
+        // Display-only canvases on adjacent pages for vector-sharp rendering.
+        private(set) var adjacentCanvases: [Int: DrawingCanvasView] = [:]
+        // All page slots in order.
+        private(set) var slots: [PageSlotView] = []
+        // Sorted pages and their frames from the last rebuild.
+        private(set) var sortedPages: [Page] = []
+        private(set) var pageFrames: [CGRect] = []
+
         var cachedPageIDs: [PersistentIdentifier] = []
         var hasCompletedInitialLayout = false
         let pullController = PullToAddController()
         var pendingScroll: ScrollAfterRebuild = .none
 
-        /// Cached page sizes from last rebuild (for viewport math).
-        private var cachedPageSizes: [CGSize] = []
         private let pageGap = PageConstants.pageGap
 
         // MARK: Init / deinit
@@ -152,8 +166,7 @@ struct MultipageCanvasContainer: UIViewRepresentable {
                 self?.scrollToPage(index: index)
             }
             NotificationCenter.default.addObserver(forName: .flushDrawings, object: nil, queue: .main) { [weak self] _ in
-                // Offscreen pages were flushed when their canvas was removed.
-                self?.recycler.allActiveCanvases.forEach { $0.flushToModel() }
+                self?.liveCanvas?.flushToModel()
             }
         }
 
@@ -166,38 +179,27 @@ struct MultipageCanvasContainer: UIViewRepresentable {
 
             let sorted = pages.sorted { $0.orderIndex < $1.orderIndex }
             let pageSizes = sorted.map(\.size)
-            cachedPageSizes = pageSizes
             cachedPageIDs = sorted.map(\.persistentModelID)
 
             let cw = PageLayout.getCanvasWidth(pageSizes: pageSizes, gap: pageGap, scrollWidth: scrollView.bounds.width)
             let totalHeight = PageLayout.getContainerHeight(pageSizes: pageSizes, gap: pageGap)
             let totalSize = CGSize(width: cw, height: totalHeight)
             let frames = PageLayout.getPageFramesAsCGRects(pageSizes: pageSizes, gap: pageGap, containerWidth: cw)
-            let style = ToolStyle.from(toolbar: toolbar)
 
             UIView.performWithoutAnimation {
-                // Tear down all active canvas views.
-                recycler.removeAll()
+                // Tear down existing canvas and slots.
+                tearDown()
                 containerView.bounds.size = totalSize
+                sortedPages = sorted
+                pageFrames = frames
 
-                // Configure recycler with new page data and canvas factory.
-                recycler.configure(sortedPages: sorted, pageFrames: frames)
-                recycler.createCanvas = { [weak self] page, frame in
-                    guard let self else {
-                        return DrawingCanvasView(page: page, frame: frame, toolStyle: style, onPageMutated: {})
-                    }
-                    let canvas = DrawingCanvasView(
-                        page: page, frame: frame, toolStyle: style, onPageMutated: onPageMutated
-                    )
-                    canvas.interactionDelegate = self
-                    canvas.layer.shadowColor = UIColor.black.cgColor
-                    canvas.layer.shadowOpacity = Float(Design.Shadow.page.opacity)
-                    canvas.layer.shadowOffset = CGSize(width: Design.Shadow.page.x, height: Design.Shadow.page.y)
-                    canvas.layer.shadowRadius = Design.Shadow.page.radius
-                    canvas.updateZoomScale(scrollView.zoomScale)
-                    return canvas
+                // Create lightweight slots for every page.
+                for (i, page) in sorted.enumerated() {
+                    let slot = PageSlotView(frame: frames[i], template: page.template)
+                    slot.pageIndex = i
+                    containerView.addSubview(slot)
+                    slots.append(slot)
                 }
-                recycler.willRemoveCanvas = { canvas in canvas.flushToModel() }
 
                 // Restore viewport or set initial layout.
                 if let viewport {
@@ -210,31 +212,109 @@ struct MultipageCanvasContainer: UIViewRepresentable {
                 containerView.layoutIfNeeded()
                 scrollView.layoutIfNeeded()
 
-                // Populate the initial active window based on current scroll position.
-                triggerRecyclerUpdate()
+                // Mount the live canvas on the initial page (page 0 or closest to viewport center).
+                let initialIndex = currentPageIndex()
+                mountCanvas(on: initialIndex)
+
+                // Fill visible slot bitmaps, then render adjacent pages at full quality.
+                fillVisibleBitmaps()
+                mountAdjacentCanvases()
             }
 
             pullController.setupIndicators(in: scrollView)
             applyPendingScroll(frames: frames)
             centerContainerIfNeeded()
 
-            // Deliver first visible page's undo manager on next run loop.
-            if let first = recycler.canvas(at: 0) ?? recycler.allActiveCanvases.first {
-                DispatchQueue.main.async { [weak self] in self?.onUndoManagerReady(first.undoManagerForPage) }
+            // Deliver focused page's undo manager on next run loop.
+            if let canvas = liveCanvas {
+                DispatchQueue.main.async { [weak self] in self?.onUndoManagerReady(canvas.undoManagerForPage) }
             }
+        }
+
+        // MARK: Focus management
+
+        // Mount a fresh live canvas on the given page index.
+        private func mountCanvas(on index: Int) {
+            guard index >= 0, index < sortedPages.count, index < slots.count else { return }
+            let page = sortedPages[index]
+            let frame = CGRect(origin: .zero, size: pageFrames[index].size)
+            let style = ToolStyle.from(toolbar: toolbar)
+            let canvas = DrawingCanvasView(page: page, frame: frame, toolStyle: style, onPageMutated: onPageMutated)
+            canvas.interactionDelegate = self
+            canvas.updateZoomScale(scrollView?.zoomScale ?? 1.0)
+
+            // Hide the slot's bitmap — canvas covers it.
+            slots[index].bitmap = nil
+            slots[index].addSubview(canvas)
+
+            liveCanvas = canvas
+            canvasPageIndex = index
+        }
+
+        // Swap focus from current page to a new page. Snapshots outgoing, destroys old canvas,
+        // mounts new canvas on target slot.
+        private func swapFocus(to newIndex: Int) {
+            guard newIndex != canvasPageIndex, newIndex >= 0, newIndex < sortedPages.count else { return }
+
+            // Tear down adjacent display canvases first.
+            tearDownAdjacentCanvases()
+
+            // Snapshot outgoing page and tear down old canvas.
+            if let canvas = liveCanvas, canvasPageIndex >= 0, canvasPageIndex < slots.count {
+                canvas.flushToModel()
+                let outgoingPage = sortedPages[canvasPageIndex]
+                slots[canvasPageIndex].bitmap = PageBitmapRenderer.render(page: outgoingPage)
+                canvas.removeFromSuperview()
+            }
+            liveCanvas = nil
+            canvasPageIndex = -1
+
+            // Mount new canvas on target.
+            mountCanvas(on: newIndex)
+
+            // Deliver undo manager for the new page.
+            if let canvas = liveCanvas {
+                onUndoManagerReady(canvas.undoManagerForPage)
+            }
+        }
+
+        // MARK: Bitmap fill
+
+        // Render bitmaps for any visible slots that don't have one yet (and aren't the live canvas slot).
+        private func fillVisibleBitmaps() {
+            guard let scrollView, let containerView else { return }
+            let visibleRect = scrollView.convert(scrollView.bounds, to: containerView)
+            for (i, slot) in slots.enumerated() {
+                guard i != canvasPageIndex, slot.bitmap == nil, slot.frame.intersects(visibleRect) else { continue }
+                slot.bitmap = PageBitmapRenderer.render(page: sortedPages[i])
+            }
+        }
+
+        // MARK: Teardown
+
+        // Remove all slots and the live canvas from the view hierarchy.
+        private func tearDown() {
+            tearDownAdjacentCanvases()
+            liveCanvas?.flushToModel()
+            liveCanvas?.removeFromSuperview()
+            liveCanvas = nil
+            canvasPageIndex = -1
+            for slot in slots { slot.removeFromSuperview() }
+            slots.removeAll()
+            sortedPages = []
+            pageFrames = []
         }
 
         // MARK: Viewport
 
         func captureViewport() -> ViewportState? {
             guard let scrollView, let containerView, !pages.isEmpty else { return nil }
-            let frames = currentPageFrames()
             return PageLayout.captureViewport(
                 scrollOffset: scrollView.contentOffset,
                 scrollBoundsSize: scrollView.bounds.size,
                 containerOrigin: containerView.frame.origin,
                 zoomScale: scrollView.zoomScale,
-                pageFrames: frames
+                pageFrames: pageFrames
             )
         }
 
@@ -259,48 +339,86 @@ struct MultipageCanvasContainer: UIViewRepresentable {
             )
         }
 
-        private func currentPageFrames() -> [CGRect] {
-            let cw = containerView?.bounds.width ?? 0
-            return PageLayout.getPageFramesAsCGRects(pageSizes: cachedPageSizes, gap: pageGap, containerWidth: cw)
-        }
-
-        // Ask the recycler to create/remove canvas views based on current scroll position.
-        private func triggerRecyclerUpdate() {
-            guard let scrollView, let containerView else { return }
-            let visibleRect = scrollView.convert(scrollView.bounds, to: containerView)
-            recycler.updateActiveWindow(visibleRect: visibleRect, containerView: containerView)
+        // Compute current page index from scroll position.
+        private func currentPageIndex() -> Int {
+            guard let scrollView, let containerView, !pageFrames.isEmpty else { return 0 }
+            let centerY = (scrollView.contentOffset.y + scrollView.bounds.height / 2)
+                / max(scrollView.zoomScale, 0.001) - containerView.frame.minY
+            let raw = PageLayout.getCurrentPageIndex(centerY: centerY, pageFrames: pageFrames)
+            return min(raw, max(0, sortedPages.count - 1))
         }
 
         private func updateCurrentPage() {
-            guard let scrollView, let containerView, !pages.isEmpty else { return }
-            let centerY = (scrollView.contentOffset.y + scrollView.bounds.height / 2)
-                / max(scrollView.zoomScale, 0.001) - containerView.frame.minY
-            let index = PageLayout.getCurrentPageIndex(centerY: centerY, pageFrames: currentPageFrames())
-            let clampedIndex = min(index, max(0, pages.count - 1))
-            onCurrentPageChanged?(clampedIndex)
-            // Deliver the focused page's undo manager to the toolbar.
-            if let canvas = recycler.canvas(at: clampedIndex) {
+            guard !pages.isEmpty else { return }
+            let index = currentPageIndex()
+            onCurrentPageChanged?(index)
+            // Deliver the focused page's undo manager if it's the canvas page.
+            if index == canvasPageIndex, let canvas = liveCanvas {
                 onUndoManagerReady(canvas.undoManagerForPage)
             }
+        }
+
+        // Handle scroll settling — swap focus if needed + fill bitmaps.
+        private func handleScrollSettle() {
+            let target = currentPageIndex()
+            if target != canvasPageIndex {
+                swapFocus(to: target)
+            }
+            fillVisibleBitmaps()
+            mountAdjacentCanvases()
+            liveCanvas?.updateZoomScale(scrollView?.zoomScale ?? 1.0)
+        }
+
+        // Mount display-only canvases on pages adjacent to the live canvas for vector-sharp rendering.
+        private func mountAdjacentCanvases() {
+            let center = canvasPageIndex
+            guard center >= 0, center < sortedPages.count else { return }
+            let wanted = Set([center - 1, center + 1].filter { $0 >= 0 && $0 < sortedPages.count })
+
+            // Remove canvases that are no longer adjacent.
+            for index in adjacentCanvases.keys where !wanted.contains(index) {
+                adjacentCanvases.removeValue(forKey: index)?.removeFromSuperview()
+            }
+
+            // Mount new adjacent canvases where needed.
+            for i in wanted where adjacentCanvases[i] == nil {
+                let page = sortedPages[i]
+                let frame = CGRect(origin: .zero, size: pageFrames[i].size)
+                let style = ToolStyle.from(toolbar: toolbar)
+                let canvas = DrawingCanvasView(page: page, frame: frame, toolStyle: style, onPageMutated: onPageMutated)
+                // Display-only — no pencil input, no interaction delegate.
+                canvas.isUserInteractionEnabled = false
+                canvas.updateZoomScale(scrollView?.zoomScale ?? 1.0)
+                slots[i].bitmap = nil
+                slots[i].addSubview(canvas)
+                adjacentCanvases[i] = canvas
+            }
+        }
+
+        // Remove all adjacent display canvases, optionally snapshotting them to bitmaps.
+        private func tearDownAdjacentCanvases() {
+            for (index, canvas) in adjacentCanvases {
+                canvas.removeFromSuperview()
+                if index >= 0, index < sortedPages.count, index < slots.count {
+                    slots[index].bitmap = PageBitmapRenderer.render(page: sortedPages[index])
+                }
+            }
+            adjacentCanvases.removeAll()
         }
 
         // MARK: Scroll-to-page
 
         private func scrollToPage(index: Int) {
-            guard let scrollView, let containerView, index < pages.count else { return }
+            guard let scrollView, let containerView, index < pages.count, index < pageFrames.count else { return }
             scrollView.zoomScale = 1.0
             scrollView.contentSize = PageLayout.getScrollContentSize(containerSize: containerView.bounds.size, zoomScale: 1.0)
             centerContainerIfNeeded()
-            let frames = currentPageFrames()
-            guard index < frames.count else { return }
             let maxY = max(0, scrollView.contentSize.height - scrollView.bounds.height)
-            let targetY = min(max(0, containerView.frame.minY + frames[index].minY - 20), maxY)
+            let targetY = min(max(0, containerView.frame.minY + pageFrames[index].minY - 20), maxY)
             UIView.animate(withDuration: 0.3) {
                 scrollView.contentOffset = CGPoint(x: 0, y: targetY)
             } completion: { [weak self] _ in
-                guard let self else { return }
-                triggerRecyclerUpdate()
-                recycler.allActiveCanvases.forEach { $0.updateZoomScale(1.0) }
+                self?.handleScrollSettle()
             }
         }
 
@@ -331,27 +449,27 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             updateCurrentPage()
             pullController.update(for: scrollView)
-            triggerRecyclerUpdate()
+            fillVisibleBitmaps()
         }
 
         func scrollViewDidZoom(_: UIScrollView) {
             centerContainerIfNeeded()
-            updateCurrentPage()
         }
 
         func scrollViewDidEndZooming(_: UIScrollView, with _: UIView?, atScale scale: CGFloat) {
-            triggerRecyclerUpdate()
-            recycler.allActiveCanvases.forEach { $0.updateZoomScale(scale) }
+            liveCanvas?.updateZoomScale(scale)
+            adjacentCanvases.values.forEach { $0.updateZoomScale(scale) }
         }
 
-        func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        func scrollViewDidEndDragging(_: UIScrollView, willDecelerate decelerate: Bool) {
             let scroll = pullController.handleEndDragging(addPage: addPage, addPageAbove: addPageAbove)
             if scroll != .none { pendingScroll = scroll }
-            if !decelerate { recycler.allActiveCanvases.forEach { $0.updateZoomScale(scrollView.zoomScale) } }
+            // If no deceleration, scroll is settled — swap focus now.
+            if !decelerate { handleScrollSettle() }
         }
 
-        func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
-            recycler.allActiveCanvases.forEach { $0.updateZoomScale(scrollView.zoomScale) }
+        func scrollViewDidEndDecelerating(_: UIScrollView) {
+            handleScrollSettle()
         }
 
         // MARK: Canvas interaction
