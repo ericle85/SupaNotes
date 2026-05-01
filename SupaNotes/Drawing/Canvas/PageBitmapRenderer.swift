@@ -61,9 +61,8 @@ enum PageBitmapRenderer {
     // Walk the page → note → originalPdfData chain to find the matching PDF page.
     private static func pdfPage(for page: Page) -> PDFPage? {
         guard let note = page.note,
-              let pdfData = note.originalPdfData,
               let pageNum = page.pdfPageNumber,
-              let doc = PDFDocument(data: pdfData),
+              let doc = PDFDocumentCache.document(for: note),
               let pdfPage = doc.page(at: pageNum)
         else { return nil }
         return pdfPage

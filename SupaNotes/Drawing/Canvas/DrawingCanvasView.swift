@@ -255,8 +255,8 @@ final class DrawingCanvasView: UIView, StrokeEngineDelegate {
     }
 
     private func applyAppearance(for page: Page) {
-        if let note = page.note, let pdfData = note.originalPdfData, let pageNum = page.pdfPageNumber,
-           let doc = PDFDocument(data: pdfData), let pdfPage = doc.page(at: pageNum)
+        if let note = page.note, let pageNum = page.pdfPageNumber,
+           let doc = PDFDocumentCache.document(for: note), let pdfPage = doc.page(at: pageNum)
         {
             // Vector PDF background — stays sharp at any zoom.
             pdfBackgroundView.pdfPage = pdfPage
