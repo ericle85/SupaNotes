@@ -3,8 +3,8 @@ import UIKit
 import SwiftData
 @testable import SupaNotes
 
-// Tests for the single-canvas focus swap mechanism. Validates that the coordinator
-// correctly reparents the live canvas and snapshots outgoing pages.
+// Tests for the multi-canvas visible-page architecture. Validates that the coordinator
+// mounts live canvases on all visible pages and adjacent display canvases ±1 from visible range.
 @MainActor
 @Suite struct SingleCanvasFocusTests {
 
@@ -63,50 +63,49 @@ import SwiftData
 
     // MARK: - Tests
 
-    // After rebuild, live canvas on page 0 + adjacent display canvas on page 1.
-    @Test func rebuild_mountsCanvasOnPage0() throws {
+    // After rebuild, live canvas on visible pages + adjacent display canvases.
+    @Test func rebuild_mountsCanvasOnVisiblePages() throws {
         let container = try makeContainer()
         let pages = try makePages(in: container.mainContext, count: 5)
         let harness = makeHarness(pages: pages)
 
         harness.coordinator.rebuildPages(pages: pages, toolbar: ToolbarState(), viewport: nil)
 
-        #expect(harness.coordinator.canvasPageIndex == 0)
-        #expect(harness.coordinator.liveCanvas != nil)
-        // 1 live + 1 adjacent (page 1; no page -1).
-        #expect(canvasCount(in: harness.containerView) == 2)
-        #expect(harness.coordinator.adjacentCanvases[1] != nil)
+        // Page 0 should have a live canvas.
+        #expect(harness.coordinator.liveCanvases[0] != nil)
+        #expect(!harness.coordinator.liveCanvases.isEmpty)
+        // At least 1 live + adjacent canvases present.
+        #expect(canvasCount(in: harness.containerView) >= 2)
     }
 
-    // Scroll-settle to a different page swaps focus.
-    @Test func scrollSettle_swapsFocus() throws {
+    // Scroll-settle to a different page reconciles canvases.
+    @Test func scrollSettle_reconcilesCanvases() throws {
         let container = try makeContainer()
         let pages = try makePages(in: container.mainContext, count: 20)
         let harness = makeHarness(pages: pages)
 
         harness.coordinator.rebuildPages(pages: pages, toolbar: ToolbarState(), viewport: nil)
-        #expect(harness.coordinator.canvasPageIndex == 0)
+        #expect(harness.coordinator.liveCanvases[0] != nil)
 
-        // Scroll far enough that currentPageIndex lands on a later page.
+        // Scroll far enough that page 0 is no longer visible.
         let targetFrame = harness.coordinator.pageFrames[10]
         harness.scrollView.contentOffset = CGPoint(x: 0, y: targetFrame.midY - harness.scrollView.bounds.height / 2)
         harness.coordinator.scrollViewDidEndDecelerating(harness.scrollView)
 
-        // Canvas should have moved away from page 0.
-        #expect(harness.coordinator.canvasPageIndex != 0)
-        // 1 live + up to 2 adjacent.
-        #expect(canvasCount(in: harness.containerView) <= 3)
+        // Page 0 should no longer have a live canvas; page 10 should.
+        #expect(harness.coordinator.liveCanvases[0] == nil)
+        #expect(harness.coordinator.liveCanvases[10] != nil)
     }
 
-    // Outgoing page should receive a bitmap snapshot after focus swap.
-    @Test func focusSwap_snapshotsOutgoingPage() throws {
+    // Outgoing page should receive a bitmap snapshot after scrolling away.
+    @Test func scrollAway_snapshotsOutgoingPage() throws {
         let container = try makeContainer()
         let pages = try makePages(in: container.mainContext, count: 20)
         let harness = makeHarness(pages: pages)
 
         harness.coordinator.rebuildPages(pages: pages, toolbar: ToolbarState(), viewport: nil)
 
-        // Trigger focus swap to page 10.
+        // Scroll away from page 0.
         let targetFrame = harness.coordinator.pageFrames[10]
         harness.scrollView.contentOffset = CGPoint(x: 0, y: targetFrame.midY - harness.scrollView.bounds.height / 2)
         harness.coordinator.scrollViewDidEndDecelerating(harness.scrollView)
@@ -116,7 +115,7 @@ import SwiftData
         #expect(slot0.bitmap != nil)
     }
 
-    // Canvas slot should NOT have a bitmap (canvas covers it).
+    // Live canvas slots should NOT have bitmaps (canvas covers them).
     @Test func canvasSlot_hasNoBitmap() throws {
         let container = try makeContainer()
         let pages = try makePages(in: container.mainContext, count: 5)
@@ -124,11 +123,13 @@ import SwiftData
 
         harness.coordinator.rebuildPages(pages: pages, toolbar: ToolbarState(), viewport: nil)
 
-        let canvasIndex = harness.coordinator.canvasPageIndex
-        #expect(harness.coordinator.slots[canvasIndex].bitmap == nil)
+        // Every live canvas slot should have nil bitmap.
+        for index in harness.coordinator.liveCanvases.keys {
+            #expect(harness.coordinator.slots[index].bitmap == nil)
+        }
     }
 
-    // Single-page note: canvas stays on page 0, no swaps needed.
+    // Single-page note: canvas stays on page 0.
     @Test func singlePage_canvasStaysOnPage0() throws {
         let container = try makeContainer()
         let pages = try makePages(in: container.mainContext, count: 1)
@@ -137,53 +138,53 @@ import SwiftData
         harness.coordinator.rebuildPages(pages: pages, toolbar: ToolbarState(), viewport: nil)
         harness.coordinator.scrollViewDidEndDecelerating(harness.scrollView)
 
-        #expect(harness.coordinator.canvasPageIndex == 0)
+        #expect(harness.coordinator.liveCanvases[0] != nil)
         #expect(canvasCount(in: harness.containerView) == 1)
     }
 
-    // Settling on the same page as current canvas should not recreate it.
-    @Test func settleOnSamePage_noSwap() throws {
+    // Settling on same position should not recreate canvases.
+    @Test func settleOnSamePosition_noChange() throws {
         let container = try makeContainer()
         let pages = try makePages(in: container.mainContext, count: 5)
         let harness = makeHarness(pages: pages)
 
         harness.coordinator.rebuildPages(pages: pages, toolbar: ToolbarState(), viewport: nil)
-        let firstCanvas = harness.coordinator.liveCanvas
+        let firstCanvas = harness.coordinator.liveCanvases[0]
 
         // Scroll within page 0 and settle.
         harness.scrollView.contentOffset = CGPoint(x: 0, y: 10)
         harness.coordinator.scrollViewDidEndDecelerating(harness.scrollView)
 
         // Same canvas instance — no swap occurred.
-        #expect(harness.coordinator.liveCanvas === firstCanvas)
+        #expect(harness.coordinator.liveCanvases[0] === firstCanvas)
     }
 
     // MARK: - Adjacent rendering
 
-    // 4 pages, active on page 0 → 2 canvases (live + adjacent page 1).
-    // Jump to page 2 (index 2) → 3 canvases (live + adjacent pages 1 and 3).
-    @Test func adjacentRendering_countMatchesPosition() throws {
+    // Adjacent canvases should be ±1 from the visible range edges.
+    @Test func adjacentRendering_surroundsVisibleRange() throws {
         let container = try makeContainer()
-        let pages = try makePages(in: container.mainContext, count: 4)
+        let pages = try makePages(in: container.mainContext, count: 20)
         let harness = makeHarness(pages: pages)
 
         harness.coordinator.rebuildPages(pages: pages, toolbar: ToolbarState(), viewport: nil)
 
-        // On page 0: live(0) + adjacent(1) = 2.
-        #expect(harness.coordinator.canvasPageIndex == 0)
-        #expect(canvasCount(in: harness.containerView) == 2)
-
-        // Jump to page 2: live(2) + adjacent(1, 3) = 3.
-        let targetFrame = harness.coordinator.pageFrames[2]
+        // Jump to a middle page so both ±1 adjacents exist.
+        let targetFrame = harness.coordinator.pageFrames[10]
         harness.scrollView.contentOffset = CGPoint(x: 0, y: targetFrame.midY - harness.scrollView.bounds.height / 2)
         harness.coordinator.scrollViewDidEndDecelerating(harness.scrollView)
 
-        #expect(harness.coordinator.canvasPageIndex == 2)
-        #expect(canvasCount(in: harness.containerView) == 3)
+        let liveKeys = Set(harness.coordinator.liveCanvases.keys)
+        let adjKeys = Set(harness.coordinator.adjacentCanvases.keys)
+
+        // Adjacent canvases should not overlap with live canvases.
+        #expect(liveKeys.isDisjoint(with: adjKeys))
+        // Adjacent count should be at most 2 (one below, one above visible range).
+        #expect(adjKeys.count <= 2)
     }
 
-    // On last page of 4: live(3) + adjacent(2) = 2.
-    @Test func adjacentRendering_lastPage_hasTwoCanvases() throws {
+    // On last page: adjacent canvas only on the page before.
+    @Test func adjacentRendering_lastPage() throws {
         let container = try makeContainer()
         let pages = try makePages(in: container.mainContext, count: 4)
         let harness = makeHarness(pages: pages)
@@ -194,7 +195,8 @@ import SwiftData
         harness.scrollView.contentOffset = CGPoint(x: 0, y: targetFrame.midY - harness.scrollView.bounds.height / 2)
         harness.coordinator.scrollViewDidEndDecelerating(harness.scrollView)
 
-        #expect(harness.coordinator.canvasPageIndex == 3)
-        #expect(canvasCount(in: harness.containerView) == 2)
+        #expect(harness.coordinator.liveCanvases[3] != nil)
+        // No adjacent canvas beyond the last page.
+        #expect(harness.coordinator.adjacentCanvases[4] == nil)
     }
 }

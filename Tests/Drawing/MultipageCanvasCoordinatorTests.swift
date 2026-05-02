@@ -133,8 +133,8 @@ struct MultipageCanvasCoordinatorTests {
         harness.coordinator.rebuildPages(pages: pages, toolbar: ToolbarState(), viewport: nil)
 
         // One live canvas + adjacent display canvases (at most 1 for page 0 since there's no page -1).
-        #expect(harness.coordinator.liveCanvas != nil)
-        #expect(harness.coordinator.canvasPageIndex == 0)
+        #expect(!harness.coordinator.liveCanvases.isEmpty)
+        #expect(harness.coordinator.liveCanvases[0] != nil)
         #expect(canvasCount(in: harness.containerView) <= 3)
         #expect(harness.coordinator.adjacentCanvases.count <= 2)
     }
@@ -157,7 +157,7 @@ struct MultipageCanvasCoordinatorTests {
         let harness = makeCoordinatorHarness(pages: pages)
 
         harness.coordinator.rebuildPages(pages: pages, toolbar: ToolbarState(), viewport: nil)
-        #expect(harness.coordinator.liveCanvas != nil)
+        #expect(!harness.coordinator.liveCanvases.isEmpty)
 
         NotificationCenter.default.post(name: .flushDrawings, object: nil)
 
