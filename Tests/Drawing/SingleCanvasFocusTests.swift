@@ -154,6 +154,62 @@ import SwiftData
         #expect(harness.coordinator.liveCanvases[0] === firstCanvas)
     }
 
+    // MARK: - Initial layout
+
+    // performInitialLayout rebuilds pages and reveals the scroll view in one call.
+    @Test func performInitialLayout_rebuildsAndReveals() throws {
+        let container = try makeContainer()
+        let pages = try makePages(in: container.mainContext, count: 3)
+        let harness = makeHarness(pages: pages)
+
+        // Simulate pre-layout state: hidden, no layout yet.
+        harness.scrollView.alpha = 0
+        #expect(!harness.coordinator.hasCompletedInitialLayout)
+        #expect(harness.coordinator.liveCanvases.isEmpty)
+
+        harness.coordinator.performInitialLayout()
+
+        #expect(harness.coordinator.hasCompletedInitialLayout)
+        #expect(harness.scrollView.alpha == 1)
+        #expect(!harness.coordinator.liveCanvases.isEmpty)
+    }
+
+    // Second call to performInitialLayout is a no-op.
+    @Test func performInitialLayout_idempotent() throws {
+        let container = try makeContainer()
+        let pages = try makePages(in: container.mainContext, count: 3)
+        let harness = makeHarness(pages: pages)
+        harness.scrollView.alpha = 0
+
+        harness.coordinator.performInitialLayout()
+        let canvasAfterFirst = harness.coordinator.liveCanvases[0]
+
+        harness.coordinator.performInitialLayout()
+
+        // Same canvas instance — second call was a no-op.
+        #expect(harness.coordinator.liveCanvases[0] === canvasAfterFirst)
+    }
+
+    // CanvasScrollView fires its callback exactly once when bounds become valid.
+    @Test func canvasScrollView_firesCallbackOnFirstValidBounds() {
+        var callCount = 0
+        let sv = CanvasScrollView(frame: .zero)
+        sv.onFirstValidBounds = { callCount += 1 }
+
+        // Zero bounds — callback should not fire.
+        sv.layoutSubviews()
+        #expect(callCount == 0)
+
+        // Valid bounds — callback fires.
+        sv.frame = CGRect(x: 0, y: 0, width: 900, height: 1000)
+        sv.layoutSubviews()
+        #expect(callCount == 1)
+
+        // Second layout — callback already nil, should not fire again.
+        sv.layoutSubviews()
+        #expect(callCount == 1)
+    }
+
     // MARK: - Adjacent rendering
 
     // Adjacent canvases should be ±1 from the visible range edges.

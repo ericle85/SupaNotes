@@ -2,6 +2,19 @@ import SwiftData
 import SwiftUI
 import UIKit
 
+// Fires a one-shot callback the first time UIKit assigns valid bounds,
+// so the coordinator can rebuild + reveal in the same frame.
+final class CanvasScrollView: UIScrollView {
+    var onFirstValidBounds: (() -> Void)?
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        if let cb = onFirstValidBounds, bounds.width > 0 {
+            onFirstValidBounds = nil
+            cb()
+        }
+    }
+}
+
 // Main container for all pages in a note — a vertically-scrolling, zoomable UIKit scroll view
 // bridged into SwiftUI. Apple Pencil draws; fingers scroll and zoom.
 //
@@ -17,8 +30,8 @@ struct MultipageCanvasContainer: UIViewRepresentable {
     var addPageAbove: (() -> Void)?
     var onPageMutated: () -> Void
 
-    func makeUIView(context: Context) -> UIScrollView {
-        let scrollView = UIScrollView()
+    func makeUIView(context: Context) -> CanvasScrollView {
+        let scrollView = CanvasScrollView()
         scrollView.backgroundColor = UIColor(named: "PaperBackground") ?? UIColor.systemGroupedBackground
         scrollView.showsVerticalScrollIndicator = true
         scrollView.showsHorizontalScrollIndicator = false
@@ -44,13 +57,16 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         pencilInteraction.delegate = coordinator
         scrollView.addInteraction(pencilInteraction)
 
-        // Don't rebuild here — bounds aren't final yet. First real layout
-        // happens in updateUIView once SwiftUI provides valid bounds.
+        // Hidden until first valid bounds — the callback rebuilds + reveals in the same frame.
         scrollView.alpha = 0
+        scrollView.onFirstValidBounds = { [weak coordinator] in
+            guard let c = coordinator else { return }
+            c.performInitialLayout()
+        }
         return scrollView
     }
 
-    func updateUIView(_ scrollView: UIScrollView, context: Context) {
+    func updateUIView(_ scrollView: CanvasScrollView, context: Context) {
         let c = context.coordinator
         c.pages = pages
         c.toolbar = toolbar
@@ -65,20 +81,14 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         c.liveCanvases.values.forEach { $0.updateToolStyle(style) }
         c.adjacentCanvases.values.forEach { $0.updateToolStyle(style) }
 
-        // Rebuild when pages change (count, identity) or on first real layout.
-        let containerWidth = c.containerView?.frame.width ?? 0
+        // Rebuild when pages change (count, identity). Initial layout is handled
+        // by CanvasScrollView.onFirstValidBounds so we skip that path here.
         let pageIDs = pages.map(\.persistentModelID)
-        let needsRebuild = pageIDs != c.cachedPageIDs
-            || (!c.hasCompletedInitialLayout && scrollView.bounds.width > 0 && abs(containerWidth - scrollView.bounds.width) > 1)
+        let needsRebuild = c.hasCompletedInitialLayout && pageIDs != c.cachedPageIDs
 
         if needsRebuild {
-            // Skip until SwiftUI provides valid bounds.
-            guard scrollView.bounds.width > 0 else { return }
-            c.hasCompletedInitialLayout = true
             let viewport = c.captureViewport()
             c.rebuildPages(pages: pages, toolbar: toolbar, viewport: viewport)
-            // Reveal after the first real layout so the user never sees an uncentered flash.
-            if scrollView.alpha == 0 { scrollView.alpha = 1 }
         }
 
         c.centerContainerIfNeeded()
@@ -182,6 +192,15 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         deinit { NotificationCenter.default.removeObserver(self) }
 
         // MARK: Page rebuild
+
+        // Called by CanvasScrollView on the first frame with valid bounds —
+        // rebuilds pages and reveals the scroll view in the same layout pass.
+        func performInitialLayout() {
+            guard let scrollView, !hasCompletedInitialLayout else { return }
+            hasCompletedInitialLayout = true
+            rebuildPages(pages: pages, toolbar: toolbar, viewport: nil)
+            scrollView.alpha = 1
+        }
 
         func rebuildPages(pages: [Page], toolbar _: ToolbarState, viewport: ViewportState?) {
             guard let containerView, let scrollView else { return }
