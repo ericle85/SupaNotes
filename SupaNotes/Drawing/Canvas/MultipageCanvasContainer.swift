@@ -484,17 +484,12 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         func pageCanvasViewDidBeginUsingTool(_ view: DrawingCanvasView) -> Bool {
             // Stop any in-flight momentum immediately so Pencil-down behaves like finger-down.
             if let scrollView {
-                // Detect if the page was still moving when Pencil touched down.
-                let wasInMotion = scrollView.isDecelerating || scrollView.isScrollAnimating
                 scrollView.stopScrollingAndZooming()
                 // Notify the test seam that a momentum stop was requested.
                 onRequestStopScrollMomentum?(scrollView)
                 onUndoManagerReady(view.undoManagerForPage)
-                // If touch is only used to stop motion, do not disable finger scrolling.
-                guard !wasInMotion else { return false }
                 // While drawing is active, keep scrolling disabled.
                 scrollView.isScrollEnabled = false
-                // If we were still moving, consume this touch so it only stops motion.
                 return true
             }
             onUndoManagerReady(view.undoManagerForPage)

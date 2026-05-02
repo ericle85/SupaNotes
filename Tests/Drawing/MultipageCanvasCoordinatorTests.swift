@@ -116,10 +116,10 @@ struct MultipageCanvasCoordinatorTests {
         )
         let shouldDrawThisTouch = coordinator.pageCanvasViewDidBeginUsingTool(canvas)
 
-        // While the page is moving, Pencil-down should only stop movement and must not draw.
-        #expect(!shouldDrawThisTouch)
-        // Finger scrolling should remain enabled because this touch was stop-only.
-        #expect(scrollView.isScrollEnabled)
+        // Pencil-down during momentum should stop scrolling AND begin drawing.
+        #expect(shouldDrawThisTouch)
+        // Scrolling disabled while drawing is active.
+        #expect(!scrollView.isScrollEnabled)
         // We still expect an explicit momentum-stop request for this first Pencil contact.
         #expect(stopRequestCount == 1)
     }

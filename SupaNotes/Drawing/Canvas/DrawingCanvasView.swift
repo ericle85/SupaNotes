@@ -359,8 +359,6 @@ private final class PencilFilteredDrawingUIView: UIView {
 
     /// The pencil touch we're currently tracking.
     private var activePencilTouch: UITouch?
-    /// Pencil touch currently being ignored (used when first touch should only stop scroll momentum).
-    private var suppressedPencilTouch: UITouch?
     /// Last effective pixel scale used for redraw so we avoid redundant invalidations.
     private var currentRenderScale: CGFloat = 0
 
@@ -457,11 +455,8 @@ private final class PencilFilteredDrawingUIView: UIView {
         super.touchesBegan(touches, with: event)
         guard activePencilTouch == nil else { return }
         guard let touch = touches.first(where: { $0.type == .pencil }) else { return }
-        // If parent requests "stop scrolling only", keep this touch fully suppressed.
-        if onGestureBegan?() == false {
-            suppressedPencilTouch = touch
-            return
-        }
+        // Notify parent (e.g. to stop scroll momentum and disable scrolling).
+        _ = onGestureBegan?()
         activePencilTouch = touch
         let point = toLetterSpace(touch.location(in: self))
         let pressure: CGFloat = touch.force > 0 ? touch.force : 0.5
@@ -471,7 +466,6 @@ private final class PencilFilteredDrawingUIView: UIView {
     /// Called when the pencil moves across the screen while drawing.
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesMoved(touches, with: event)
-        if let suppressedPencilTouch, touches.contains(suppressedPencilTouch) { return }
         guard let activePencilTouch else { return }
         guard touches.contains(activePencilTouch) else { return }
         let location = activePencilTouch.location(in: self)
@@ -482,10 +476,6 @@ private final class PencilFilteredDrawingUIView: UIView {
     /// Called when the pencil lifts off the screen.
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesEnded(touches, with: event)
-        if let suppressedPencilTouch, touches.contains(suppressedPencilTouch) {
-            self.suppressedPencilTouch = nil
-            return
-        }
         guard let activePencilTouch else { return }
         guard touches.contains(activePencilTouch) else { return }
         let location = activePencilTouch.location(in: self)
@@ -497,10 +487,6 @@ private final class PencilFilteredDrawingUIView: UIView {
     /// Called if the drawing is interrupted (like a phone call).
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesCancelled(touches, with: event)
-        if let suppressedPencilTouch, touches.contains(suppressedPencilTouch) {
-            self.suppressedPencilTouch = nil
-            return
-        }
         guard let activePencilTouch else { return }
         guard touches.contains(activePencilTouch) else { return }
         let location = activePencilTouch.location(in: self)
