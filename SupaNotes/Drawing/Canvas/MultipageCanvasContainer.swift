@@ -405,20 +405,9 @@ struct MultipageCanvasContainer: UIViewRepresentable {
             }
         }
 
-        // MARK: Debug
-
-        private func printCanvasDebug() {
-            let live = liveCanvases.keys.sorted().map { "p\($0)" }.joined(separator: ",")
-            let adj = adjacentCanvases.keys.sorted().map { "p\($0)" }.joined(separator: ",")
-            let bmp = slots.enumerated()
-                .filter { $0.element.bitmap != nil }
-                .map { "p\($0.offset)" }
-                .joined(separator: ",")
-            print("[canvas] vector:[\(live)] adj:[\(adj)] bitmap:[\(bmp)]")
-        }
-
         /// Handle scroll settling — reconcile canvases, fill bitmaps, mount adjacents.
         private func handleScrollSettle() {
+            updateCurrentPage()
             // Invalidate cache so reconcile always runs fresh on settle.
             lastReconciledVisible = []
             reconcileLiveCanvases()
@@ -434,7 +423,6 @@ struct MultipageCanvasContainer: UIViewRepresentable {
             {
                 slot.bitmap = nil
             }
-            printCanvasDebug()
         }
 
         /// Mount display-only canvases on pages ±1 from the visible range for vector-sharp rendering.
@@ -525,7 +513,6 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
-            updateCurrentPage()
             pullController.update(for: scrollView)
             // Teardown off-screen canvases during scroll to free memory (no mounts — that waits for settle).
             evictOffScreenCanvases()
@@ -539,7 +526,6 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         func scrollViewDidEndZooming(_: UIScrollView, with _: UIView?, atScale scale: CGFloat) {
             liveCanvases.values.forEach { $0.updateZoomScale(scale) }
             adjacentCanvases.values.forEach { $0.updateZoomScale(scale) }
-            printCanvasDebug()
         }
 
         func scrollViewDidEndDragging(_: UIScrollView, willDecelerate decelerate: Bool) {
