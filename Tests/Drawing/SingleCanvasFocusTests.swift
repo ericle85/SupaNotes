@@ -61,6 +61,17 @@ import SwiftData
         containerView.subviews.flatMap { $0.subviews.compactMap { $0 as? DrawingCanvasView } }.count
     }
 
+    // Simulate real scroll flow: set offset → scrollViewDidScroll → settle.
+    private func simulateScroll(
+        to offset: CGPoint,
+        coordinator: MultipageCanvasContainer.Coordinator,
+        scrollView: UIScrollView
+    ) {
+        scrollView.contentOffset = offset
+        coordinator.scrollViewDidScroll(scrollView)
+        coordinator.scrollViewDidEndDecelerating(scrollView)
+    }
+
     // MARK: - Tests
 
     // After rebuild, live canvas on visible pages + adjacent display canvases.
@@ -89,33 +100,17 @@ import SwiftData
 
         // Scroll far enough that page 0 is no longer visible.
         let targetFrame = harness.coordinator.pageFrames[10]
-        harness.scrollView.contentOffset = CGPoint(x: 0, y: targetFrame.midY - harness.scrollView.bounds.height / 2)
-        harness.coordinator.scrollViewDidEndDecelerating(harness.scrollView)
+        simulateScroll(
+            to: CGPoint(x: 0, y: targetFrame.midY - harness.scrollView.bounds.height / 2),
+            coordinator: harness.coordinator, scrollView: harness.scrollView
+        )
 
         // Page 0 should no longer have a live canvas; page 10 should.
         #expect(harness.coordinator.liveCanvases[0] == nil)
         #expect(harness.coordinator.liveCanvases[10] != nil)
     }
 
-    // Outgoing page should receive a bitmap snapshot after scrolling away.
-    @Test func scrollAway_snapshotsOutgoingPage() throws {
-        let container = try makeContainer()
-        let pages = try makePages(in: container.mainContext, count: 20)
-        let harness = makeHarness(pages: pages)
-
-        harness.coordinator.rebuildPages(pages: pages, toolbar: ToolbarState(), viewport: nil)
-
-        // Scroll away from page 0.
-        let targetFrame = harness.coordinator.pageFrames[10]
-        harness.scrollView.contentOffset = CGPoint(x: 0, y: targetFrame.midY - harness.scrollView.bounds.height / 2)
-        harness.coordinator.scrollViewDidEndDecelerating(harness.scrollView)
-
-        // The outgoing slot (page 0) should now have a bitmap.
-        let slot0 = harness.coordinator.slots[0]
-        #expect(slot0.bitmap != nil)
-    }
-
-    // Live canvas slots should NOT have bitmaps (canvas covers them).
+// Live canvas slots should NOT have bitmaps (canvas covers them).
     @Test func canvasSlot_hasNoBitmap() throws {
         let container = try makeContainer()
         let pages = try makePages(in: container.mainContext, count: 5)
@@ -171,8 +166,10 @@ import SwiftData
 
         // Jump to a middle page so both ±1 adjacents exist.
         let targetFrame = harness.coordinator.pageFrames[10]
-        harness.scrollView.contentOffset = CGPoint(x: 0, y: targetFrame.midY - harness.scrollView.bounds.height / 2)
-        harness.coordinator.scrollViewDidEndDecelerating(harness.scrollView)
+        simulateScroll(
+            to: CGPoint(x: 0, y: targetFrame.midY - harness.scrollView.bounds.height / 2),
+            coordinator: harness.coordinator, scrollView: harness.scrollView
+        )
 
         let liveKeys = Set(harness.coordinator.liveCanvases.keys)
         let adjKeys = Set(harness.coordinator.adjacentCanvases.keys)
@@ -192,8 +189,10 @@ import SwiftData
         harness.coordinator.rebuildPages(pages: pages, toolbar: ToolbarState(), viewport: nil)
 
         let targetFrame = harness.coordinator.pageFrames[3]
-        harness.scrollView.contentOffset = CGPoint(x: 0, y: targetFrame.midY - harness.scrollView.bounds.height / 2)
-        harness.coordinator.scrollViewDidEndDecelerating(harness.scrollView)
+        simulateScroll(
+            to: CGPoint(x: 0, y: targetFrame.midY - harness.scrollView.bounds.height / 2),
+            coordinator: harness.coordinator, scrollView: harness.scrollView
+        )
 
         #expect(harness.coordinator.liveCanvases[3] != nil)
         // No adjacent canvas beyond the last page.

@@ -44,7 +44,9 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         pencilInteraction.delegate = coordinator
         scrollView.addInteraction(pencilInteraction)
 
-        coordinator.rebuildPages(pages: pages, toolbar: toolbar, viewport: nil)
+        // Don't rebuild here — bounds aren't final yet. First real layout
+        // happens in updateUIView once SwiftUI provides valid bounds.
+        scrollView.alpha = 0
         return scrollView
     }
 
@@ -70,9 +72,13 @@ struct MultipageCanvasContainer: UIViewRepresentable {
             || (!c.hasCompletedInitialLayout && scrollView.bounds.width > 0 && abs(containerWidth - scrollView.bounds.width) > 1)
 
         if needsRebuild {
-            c.hasCompletedInitialLayout = scrollView.bounds.width > 0
+            // Skip until SwiftUI provides valid bounds.
+            guard scrollView.bounds.width > 0 else { return }
+            c.hasCompletedInitialLayout = true
             let viewport = c.captureViewport()
             c.rebuildPages(pages: pages, toolbar: toolbar, viewport: viewport)
+            // Reveal after the first real layout so the user never sees an uncentered flash.
+            if scrollView.alpha == 0 { scrollView.alpha = 1 }
         }
 
         c.centerContainerIfNeeded()
