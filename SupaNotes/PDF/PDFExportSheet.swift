@@ -4,23 +4,30 @@ struct PDFExportSheet: View {
     let note: Note
     @Environment(\.dismiss) private var dismiss
     @State private var selection: Set<UUID> = []
-    @State private var mode: Mode = .all
     @State private var exportURL: URL?
 
-    enum Mode: String, CaseIterable { case all = "All Pages", selected = "Select Pages" }
-
     private let columns = [GridItem(.adaptive(minimum: 130), spacing: 12)]
+
+    // True when every page is currently selected
+    private var allSelected: Bool { selection.count == note.sortedPages.count }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                Picker("", selection: $mode) {
-                    ForEach(Mode.allCases, id: \.rawValue) { m in
-                        Text(m.rawValue).tag(m)
+                // Toggle between select-all and deselect-all
+                HStack {
+                    Button(allSelected ? "Deselect All" : "Select All") {
+                        if allSelected {
+                            selection.removeAll()
+                        } else {
+                            selection = Set(note.sortedPages.map(\.id))
+                        }
                     }
+                    .font(.subheadline)
+                    Spacer()
                 }
-                .pickerStyle(.segmented)
-                .padding()
+                .padding(.horizontal)
+                .padding(.top, 8)
 
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 12) {
@@ -51,6 +58,8 @@ struct PDFExportSheet: View {
                     Button("Cancel") { dismiss() }
                 }
             }
+            // Pre-select all pages on appear
+            .onAppear { selection = Set(note.sortedPages.map(\.id)) }
             .sheet(item: $exportURL) { url in
                 ShareSheet(items: [url])
             }
@@ -60,22 +69,19 @@ struct PDFExportSheet: View {
     @ViewBuilder
     private func thumbnailCell(page: Page, index: Int) -> some View {
         let selected = selection.contains(page.id)
-        let selectable = mode == .selected
         Button {
-            guard selectable else { return }
+            // Toggle this page's selection
             if selected { selection.remove(page.id) } else { selection.insert(page.id) }
         } label: {
             VStack(spacing: 4) {
                 PageThumbnail(page: page)
                     .frame(width: 130, height: 168)
                     .overlay(alignment: .topTrailing) {
-                        if selectable {
-                            Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 22))
-                                .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-                                .background(Circle().fill(.white).padding(2))
-                                .padding(6)
-                        }
+                        Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 22))
+                            .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                            .background(Circle().fill(.white).padding(2))
+                            .padding(6)
                     }
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
@@ -90,18 +96,16 @@ struct PDFExportSheet: View {
     }
 
     private var buttonTitle: String {
-        switch mode {
-        case .all: return "Export \(note.pages.count) Page\(note.pages.count == 1 ? "" : "s")"
-        case .selected: return "Export \(selection.count) Selected"
-        }
+        "Export \(selection.count) Page\(selection.count == 1 ? "" : "s")"
     }
 
     private var canExport: Bool {
-        mode == .all || !selection.isEmpty
+        !selection.isEmpty
     }
 
     private func exportAndShare() {
-        let pages: [Page]? = mode == .all ? nil : note.sortedPages.filter { selection.contains($0.id) }
+        // Pass nil when all pages selected (export full note), otherwise filter
+        let pages: [Page]? = allSelected ? nil : note.sortedPages.filter { selection.contains($0.id) }
         guard let data = PDFService.exportNote(note, pages: pages) else { return }
         // Sanitize title to prevent path traversal or invalid filenames.
         let safeTitle = note.title
