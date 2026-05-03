@@ -96,22 +96,28 @@ final class PullToAddController {
     }
 
     /// Handle the end of a drag gesture - trigger page add if threshold was reached.
-    func handleEndDragging(addPage: () -> Void, addPageAbove: (() -> Void)?) -> MultipageCanvasContainer.ScrollAfterRebuild {
+    /// firstPageIndex/lastPageIndex are the orderIndex of the first and last pages.
+    func handleEndDragging(
+        firstPageIndex: Int,
+        lastPageIndex: Int,
+        addPage: (Int) -> Void,
+        addPageAbove: ((Int) -> Void)?
+    ) -> MultipageCanvasContainer.ScrollAfterRebuild {
         var scroll: MultipageCanvasContainer.ScrollAfterRebuild = .none
 
-        // If top trigger was reached, add a page above.
+        // If top trigger was reached, add a page above the first page.
         if hasTriggeredTop {
             topIndicator?.setTriggered()
             hapticFeedback.impactOccurred()
             scroll = .scrollToFirst
-            addPageAbove?()
+            addPageAbove?(firstPageIndex)
             hasTriggeredTop = false
-        // If bottom trigger was reached, add a page below.
+        // If bottom trigger was reached, add a page below the last page.
         } else if hasTriggeredBottom {
             bottomIndicator?.setTriggered()
             hapticFeedback.impactOccurred()
             scroll = .scrollToLast
-            addPage()
+            addPage(lastPageIndex)
             hasTriggeredBottom = false
         }
 

@@ -22,7 +22,7 @@ final class Note {
         self.title = title
         createdAt = .now
         updatedAt = .now
-        pages = [Page(orderIndex: 0)]
+        pages = []
     }
 
     func moveToTrash() {

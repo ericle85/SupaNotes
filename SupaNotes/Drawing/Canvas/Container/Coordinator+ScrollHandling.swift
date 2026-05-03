@@ -32,7 +32,14 @@ extension MultipageCanvasContainer.Coordinator {
     }
 
     func scrollViewDidEndDragging(_: UIScrollView, willDecelerate decelerate: Bool) {
-        let scroll = pullController.handleEndDragging(addPage: addPage, addPageAbove: addPageAbove)
+        let firstIndex = sortedPages.first?.orderIndex ?? 0
+        let lastIndex = sortedPages.last?.orderIndex ?? 0
+        let scroll = pullController.handleEndDragging(
+            firstPageIndex: firstIndex,
+            lastPageIndex: lastIndex,
+            addPage: addPage,
+            addPageAbove: addPageAbove
+        )
         if scroll != .none { pendingScroll = scroll }
         if !decelerate { handleScrollSettle() }
     }

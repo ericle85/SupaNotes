@@ -42,7 +42,7 @@ import SwiftData
             onUndoManagerReady: { _ in },
             onPencilDoubleTap: nil,
             onCurrentPageChanged: nil,
-            addPage: {},
+            addPage: { _ in },
             addPageAbove: nil,
             onPageMutated: {}
         )

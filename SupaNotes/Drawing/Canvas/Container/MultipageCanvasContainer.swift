@@ -27,8 +27,8 @@ struct MultipageCanvasContainer: UIViewRepresentable {
     var onUndoManagerReady: (UndoManager?) -> Void
     var onPencilDoubleTap: (() -> Void)?
     var onCurrentPageChanged: ((Int) -> Void)?
-    var addPage: () -> Void
-    var addPageAbove: (() -> Void)?
+    var addPage: (Int) -> Void
+    var addPageAbove: ((Int) -> Void)?
     var onPageMutated: () -> Void
 
     func makeUIView(context: Context) -> CanvasScrollView {
@@ -137,8 +137,8 @@ struct MultipageCanvasContainer: UIViewRepresentable {
         var onUndoManagerReady: (UndoManager?) -> Void
         var onPencilDoubleTap: (() -> Void)?
         var onCurrentPageChanged: ((Int) -> Void)?
-        var addPage: () -> Void
-        var addPageAbove: (() -> Void)?
+        var addPage: (Int) -> Void
+        var addPageAbove: ((Int) -> Void)?
         var onPageMutated: () -> Void
 
         // MARK: UIKit References
@@ -177,8 +177,8 @@ struct MultipageCanvasContainer: UIViewRepresentable {
             onUndoManagerReady: @escaping (UndoManager?) -> Void,
             onPencilDoubleTap: (() -> Void)?,
             onCurrentPageChanged: ((Int) -> Void)?,
-            addPage: @escaping () -> Void,
-            addPageAbove: (() -> Void)?,
+            addPage: @escaping (Int) -> Void,
+            addPageAbove: ((Int) -> Void)?,
             onPageMutated: @escaping () -> Void
         ) {
             self.pages = pages

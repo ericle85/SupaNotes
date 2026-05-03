@@ -54,7 +54,7 @@ struct MultipageCanvasCoordinatorTests {
             onUndoManagerReady: onUndoManagerReady,
             onPencilDoubleTap: nil,
             onCurrentPageChanged: nil,
-            addPage: {},
+            addPage: { _ in },
             addPageAbove: nil,
             onPageMutated: {}
         )
@@ -93,7 +93,7 @@ struct MultipageCanvasCoordinatorTests {
             onUndoManagerReady: { _ in },
             onPencilDoubleTap: nil,
             onCurrentPageChanged: nil,
-            addPage: {},
+            addPage: { _ in },
             addPageAbove: nil,
             onPageMutated: {}
         )

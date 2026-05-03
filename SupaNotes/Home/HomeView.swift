@@ -238,6 +238,8 @@ struct HomeView: View {
             newNote.folder = folder
         }
         modelContext.insert(newNote)
+        // Notes start empty — add the initial blank page.
+        PageManager(modelContext: modelContext).addPage(to: newNote)
         noteNavigationStack.append(newNote.id)
     }
 

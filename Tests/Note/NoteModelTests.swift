@@ -80,8 +80,7 @@ import SwiftData
         let note = Note(title: "Test")
         context.insert(note)
 
-        // Clear the default page and add pages in reverse order
-        note.pages = []
+        // Add pages in reverse order.
         let page3 = Page(orderIndex: 2)  // This should be page 3
         let page1 = Page(orderIndex: 0)  // This should be page 1
         let page2 = Page(orderIndex: 1)  // This should be page 2
@@ -112,6 +111,6 @@ import SwiftData
         #expect(note.title == "Untitled Note")     // Default title
         #expect(note.isDeleted == false)           // New notes are not deleted
         #expect(note.deletedAt == nil)             // No deletion timestamp
-        #expect(note.pages.count == 1)             // New notes start with 1 blank page
+        #expect(note.pages.count == 0)             // New notes start empty
     }
 }

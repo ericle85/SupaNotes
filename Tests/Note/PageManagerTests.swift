@@ -13,11 +13,9 @@ import SwiftData
     }
 
     /// Create a note whose pages are all inserted in the context.
-    /// Mirrors the pattern from NoteModelTests.sortedPages test.
     private func makeNote(in context: ModelContext, pageCount: Int = 1) throws -> Note {
         let note = Note(title: "T")
         context.insert(note)
-        note.pages = []
         for i in 0..<pageCount {
             let page = Page(orderIndex: i)
             context.insert(page)
@@ -27,7 +25,7 @@ import SwiftData
         return note
     }
 
-    // MARK: - addPage
+    // MARK: - addPage (default = .end)
 
     @Test func addPage_appendsPageWithNextOrderIndex() throws {
         let container = try makeContainer()
@@ -80,30 +78,91 @@ import SwiftData
         #expect(added?.note === note)
     }
 
-    // MARK: - addPageAbove
-
-    @Test func addPageAbove_shiftsExistingIndices() throws {
+    @Test func addPage_toEmptyNote_createsFirstPage() throws {
         let container = try makeContainer()
         let context = container.mainContext
+        let note = try makeNote(in: context, pageCount: 0)
+        let manager = PageManager(modelContext: context)
+
+        manager.addPage(to: note)
+
+        #expect(note.pages.count == 1)
+        #expect(note.sortedPages.first?.orderIndex == 0)
+    }
+
+    // MARK: - addPage at .above
+
+    @Test func addPage_above_shiftsExistingIndices() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        // Pages at indices 0, 1.
         let note = try makeNote(in: context, pageCount: 2)
         let manager = PageManager(modelContext: context)
 
-        manager.addPageAbove(in: note)
+        // Insert above page at orderIndex 1 — it should become index 1, old page 1 becomes 2.
+        manager.addPage(to: note, at: .above(1))
 
         let indices = note.sortedPages.map(\.orderIndex)
         #expect(indices == [0, 1, 2])
         #expect(note.pages.count == 3)
     }
 
-    @Test func addPageAbove_onEmptyPages_insertsAtZero() throws {
+    @Test func addPage_above_firstPage_insertsAtZero() throws {
         let container = try makeContainer()
         let context = container.mainContext
-        let note = try makeNote(in: context, pageCount: 0)
+        let note = try makeNote(in: context, pageCount: 2)
         let manager = PageManager(modelContext: context)
 
-        manager.addPageAbove(in: note)
+        manager.addPage(to: note, at: .above(0))
 
-        #expect(note.pages.count == 1)
-        #expect(note.sortedPages.first?.orderIndex == 0)
+        let indices = note.sortedPages.map(\.orderIndex)
+        #expect(indices == [0, 1, 2])
+        // The new page is at index 0.
+        #expect(note.sortedPages.first?.drawingData.isEmpty == true)
+    }
+
+    // MARK: - addPage at .below
+
+    @Test func addPage_below_insertsAfterTarget() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        // Pages at indices 0, 1, 2.
+        let note = try makeNote(in: context, pageCount: 3)
+        let manager = PageManager(modelContext: context)
+
+        // Insert below page at orderIndex 1 — new page at 2, old page 2 becomes 3.
+        manager.addPage(to: note, at: .below(1))
+
+        let indices = note.sortedPages.map(\.orderIndex)
+        #expect(indices == [0, 1, 2, 3])
+        #expect(note.pages.count == 4)
+    }
+
+    @Test func addPage_below_lastPage_appendsToEnd() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let note = try makeNote(in: context, pageCount: 2)
+        let manager = PageManager(modelContext: context)
+
+        // Insert below the last page (orderIndex 1).
+        manager.addPage(to: note, at: .below(1))
+
+        let indices = note.sortedPages.map(\.orderIndex)
+        #expect(indices == [0, 1, 2])
+        #expect(note.sortedPages.last?.drawingData.isEmpty == true)
+    }
+
+    @Test func addPage_above_firstPage_pushesAllDown() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let note = try makeNote(in: context, pageCount: 3)
+        let manager = PageManager(modelContext: context)
+
+        // Insert above the first page (orderIndex 0).
+        manager.addPage(to: note, at: .above(0))
+
+        let indices = note.sortedPages.map(\.orderIndex)
+        #expect(indices == [0, 1, 2, 3])
+        #expect(note.pages.count == 4)
     }
 }
