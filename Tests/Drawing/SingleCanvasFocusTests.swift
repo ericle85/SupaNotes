@@ -194,7 +194,7 @@ import SwiftData
     @Test func canvasScrollView_firesCallbackOnFirstValidBounds() {
         var callCount = 0
         let sv = CanvasScrollView(frame: .zero)
-        sv.onFirstValidBounds = { callCount += 1 }
+        sv.buildPagesOnceWidthIsKnown = { callCount += 1 }
 
         // Zero bounds — callback should not fire.
         sv.layoutSubviews()

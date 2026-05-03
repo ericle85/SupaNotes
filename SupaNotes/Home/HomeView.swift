@@ -141,39 +141,25 @@ struct HomeView: View {
         .padding(.vertical, 10)
     }
 
-    /// Builds the correct NoteListView for root or folder
+    // Builds the correct NoteListView for root or folder.
+    // Root level gets a "create folder" action; folder level does not.
     @ViewBuilder
     private var noteGridForCurrentView: some View {
-        switch currentViewInApp {
-        case .allNotes:
-            NoteListView(
-                folder: nil,
-                sortOrder: selectedNoteSortOrder,
+        let folder = currentViewInApp.folder
+        let createFolder: (() -> Void)? = currentViewInApp == .allNotes
+            ? { let f = Folder(); modelContext.insert(f) }
+            : nil
 
-                onOpenNote: { noteID in noteNavigationStack.append(noteID) },
-                onOpenFolder: { folder in currentViewInApp = .folder(folder) },
-                onCreateNote: { createNewNote() },
-                onCreateFolder: {
-                    let newFolder = Folder()
-                    modelContext.insert(newFolder)
-                },
-                onImportPDF: { isShowingPDFPicker = true },
-                onImportImage: { isShowingPhotoPicker = true }
-            )
-        case let .folder(folder):
-            NoteListView(
-                folder: folder,
-                sortOrder: selectedNoteSortOrder,
-
-                onOpenNote: { noteID in noteNavigationStack.append(noteID) },
-                onOpenFolder: { folder in currentViewInApp = .folder(folder) },
-                onCreateNote: { createNewNote() },
-                onImportPDF: { isShowingPDFPicker = true },
-                onImportImage: { isShowingPhotoPicker = true }
-            )
-        default:
-            EmptyView()
-        }
+        NoteListView(
+            folder: folder,
+            sortOrder: selectedNoteSortOrder,
+            onOpenNote: { noteID in noteNavigationStack.append(noteID) },
+            onOpenFolder: { folder in currentViewInApp = .folder(folder) },
+            onCreateNote: { createNewNote() },
+            onCreateFolder: createFolder,
+            onImportPDF: { isShowingPDFPicker = true },
+            onImportImage: { isShowingPhotoPicker = true }
+        )
     }
 
     private var appTopNavigationBar: some View {
