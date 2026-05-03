@@ -25,12 +25,12 @@ import Foundation
         let originalURL = fixtureURL("482kb.pdf")
         let originalData = try Data(contentsOf: originalURL)
 
-        PDFService.importPDF(data: originalData, into: note, modelContext: context)
+        PDFImporter.importPDF(data: originalData, into: note, modelContext: context)
 
         #expect(note.sortedPages.count > 0)
         #expect(note.sortedPages.allSatisfy { $0.drawingData.isEmpty })
 
-        let exportedData = try #require(PDFService.exportNote(note, pages: nil), "Export returned nil")
+        let exportedData = try #require(PDFExporter.exportNote(note, pages: nil), "Export returned nil")
 
         #expect(exportedData.count <= originalData.count)
     }

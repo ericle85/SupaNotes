@@ -47,8 +47,8 @@ struct NoteEditorView: View {
                 onUndoManagerReady: { canvasUndoManager = $0 },
                 onPencilDoubleTap: { toolbar.switchToPreviousTool() },
                 onCurrentPageChanged: { currentPageIndex = $0 },
-                addPage: { pageManager.addPage(to: note) },
-                addPageAbove: { pageManager.addPageAbove(in: note) },
+                addPage: { index in pageManager.addPage(to: note, at: .below(index)) },
+                addPageAbove: { index in pageManager.addPage(to: note, at: .above(index)) },
                 onPageMutated: { note.updatedAt = .now }
             )
             .ignoresSafeArea()
@@ -175,7 +175,7 @@ struct NoteEditorView: View {
         guard case let .success(url) = result else { return }
         let didAccess = url.startAccessingSecurityScopedResource()
         defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
-        PDFService.importPDF(url: url, into: note, modelContext: modelContext)
+        PDFImporter.importPDF(url: url, into: note, modelContext: modelContext)
     }
 
     private func flushDrawings() {
@@ -184,7 +184,7 @@ struct NoteEditorView: View {
     }
 
     private func printNote(_ note: Note) {
-        guard let data = PDFService.exportNote(note, pages: nil) else { return }
+        guard let data = PDFExporter.exportNote(note, pages: nil) else { return }
         PrintService.print(pdfData: data, jobName: note.title)
     }
 }

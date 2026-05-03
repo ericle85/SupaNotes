@@ -106,7 +106,7 @@ struct PDFExportSheet: View {
     private func exportAndShare() {
         // Pass nil when all pages selected (export full note), otherwise filter
         let pages: [Page]? = allSelected ? nil : note.sortedPages.filter { selection.contains($0.id) }
-        guard let data = PDFService.exportNote(note, pages: pages) else { return }
+        guard let data = PDFExporter.exportNote(note, pages: pages) else { return }
         // Sanitize title to prevent path traversal or invalid filenames.
         let safeTitle = note.title
             .replacingOccurrences(of: "/", with: "-")
@@ -140,7 +140,7 @@ private struct PageThumbnail: View {
         }
         .task(id: page.id) {
             // Render off main thread to avoid UI freeze with many pages.
-            let img = await Task.detached { PDFService.thumbnail(for: page, width: 260) }.value
+            let img = await Task.detached { PageRenderer.thumbnail(for: page, width: 260) }.value
             self.image = img
         }
     }

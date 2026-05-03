@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A single tile in the note grid — shows a page thumbnail, a title menu, and the last-edited date.
-/// The thumbnail is generated from the first page of the note using PDFService.
+/// The thumbnail is generated from the first page of the note using PageRenderer.
 struct NoteTileView: View {
     let note: Note
     let onOpen: () -> Void
@@ -99,13 +99,13 @@ struct NoteTileView: View {
 
     // MARK: - Thumbnail Generation
 
-    /// Renders a small bitmap of the note's first page via PDFService
+    /// Renders a small bitmap of the note's first page via PageRenderer
     // ALL THUMBNAILS ARE JUST 1st PAGE
     private func renderThumbnail() {
         guard let page = note.sortedPages.first else {
             thumbnail = nil
             return
         }
-        thumbnail = PDFService.thumbnail(for: page, width: renderWidth)
+        thumbnail = PageRenderer.thumbnail(for: page, width: renderWidth)
     }
 }

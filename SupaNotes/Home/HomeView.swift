@@ -249,7 +249,7 @@ struct HomeView: View {
             newNote.folder = folder
         }
         modelContext.insert(newNote)
-        PDFService.importPDF(url: url, into: newNote, modelContext: modelContext)
+        PDFImporter.importPDF(url: url, into: newNote, modelContext: modelContext)
         noteNavigationStack.append(newNote.id)
     }
 
@@ -260,7 +260,7 @@ struct HomeView: View {
             newNote.folder = folder
         }
         modelContext.insert(newNote)
-        PDFService.importImage(image, into: newNote, modelContext: modelContext)
+        PDFImporter.importImage(image, into: newNote, modelContext: modelContext)
         noteNavigationStack.append(newNote.id)
     }
 
