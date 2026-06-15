@@ -1,0 +1,3 @@
+{
+  "sweetpad.build.derivedDataPath": "${workspaceFolder}/.derivedData"
+}

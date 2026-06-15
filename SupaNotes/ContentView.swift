@@ -3,12 +3,11 @@ import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        HomeView()
+        Text("Hello, world!")
+            .padding()
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: [Note.self, Page.self, Folder.self], inMemory: true)
-        .environment(ToolbarState())
 }
