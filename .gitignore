@@ -120,5 +120,6 @@ iOSInjectionProject/
 # Debugging
 *.xclog
 xcdebugger/
+*.mp4
 
 skills/

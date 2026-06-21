@@ -1,8 +1,5 @@
 import XCTest
 
-/// Base class for all UI tests. Launches the app in QA/test mode and exposes
-/// small helpers so individual tests (and the agents that write them) stay short
-/// and read like a QA script: launch → interact → assert.
 class QABase: XCTestCase {
     var app: XCUIApplication!
 
@@ -15,5 +12,11 @@ class QABase: XCTestCase {
 
     override func tearDownWithError() throws {
         app = nil
+    }
+
+    func open(_ identifier: String) {
+        let link = app.buttons[identifier]
+        XCTAssertTrue(link.waitForExistence(timeout: 10))
+        link.tap()
     }
 }
