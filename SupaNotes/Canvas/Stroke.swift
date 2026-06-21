@@ -1,5 +1,5 @@
 import CoreGraphics
-import Foundation
+import UIKit
 
 struct StrokePoint {
     var location: CGPoint
@@ -10,4 +10,6 @@ struct StrokePoint {
 
 struct Stroke {
     var points: [StrokePoint] = []
+    var color: UIColor = .label
+    var width: CGFloat = 3
 }

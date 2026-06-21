@@ -1,18 +1,25 @@
-import Foundation
 import CoreGraphics
 
-class StrokeEngine {
-    var page = DrawingPage()
+final class StrokeEngine {
+    private(set) var strokes: [Stroke] = []
     private(set) var activeStroke: Stroke?
-    var strokeRenderer = StrokeRenderer()
 
-    func beginStroke(at point: StrokePoint) {}
-    func extendStroke(with point: StrokePoint) {}
-    func saveStroke() {}
-    func cancelStroke() {}
-}
+    func begin(at point: StrokePoint) {
+        activeStroke = Stroke(points: [point])
+    }
 
-struct StrokeRenderer {
-    func draw(_ page: DrawingPage, in context: CGContext) {}
-    func draw(_ stroke: Stroke, in context: CGContext) {}
+    func extend(with point: StrokePoint) {
+        activeStroke?.points.append(point)
+    }
+
+    func end(at point: StrokePoint) {
+        guard var stroke = activeStroke else { return }
+        stroke.points.append(point)
+        if stroke.points.count > 1 { strokes.append(stroke) }
+        activeStroke = nil
+    }
+
+    func cancel() {
+        activeStroke = nil
+    }
 }

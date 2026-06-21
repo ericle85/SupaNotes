@@ -2,25 +2,46 @@ import SwiftUI
 import UIKit
 
 struct CanvasView: UIViewRepresentable {
-    func makeUIView(context: Context) -> CanvasUIView {
-        CanvasUIView()
+    func makeUIView(context _: Context) -> DrawingCanvas {
+        DrawingCanvas()
     }
 
-    func updateUIView(_ uiView: CanvasUIView, context: Context) {}
+    func updateUIView(_: DrawingCanvas, context _: Context) {}
 }
 
-class CanvasUIView: UIView {
+final class DrawingCanvas: StrokeInputSource {
     private let engine = StrokeEngine()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        isMultipleTouchEnabled = false
+        backgroundColor = .white
+        accessibilityIdentifier = QAID.drawCanvas
+
+        onStrokeStarted = { [weak self] point in
+            self?.engine.begin(at: point)
+            self?.setNeedsDisplay()
+        }
+        onStrokeContinued = { [weak self] point in
+            self?.engine.extend(with: point)
+            self?.setNeedsDisplay()
+        }
+        onStrokeFinished = { [weak self] point in
+            self?.engine.end(at: point)
+            self?.setNeedsDisplay()
+        }
+        onStrokeDiscarded = { [weak self] in
+            self?.engine.cancel()
+            self?.setNeedsDisplay()
+        }
     }
 
-    required init?(coder: NSCoder) { fatalError() }
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
+        fatalError()
+    }
 
-    override func draw(_ rect: CGRect) {
-        guard let ctx = UIGraphicsGetCurrentContext() else { return }
-        engine.strokeRenderer.draw(engine.page, in: ctx)
+    override func draw(_: CGRect) {
+        guard let context = UIGraphicsGetCurrentContext() else { return }
+        StrokeRenderer.draw(engine.strokes, active: engine.activeStroke, in: context)
     }
 }
