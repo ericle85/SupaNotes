@@ -25,9 +25,15 @@ x + x + x => SIMPLIFY_EXPRESSION => 3*x
 x**2 + 5*x + 6 => FACTOR_EXPRESSION => (x + 2)*(x + 3)
 x**2 - 9 => FACTOR_EXPRESSION => (x - 3)*(x + 3)
 
+# quadratic root extraction
+x**2 = 4 => SOLVE_EQUATION_ONE_STEP => x = 2
+x**2 = 9 => SOLVE_EQUATION_ONE_STEP => x = 3
+x**2 = 0 => SOLVE_EQUATION_ONE_STEP => x = 0
+x**4 = 16 => SOLVE_EQUATION_ONE_STEP => x = 2
+2*x**2 = 8 => SOLVE_EQUATION_ONE_STEP => x**2 = 4
+
 # graceful no-suggestion cases, previously crashed
 a = b = c => NO_SUGGESTION => NO_SUGGESTION
 0 = 0 => SOLVE_EQUATION_ONE_STEP => NO_SUGGESTION
 
-# known limitation, quadratic root extraction not implemented
-xfail: x**2 = 4 => SOLVE_EQUATION_ONE_STEP => x = 2
+

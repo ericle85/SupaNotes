@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional
-from sympy import Add, Expr, Symbol
+from sympy import Add, Expr, Integer, Symbol
 from autocomplete.document_line_parser import ParsedEquation
 
 
@@ -27,6 +27,8 @@ def generate_next_solving_step(line: ParsedEquation) -> EquationStep:
         _move_variable_terms_from_right_to_left,
         _move_constant_terms_from_left_to_right,
         _divide_both_sides_by_coefficient,
+        _divide_by_power_coefficient,
+        _extract_root_if_possible,
     ):
         step = build_step(left_side, right_side, variable)
         if step is not None:
@@ -94,6 +96,47 @@ def _divide_both_sides_by_coefficient(
         move_description=f"divide both sides by {coefficient}",
         is_fully_solved=False,
     )
+
+
+def _divide_by_power_coefficient(
+    left_side: Expr, right_side: Expr, variable: Symbol
+) -> Optional[EquationStep]:
+    """Handle a*x**n = c → x**n = c/a (first step toward root extraction)."""
+    power_term = None
+    args = left_side.args if left_side.is_Mul else [left_side]
+    for arg in args:
+        if arg.is_Pow and arg.base == variable and arg.exp.is_number and arg.exp > 1:
+            power_term = arg
+            break
+    if power_term is None:
+        return None
+    coeff = left_side / power_term
+    if coeff == 1 or coeff == 0:
+        return None
+    return EquationStep(
+        resulting_equation_text=_format_equation(left_side / coeff, right_side / coeff),
+        move_description=f"divide both sides by {coeff}",
+        is_fully_solved=False,
+    )
+
+
+def _extract_root_if_possible(
+    left_side: Expr, right_side: Expr, variable: Symbol
+) -> Optional[EquationStep]:
+    """Handle x**n = c → x = c^(1/n)."""
+    if not right_side.is_number:
+        return None
+    if left_side.is_Pow and left_side.base == variable and left_side.exp.is_number:
+        n = left_side.exp
+        root_val = right_side ** (Integer(1) / n)
+        result_text = f"{variable} = {root_val}"
+        move_desc = "take the square root" if n == 2 else f"take the {n}-th root"
+        return EquationStep(
+            resulting_equation_text=result_text,
+            move_description=move_desc,
+            is_fully_solved=True,
+        )
+    return None
 
 
 def _format_equation(left_side: Expr, right_side: Expr) -> str:
