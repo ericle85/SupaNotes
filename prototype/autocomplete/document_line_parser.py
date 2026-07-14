@@ -17,22 +17,40 @@ class ParsedExpression:
     original_text: str
 
 
-ParsedLine = Union[ParsedEquation, ParsedExpression]
+@dataclass(frozen=True)
+class UnparsableLine:
+    original_text: str
+    parse_error_description: str
+
+
+ParsedLine = Union[ParsedEquation, ParsedExpression, UnparsableLine]
 
 
 def parse_single_line(line_text: str) -> ParsedLine:
     stripped_text = line_text.strip()
-    if "=" in stripped_text:
-        left_text, right_text = stripped_text.split("=", 1)
-        return ParsedEquation(
-            left_side=parse_expr(left_text.strip()),
-            right_side=parse_expr(right_text.strip()),
+    equals_sign_count = stripped_text.count("=")
+    if equals_sign_count > 1:
+        return UnparsableLine(
+            original_text=stripped_text,
+            parse_error_description="line contains multiple equals signs",
+        )
+    try:
+        if equals_sign_count == 1:
+            left_text, right_text = stripped_text.split("=")
+            return ParsedEquation(
+                left_side=parse_expr(left_text.strip()),
+                right_side=parse_expr(right_text.strip()),
+                original_text=stripped_text,
+            )
+        return ParsedExpression(
+            expression=parse_expr(stripped_text),
             original_text=stripped_text,
         )
-    return ParsedExpression(
-        expression=parse_expr(stripped_text),
-        original_text=stripped_text,
-    )
+    except Exception as parse_error:
+        return UnparsableLine(
+            original_text=stripped_text,
+            parse_error_description=f"could not parse expression: {parse_error}",
+        )
 
 
 def parse_document_text(document_text: str) -> list[ParsedLine]:

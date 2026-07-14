@@ -9,7 +9,10 @@ def print_single_suggestion(document_name: str, document_path: str) -> None:
     print(f"document:    {document_name}")
     print(f"current:     {result.current_line_text}")
     print(f"operation:   {result.classified_intent.operation.name}")
-    print(f"next line:   {result.suggestion.suggested_text}")
+    if result.suggestion.has_suggestion:
+        print(f"next line:   {result.suggestion.suggested_text}")
+    else:
+        print(f"no suggestion: {result.suggestion.diagnostic_reason}")
 
 
 def print_full_derivation_if_equation(document_path: str) -> None:

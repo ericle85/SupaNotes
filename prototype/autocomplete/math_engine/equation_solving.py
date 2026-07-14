@@ -4,11 +4,18 @@ from sympy import Add, Expr, Symbol
 from autocomplete.document_line_parser import ParsedEquation
 
 
+_preferred_unknown_variable_names = ("x", "y", "z", "t", "w", "u", "v", "s", "r", "q", "p", "n", "m", "k")
+
+
 @dataclass(frozen=True)
 class EquationStep:
     resulting_equation_text: str
     move_description: str
     is_fully_solved: bool
+
+
+def equation_contains_solvable_variable(line: ParsedEquation) -> bool:
+    return bool(line.left_side.free_symbols | line.right_side.free_symbols)
 
 
 def generate_next_solving_step(line: ParsedEquation) -> EquationStep:
@@ -34,8 +41,11 @@ def generate_next_solving_step(line: ParsedEquation) -> EquationStep:
 
 def _select_target_variable(line: ParsedEquation) -> Symbol:
     all_symbols = line.left_side.free_symbols | line.right_side.free_symbols
-    ordered_symbols = sorted(all_symbols, key=lambda symbol: symbol.name)
-    return ordered_symbols[0]
+    symbols_by_name = {symbol.name: symbol for symbol in all_symbols}
+    for preferred_name in _preferred_unknown_variable_names:
+        if preferred_name in symbols_by_name:
+            return symbols_by_name[preferred_name]
+    return sorted(all_symbols, key=lambda symbol: symbol.name)[0]
 
 
 def _split_variable_and_constant_terms(expression: Expr, variable: Symbol):

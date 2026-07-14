@@ -1,10 +1,33 @@
 # input => expected operation => expected next line
 # one autocomplete suggestion per line, the whole pipeline is exercised
+# expected next line NO_SUGGESTION means the request is handled gracefully with a diagnostic reason
+# a leading "xfail:" marks a known limitation we have not implemented yet
+
+# linear equations, numeric coefficients
 2*x + 3 = 11 => SOLVE_EQUATION_ONE_STEP => 2*x = 8
 3*x + 2 = x + 8 => SOLVE_EQUATION_ONE_STEP => 2*x + 2 = 8
 2*x = 8 => SOLVE_EQUATION_ONE_STEP => x = 4
 x/2 = 5 => SOLVE_EQUATION_ONE_STEP => x = 10
+x/3 = 4 => SOLVE_EQUATION_ONE_STEP => x = 12
+-3*x = 9 => SOLVE_EQUATION_ONE_STEP => x = -3
+2*x - 5 = 1 => SOLVE_EQUATION_ONE_STEP => 2*x = 6
+2*(x + 1) = 6 => SOLVE_EQUATION_ONE_STEP => 2*x = 4
+
+# linear equations, symbolic coefficients
+a*x = b => SOLVE_EQUATION_ONE_STEP => x = b/a
+a*x + b = c => SOLVE_EQUATION_ONE_STEP => a*x = -b + c
+
+# expression simplification
 2*x + 3*x + 4 => SIMPLIFY_EXPRESSION => 5*x + 4
 x + x + x => SIMPLIFY_EXPRESSION => 3*x
+
+# expression factoring
 x**2 + 5*x + 6 => FACTOR_EXPRESSION => (x + 2)*(x + 3)
 x**2 - 9 => FACTOR_EXPRESSION => (x - 3)*(x + 3)
+
+# graceful no-suggestion cases, previously crashed
+a = b = c => NO_SUGGESTION => NO_SUGGESTION
+0 = 0 => SOLVE_EQUATION_ONE_STEP => NO_SUGGESTION
+
+# known limitation, quadratic root extraction not implemented
+xfail: x**2 = 4 => SOLVE_EQUATION_ONE_STEP => x = 2
