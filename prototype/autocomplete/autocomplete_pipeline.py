@@ -20,7 +20,7 @@ def run_autocomplete_on_document_text(document_text: str) -> AutocompleteResult:
     suggestion = generate_next_line(context, intent)
     return AutocompleteResult(
         current_line_text=context.current_line.original_text,
-        classified_intent=intent,
+        classified_intent=ClassifiedIntent(operation=suggestion.operation),
         suggestion=suggestion,
     )
 

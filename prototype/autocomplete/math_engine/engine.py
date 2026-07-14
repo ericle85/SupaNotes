@@ -1,36 +1,24 @@
 from dataclasses import dataclass
+from typing import Callable
+from sympy import Add, Symbol, sin, cos, tan, exp, log, sqrt, I, E, S
+
 from autocomplete.document_context_model import DocumentContext
-from autocomplete.document_line_parser import ParsedEquation, UnparsableLine
+from autocomplete.document_line_parser import ParsedEquation, ParsedExpression, UnparsableLine
 from autocomplete.math_operations import ClassifiedIntent, MathOperation
-from autocomplete.math_engine.equation_solving import (
-    generate_next_solving_step,
-    equation_contains_solvable_variable,
-)
-from autocomplete.math_engine.expression_transforms import (
-    simplify_expression, factor_expression,
-)
-from autocomplete.math_engine.calculus import (
-    differentiate_expression,
-    integrate_expression,
-)
-from autocomplete.math_engine.complex_numbers import (
-    compute_magnitude,
-    compute_phase_angle,
-    convert_rectangular_to_polar,
-)
-from autocomplete.math_engine.linear_algebra import (
-    compute_determinant,
-    compute_inverse_matrix,
-    compute_eigenvalues,
-)
-from autocomplete.math_engine.transforms import (
-    compute_laplace_transform,
+from autocomplete.math_engine import (
+    equation_solving,
+    expression_transforms,
+    calculus,
+    complex_numbers,
+    linear_algebra,
+    transforms,
 )
 
 
 @dataclass(frozen=True)
 class SuggestedNextLine:
     suggested_text: str
+    operation: MathOperation
     diagnostic_reason: str = ""
 
     @property
@@ -39,178 +27,221 @@ class SuggestedNextLine:
 
 
 def generate_next_line(context: DocumentContext, intent: ClassifiedIntent) -> SuggestedNextLine:
-    current_line = context.current_line
-    if isinstance(current_line, UnparsableLine):
-        return SuggestedNextLine("", current_line.parse_error_description)
-    
-    # Equation solving operations
-    if intent.operation == MathOperation.SOLVE_EQUATION_ONE_STEP:
-        return _suggest_equation_step(current_line)
-    if intent.operation == MathOperation.SOLVE_QUADRATIC:
-        return _suggest_equation_step(current_line)
-    if intent.operation == MathOperation.SOLVE_FACTOR_FORM:
-        return _suggest_equation_step(current_line)
-    if intent.operation == MathOperation.SOLVE_TRIG:
-        return _suggest_equation_step(current_line)
-    if intent.operation == MathOperation.SOLVE_EXP_LOG:
-        return _suggest_equation_step(current_line)
-    if intent.operation == MathOperation.SOLVE_RADICAL:
-        return _suggest_equation_step(current_line)
-    
-    # Expression transform operations
-    if intent.operation == MathOperation.SIMPLIFY_EXPRESSION:
-        if isinstance(current_line, ParsedEquation):
-            return SuggestedNextLine(_simplify_equation(current_line))
-        return SuggestedNextLine(simplify_expression(current_line))
-    if intent.operation == MathOperation.FACTOR_EXPRESSION:
-        if isinstance(current_line, ParsedEquation):
-            return SuggestedNextLine(_factor_equation(current_line))
-        return SuggestedNextLine(factor_expression(current_line))
-    if intent.operation == MathOperation.EXPAND_EXPRESSION:
-        return SuggestedNextLine(_expand_expression(current_line))
-    if intent.operation == MathOperation.CANCEL_EXPRESSION:
-        return SuggestedNextLine(_cancel_expression(current_line))
-    
-    # Calculus operations
-    if intent.operation == MathOperation.DIFFERENTIATE:
-        return SuggestedNextLine(_differentiate_expression(current_line))
-    if intent.operation == MathOperation.INTEGRATE:
-        return SuggestedNextLine(_integrate_expression(current_line))
-    if intent.operation == MathOperation.COMPUTE_LIMIT:
-        return SuggestedNextLine(_compute_limit(current_line))
-    if intent.operation == MathOperation.EXPAND_TAYLOR:
-        return SuggestedNextLine(_expand_taylor_series(current_line))
-    
-    # Complex number operations
-    if intent.operation == MathOperation.CONVERT_POLAR:
-        return SuggestedNextLine(_convert_to_polar(current_line))
-    if intent.operation == MathOperation.COMPUTE_MAGNITUDE:
-        return SuggestedNextLine(_compute_magnitude_val(current_line))
-    if intent.operation == MathOperation.COMPUTE_PHASE:
-        return SuggestedNextLine(_compute_phase_val(current_line))
-    if intent.operation == MathOperation.EULER_FORM:
-        return SuggestedNextLine(_euler_form(current_line))
-    
-    # Linear algebra operations
-    if intent.operation == MathOperation.RREF_STEP:
-        return SuggestedNextLine(_rref_step(current_line))
-    if intent.operation == MathOperation.COMPUTE_DETERMINANT:
-        return SuggestedNextLine(_compute_det(current_line))
-    if intent.operation == MathOperation.COMPUTE_INVERSE:
-        return SuggestedNextLine(_compute_inv(current_line))
-    if intent.operation == MathOperation.COMPUTE_EIGENVALUES:
-        return SuggestedNextLine(_compute_eigenval(current_line))
-    
-    # Transform operations
-    if intent.operation == MathOperation.LAPLACE_TRANSFORM:
-        return SuggestedNextLine(_compute_laplace(current_line))
-    if intent.operation == MathOperation.INVERSE_LAPLACE:
-        return SuggestedNextLine(_compute_inverse_laplace(current_line))
-    if intent.operation == MathOperation.FOURIER_TRANSFORM:
-        return SuggestedNextLine(_compute_fourier(current_line))
-    
-    return SuggestedNextLine("", "no operation matched the current line")
+    # intent is currently unused: the stub classifier is too coarse, so the CAS
+    # resolves the real operation from the line's math structure. Re-introduce
+    # when a real intent model can override _resolve_operation.
+    line = context.current_line
+    if isinstance(line, UnparsableLine):
+        return SuggestedNextLine("", MathOperation.SIMPLIFY_EXPRESSION, line.parse_error_description)
+    operation = _resolve_operation(line)
+    if isinstance(line, ParsedEquation):
+        return _execute_equation(line, operation)
+    return _execute_expression(line, operation)
 
 
-def _suggest_equation_step(line: ParsedEquation) -> SuggestedNextLine:
-    if not equation_contains_solvable_variable(line):
-        return SuggestedNextLine("", "equation has no variable to solve for")
-    return SuggestedNextLine(generate_next_solving_step(line).resulting_equation_text)
+_SINGLE_VAR_INDICATORS = ("x", "y", "z", "t", "w")
 
 
+def _resolve_operation(line) -> MathOperation:
+    if isinstance(line, ParsedEquation):
+        return _resolve_equation(line)
+    if isinstance(line, ParsedExpression):
+        return _resolve_expression(line)
+    return MathOperation.SIMPLIFY_EXPRESSION
 
-def _expand_expression(line):
-    from autocomplete.math_engine.expression_transforms import expand_expression
-    return expand_expression(line)
 
-def _cancel_expression(line):
-    from autocomplete.math_engine.expression_transforms import cancel_expression
-    return cancel_expression(line)
+def _resolve_equation(line: ParsedEquation) -> MathOperation:
+    for matches, operation in _equation_rules:
+        if matches(line):
+            return operation
+    return MathOperation.SOLVE_EQUATION_ONE_STEP
 
-def _differentiate_expression(line):
-    from autocomplete.math_engine.calculus import differentiate_expression
-    return differentiate_expression(line, _get_variable_name(line.expression))
 
-def _integrate_expression(line):
-    from autocomplete.math_engine.calculus import integrate_expression
-    return integrate_expression(line, _get_variable_name(line.expression))
+def _resolve_expression(line: ParsedExpression) -> MathOperation:
+    for matches, operation in _expression_rules:
+        if matches(line):
+            return operation
+    return MathOperation.SIMPLIFY_EXPRESSION
 
-def _compute_limit(line):
-    from autocomplete.math_engine.calculus import compute_limit_at_point
-    return compute_limit_at_point(line, _get_variable_name(line.expression), "0")
 
-def _expand_taylor_series(line):
-    from autocomplete.math_engine.calculus import expand_as_taylor_series
-    return expand_as_taylor_series(line, _get_variable_name(line.expression))
+def _either_side(predicate: Callable) -> Callable[[ParsedEquation], bool]:
+    return lambda line: predicate(line.left_side) or predicate(line.right_side)
 
-def _convert_to_polar(line):
-    from autocomplete.math_engine.complex_numbers import convert_rectangular_to_polar
-    return convert_rectangular_to_polar(line)
 
-def _compute_magnitude_val(line):
-    from autocomplete.math_engine.complex_numbers import compute_magnitude
-    return compute_magnitude(line)
+def _contains_func(*funcs) -> Callable:
+    def check(expr) -> bool:
+        if hasattr(expr, "func") and expr.func in funcs:
+            return True
+        if hasattr(expr, "atoms"):
+            return any(hasattr(atom, "func") and atom.func in funcs for atom in expr.atoms())
+        return False
+    return check
 
-def _compute_phase_val(line):
-    from autocomplete.math_engine.complex_numbers import compute_phase_angle
-    return compute_phase_angle(line)
 
-def _euler_form(line):
-    from autocomplete.math_engine.complex_numbers import express_in_euler_form
-    return express_in_euler_form(line)
+_contains_trig = _contains_func(sin, cos, tan)
+_contains_log = _contains_func(log)
+_exp_func_check = _contains_func(exp)
 
-def _rref_step(line):
-    from autocomplete.math_engine.linear_algebra import generate_next_rref_step
-    step = generate_next_rref_step(line)
-    return step.resulting_matrix_text
 
-def _compute_det(line):
-    return compute_determinant(line)
+def _contains_exp(expr) -> bool:
+    return _exp_func_check(expr) or (expr.is_Pow and expr.base == E)
 
-def _compute_inv(line):
-    return compute_inverse_matrix(line)
 
-def _compute_eigenval(line):
-    return compute_eigenvalues(line)
+def _contains_sqrt(expr) -> bool:
+    if expr.is_Pow and expr.exp == S.Half:
+        return True
+    if hasattr(expr, "func") and expr.func == sqrt:
+        return True
+    if hasattr(expr, "atoms"):
+        return any(atom.is_Pow and atom.exp == S.Half for atom in expr.atoms())
+    return False
 
-def _compute_laplace(line):
-    return compute_laplace_transform(line)
 
-def _compute_inverse_laplace(line):
-    from autocomplete.math_engine.transforms import compute_inverse_laplace_transform
-    return compute_inverse_laplace_transform(line)
+def _has_single_unknown(line: ParsedEquation) -> bool:
+    all_symbols = line.left_side.free_symbols | line.right_side.free_symbols
+    if len(all_symbols) <= 1:
+        return True
+    names = {symbol.name for symbol in all_symbols}
+    if any(len(name) > 1 and name[0].islower() and name.isalpha() for name in names):
+        return False
+    if any(symbol.name == "x" for symbol in all_symbols):
+        return True
+    return any(indicator in names for indicator in _SINGLE_VAR_INDICATORS)
 
-def _compute_fourier(line):
-    from autocomplete.math_engine.transforms import compute_fourier_transform
-    return compute_fourier_transform(line)
 
-def _get_variable_name(expression):
-    from sympy import Symbol
+def _is_factor_form_equation(line: ParsedEquation) -> bool:
+    if line.right_side != 0 or not line.left_side.is_Mul:
+        return False
+    binomial_factors = [
+        factor for factor in line.left_side.args
+        if factor.is_Add or (factor.is_Mul and len(factor.free_symbols) > 0)
+    ]
+    return len(binomial_factors) >= 2
+
+
+def _is_quadratic_equation(line: ParsedEquation) -> bool:
+    symbols = line.left_side.free_symbols | line.right_side.free_symbols
+    return _is_quadratic(line.left_side, symbols)
+
+
+def _is_quadratic(expr, symbols) -> bool:
+    for symbol in symbols:
+        polynomial = expr.as_poly(symbol) if expr.as_poly(symbol) else None
+        degree = polynomial.degree() if polynomial else -1
+        if degree == 2:
+            return True
+    return False
+
+
+def _needs_expansion(expr) -> bool:
+    if expr.is_Pow and expr.exp.is_integer and expr.exp > 1:
+        return True
+    if hasattr(expr, "atoms"):
+        return any(arg.is_Pow and arg.exp.is_integer and arg.exp > 1 for arg in expr.atoms())
+    return False
+
+
+def _needs_cancellation(expr) -> bool:
+    if expr.is_Mul:
+        return any(arg.is_Pow and arg.exp.is_Rational for arg in expr.args)
+    return False
+
+
+def _expression_contains_power_term(line: ParsedExpression) -> bool:
+    expr = line.expression
+    terms = expr.args if isinstance(expr, Add) else (expr,)
+    return any(term.is_Pow for term in terms)
+
+
+EquationRule = tuple[Callable[[ParsedEquation], bool], MathOperation]
+ExpressionRule = tuple[Callable[[ParsedExpression], bool], MathOperation]
+
+_equation_rules: tuple[EquationRule, ...] = (
+    (_is_factor_form_equation, MathOperation.SOLVE_FACTOR_FORM),
+    (lambda line: not _has_single_unknown(line), MathOperation.SIMPLIFY_EXPRESSION),
+    (_either_side(_contains_trig), MathOperation.SOLVE_TRIG),
+    (_either_side(_contains_exp), MathOperation.SOLVE_EXP_LOG),
+    (_either_side(_contains_log), MathOperation.SOLVE_EXP_LOG),
+    (_either_side(_contains_sqrt), MathOperation.SOLVE_RADICAL),
+    (_is_quadratic_equation, MathOperation.SOLVE_QUADRATIC),
+)
+
+_expression_rules: tuple[ExpressionRule, ...] = (
+    (lambda line: I in line.expression.atoms(), MathOperation.CONVERT_POLAR),
+    (lambda line: _needs_expansion(line.expression), MathOperation.EXPAND_EXPRESSION),
+    (lambda line: _expression_contains_power_term(line), MathOperation.FACTOR_EXPRESSION),
+    (lambda line: _needs_cancellation(line.expression), MathOperation.CANCEL_EXPRESSION),
+)
+
+
+_equation_transforms = {
+    MathOperation.SIMPLIFY_EXPRESSION: expression_transforms.simplify_equation,
+    MathOperation.FACTOR_EXPRESSION: expression_transforms.factor_equation,
+    MathOperation.EXPAND_EXPRESSION: expression_transforms.expand_equation,
+    MathOperation.CANCEL_EXPRESSION: expression_transforms.cancel_equation,
+}
+
+_expression_transforms = {
+    MathOperation.SIMPLIFY_EXPRESSION: expression_transforms.simplify_expression,
+    MathOperation.FACTOR_EXPRESSION: expression_transforms.factor_expression,
+    MathOperation.EXPAND_EXPRESSION: expression_transforms.expand_expression,
+    MathOperation.CANCEL_EXPRESSION: expression_transforms.cancel_expression,
+}
+
+_expression_single_arg = {
+    MathOperation.CONVERT_POLAR: complex_numbers.convert_rectangular_to_polar,
+    MathOperation.COMPUTE_MAGNITUDE: complex_numbers.compute_magnitude,
+    MathOperation.COMPUTE_PHASE: complex_numbers.compute_phase_angle,
+    MathOperation.EULER_FORM: complex_numbers.express_in_euler_form,
+    MathOperation.COMPUTE_DETERMINANT: linear_algebra.compute_determinant,
+    MathOperation.COMPUTE_INVERSE: linear_algebra.compute_inverse_matrix,
+    MathOperation.COMPUTE_EIGENVALUES: linear_algebra.compute_eigenvalues,
+    MathOperation.LAPLACE_TRANSFORM: transforms.compute_laplace_transform,
+    MathOperation.INVERSE_LAPLACE: transforms.compute_inverse_laplace_transform,
+    MathOperation.FOURIER_TRANSFORM: transforms.compute_fourier_transform,
+}
+
+
+def _compute_limit(line: ParsedExpression, variable_name: str) -> str:
+    return calculus.compute_limit_at_point(line, variable_name, "0")
+
+
+_calculus_ops = {
+    MathOperation.DIFFERENTIATE: calculus.differentiate_expression,
+    MathOperation.INTEGRATE: calculus.integrate_expression,
+    MathOperation.COMPUTE_LIMIT: _compute_limit,
+    MathOperation.EXPAND_TAYLOR: calculus.expand_as_taylor_series,
+}
+
+
+def _execute_equation(line: ParsedEquation, operation: MathOperation) -> SuggestedNextLine:
+    transform = _equation_transforms.get(operation)
+    if transform is not None:
+        return SuggestedNextLine(transform(line), operation)
+    if not equation_solving.equation_contains_solvable_variable(line):
+        return SuggestedNextLine("", operation, "equation has no variable to solve for")
+    step = equation_solving.generate_next_solving_step(line)
+    return SuggestedNextLine(step.resulting_equation_text, operation)
+
+
+def _execute_expression(line: ParsedExpression, operation: MathOperation) -> SuggestedNextLine:
+    transform = _expression_transforms.get(operation)
+    if transform is not None:
+        return SuggestedNextLine(transform(line), operation)
+    single_arg_func = _expression_single_arg.get(operation)
+    if single_arg_func is not None:
+        return SuggestedNextLine(single_arg_func(line), operation)
+    if operation == MathOperation.RREF_STEP:
+        step = linear_algebra.generate_next_rref_step(line)
+        return SuggestedNextLine(step.resulting_matrix_text, operation)
+    calculus_func = _calculus_ops.get(operation)
+    if calculus_func is not None:
+        return SuggestedNextLine(calculus_func(line, _get_variable_name(line.expression)), operation)
+    return SuggestedNextLine("", operation, "no operation matched the current line")
+
+
+def _get_variable_name(expression) -> str:
     symbols = expression.free_symbols
     if symbols:
-        return sorted(symbols, key=lambda s: s.name)[0].name
+        return sorted(symbols, key=lambda symbol: symbol.name)[0].name
     return "x"
-
-def _suggest_equation_step(line):
-    from autocomplete.math_engine.equation_solving import (
-        generate_next_solving_step,
-        equation_contains_solvable_variable,
-    )
-    if not equation_contains_solvable_variable(line):
-        return SuggestedNextLine("", "equation has no variable to solve for")
-    return SuggestedNextLine(generate_next_solving_step(line).resulting_equation_text)
-
-
-def _simplify_equation(line):
-    from autocomplete.math_engine.expression_transforms import simplify_equation
-    return simplify_equation(line)
-
-
-def _factor_equation(line):
-    from autocomplete.math_engine.expression_transforms import factor_equation
-    return factor_equation(line)
-
-
-def _expand_equation(line):
-    from autocomplete.math_engine.expression_transforms import expand_equation
-    return expand_equation(line)
