@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from autocomplete.document_line_parser import read_document_lines_from_file
+from autocomplete.document_line_parser import parse_document_text
 from autocomplete.document_context_model import build_context_for_last_line
 from autocomplete.intent_classifier import classify_intent
 from autocomplete.math_operations import ClassifiedIntent
@@ -13,8 +13,8 @@ class AutocompleteResult:
     suggestion: SuggestedNextLine
 
 
-def run_autocomplete_on_document(file_path: str) -> AutocompleteResult:
-    parsed_lines = read_document_lines_from_file(file_path)
+def run_autocomplete_on_document_text(document_text: str) -> AutocompleteResult:
+    parsed_lines = parse_document_text(document_text)
     context = build_context_for_last_line(parsed_lines)
     intent = classify_intent(context)
     suggestion = generate_next_line(context, intent)
@@ -23,3 +23,8 @@ def run_autocomplete_on_document(file_path: str) -> AutocompleteResult:
         classified_intent=intent,
         suggestion=suggestion,
     )
+
+
+def run_autocomplete_on_document(file_path: str) -> AutocompleteResult:
+    with open(file_path, "r") as document_file:
+        return run_autocomplete_on_document_text(document_file.read())

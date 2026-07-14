@@ -1,0 +1,10 @@
+# input => expected operation => expected next line
+# one autocomplete suggestion per line, the whole pipeline is exercised
+2*x + 3 = 11 => SOLVE_EQUATION_ONE_STEP => 2*x = 8
+3*x + 2 = x + 8 => SOLVE_EQUATION_ONE_STEP => 2*x + 2 = 8
+2*x = 8 => SOLVE_EQUATION_ONE_STEP => x = 4
+x/2 = 5 => SOLVE_EQUATION_ONE_STEP => x = 10
+2*x + 3*x + 4 => SIMPLIFY_EXPRESSION => 5*x + 4
+x + x + x => SIMPLIFY_EXPRESSION => 3*x
+x**2 + 5*x + 6 => FACTOR_EXPRESSION => (x + 2)*(x + 3)
+x**2 - 9 => FACTOR_EXPRESSION => (x - 3)*(x + 3)
