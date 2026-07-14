@@ -25,11 +25,11 @@ x + x + x => SIMPLIFY_EXPRESSION => 3*x
 x**2 + 5*x + 6 => FACTOR_EXPRESSION => (x + 2)*(x + 3)
 x**2 - 9 => FACTOR_EXPRESSION => (x - 3)*(x + 3)
 
-# quadratic root extraction
-x**2 = 4 => SOLVE_EQUATION_ONE_STEP => x = 2
-x**2 = 9 => SOLVE_EQUATION_ONE_STEP => x = 3
+# quadratic root extraction (both real roots)
+x**2 = 4 => SOLVE_EQUATION_ONE_STEP => x = -2, 2
+x**2 = 9 => SOLVE_EQUATION_ONE_STEP => x = -3, 3
 x**2 = 0 => SOLVE_EQUATION_ONE_STEP => x = 0
-x**4 = 16 => SOLVE_EQUATION_ONE_STEP => x = 2
+x**4 = 16 => SOLVE_EQUATION_ONE_STEP => x = -2, 2
 2*x**2 = 8 => SOLVE_EQUATION_ONE_STEP => x**2 = 4
 
 # graceful no-suggestion cases, previously crashed

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
-from sympy import Add, Expr, Integer, Symbol
+from sympy import Add, Expr, Integer, Symbol, S, solveset
+from sympy.sets import EmptySet
 from autocomplete.document_line_parser import ParsedEquation
 
 
@@ -123,20 +124,32 @@ def _divide_by_power_coefficient(
 def _extract_root_if_possible(
     left_side: Expr, right_side: Expr, variable: Symbol
 ) -> Optional[EquationStep]:
-    """Handle x**n = c → x = c^(1/n)."""
+    """Handle x**n = c → x = c^(1/n), returning all real solutions."""
     if not right_side.is_number:
         return None
-    if left_side.is_Pow and left_side.base == variable and left_side.exp.is_number:
-        n = left_side.exp
-        root_val = right_side ** (Integer(1) / n)
-        result_text = f"{variable} = {root_val}"
-        move_desc = "take the square root" if n == 2 else f"take the {n}-th root"
+    if not left_side.is_Pow or left_side.base != variable or not left_side.exp.is_number:
+        return None
+    n = left_side.exp
+
+    # Use solveset for all real roots (includes negative solutions)
+    equation = variable**n - right_side
+    solutions = solveset(equation, variable, domain=S.Reals)
+
+    if solutions == EmptySet:
         return EquationStep(
-            resulting_equation_text=result_text,
-            move_description=move_desc,
+            resulting_equation_text=f"{variable} = ∅",
+            move_description=f"no real solution to x**{n} = {right_side}",
             is_fully_solved=True,
         )
-    return None
+
+    solution_list = sorted(list(solutions), key=lambda s: float(s) if s.is_real else float('-inf'))
+    solutions_text = ", ".join(str(s) for s in solution_list)
+    move_desc = "take the square root" if n == 2 else f"take the {n}-th root"
+    return EquationStep(
+        resulting_equation_text=f"{variable} = {solutions_text}",
+        move_description=move_desc,
+        is_fully_solved=True,
+    )
 
 
 def _format_equation(left_side: Expr, right_side: Expr) -> str:
