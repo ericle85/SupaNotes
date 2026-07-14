@@ -123,3 +123,4 @@ xcdebugger/
 *.mp4
 
 skills/
+.pi-subagents/

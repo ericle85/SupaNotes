@@ -1,9 +1,22 @@
+import Combine
 import SwiftUI
 import UIKit
 
+final class DrawingCanvasController: ObservableObject {
+    fileprivate weak var canvas: DrawingCanvas?
+
+    func clear() {
+        canvas?.clearStrokes()
+    }
+}
+
 struct CanvasView: UIViewRepresentable {
+    @ObservedObject var controller: DrawingCanvasController
+
     func makeUIView(context _: Context) -> DrawingCanvas {
-        DrawingCanvas()
+        let canvas = DrawingCanvas()
+        controller.canvas = canvas
+        return canvas
     }
 
     func updateUIView(_: DrawingCanvas, context _: Context) {}
@@ -38,6 +51,11 @@ final class DrawingCanvas: StrokeInputSource {
     @available(*, unavailable)
     required init?(coder _: NSCoder) {
         fatalError()
+    }
+
+    func clearStrokes() {
+        engine.clear()
+        setNeedsDisplay()
     }
 
     override func draw(_: CGRect) {

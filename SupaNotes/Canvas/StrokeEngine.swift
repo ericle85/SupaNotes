@@ -22,4 +22,9 @@ final class StrokeEngine {
     func cancel() {
         activeStroke = nil
     }
+
+    func clear() {
+        strokes = []
+        activeStroke = nil
+    }
 }

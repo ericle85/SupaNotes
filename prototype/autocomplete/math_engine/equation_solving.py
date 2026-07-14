@@ -1,11 +1,20 @@
 from dataclasses import dataclass
 from typing import Optional
-from sympy import Add, Expr, Integer, Symbol, S, solveset
+from sympy import (
+    Add, Expr, Integer, Symbol, S, solveset,
+    sin, cos, tan, exp, log, sqrt,
+    asin, acos, atan, E,
+)
 from sympy.sets import EmptySet
 from autocomplete.document_line_parser import ParsedEquation
 
 
-_preferred_unknown_variable_names = ("x", "y", "z", "t", "w", "u", "v", "s", "r", "q", "p", "n", "m", "k")
+_preferred_unknown_variable_names = (
+    "x", "y", "z", "t", "w", "u", "v", "s", "r", "q", "p", "n", "m", "k",
+    # Greek letters for physics/engineering
+    "alpha", "beta", "gamma", "delta", "epsilon", "mu", "rho", "sigma", "theta",
+    "phi", "psi", "omega", "lambda", "eta", "xi", "tau",
+)
 
 
 @dataclass(frozen=True)
@@ -29,6 +38,12 @@ def generate_next_solving_step(line: ParsedEquation) -> EquationStep:
         _move_constant_terms_from_left_to_right,
         _divide_both_sides_by_coefficient,
         _divide_by_power_coefficient,
+        _extract_radical_solution,
+        _extract_trig_solution,
+        _extract_exp_log_solution,
+        _extract_quadratic_solution,
+        _extract_factored_form_solution,
+        _expand_factored_form_equation,
         _extract_root_if_possible,
     ):
         step = build_step(left_side, right_side, variable)
@@ -150,6 +165,176 @@ def _extract_root_if_possible(
         move_description=move_desc,
         is_fully_solved=True,
     )
+
+
+
+
+def _extract_trig_solution(
+    left_side: Expr, right_side: Expr, variable: Symbol
+) -> Optional[EquationStep]:
+    """Handle trig equations like sin(x) = 0, cos(x) = 0.5"""
+    # Check if left side is a trig function
+    if left_side.func in (sin, cos, tan):
+        func_name = left_side.func.__name__
+        # Extract the argument
+        arg = left_side.args[0]
+        if arg == variable:
+            # Get the principal value
+            if func_name == 'sin':
+                val = asin(right_side)
+            elif func_name == 'cos':
+                val = acos(right_side)
+            elif func_name == 'tan':
+                val = atan(right_side)
+            return EquationStep(
+                resulting_equation_text=f"{variable} = {val}",
+                move_description=f"take the {func_name} inverse",
+                is_fully_solved=True,
+            )
+    return None
+
+
+def _extract_exp_log_solution(
+    left_side: Expr, right_side: Expr, variable: Symbol
+) -> Optional[EquationStep]:
+    """Handle exponential/logarithmic equations like e^x = 2, ln(x) = 3"""
+    # Check if left side is exp or log
+    if left_side.func in (exp,):
+        arg = left_side.args[0]
+        if arg == variable:
+            # e^x = c → x = ln(c)
+            val = log(right_side)
+            return EquationStep(
+                resulting_equation_text=f"{variable} = {val}",
+                move_description="take the natural logarithm",
+                is_fully_solved=True,
+            )
+    elif left_side.func in (log,):
+        arg = left_side.args[0]
+        if arg == variable:
+            # ln(x) = c → x = e^c
+            val = exp(right_side)
+            return EquationStep(
+                resulting_equation_text=f"{variable} = {val}",
+                move_description="exponentiate both sides",
+                is_fully_solved=True,
+            )
+    # Check for e**x form (Pow with base E)
+    elif left_side.is_Pow and left_side.base == E and left_side.exp == variable:
+        val = log(right_side)
+        return EquationStep(
+            resulting_equation_text=f"{variable} = {val}",
+            move_description="take the natural logarithm",
+            is_fully_solved=True,
+        )
+    return None
+
+
+def _extract_radical_solution(
+    left_side: Expr, right_side: Expr, variable: Symbol
+) -> Optional[EquationStep]:
+    """Handle radical equations like sqrt(x) = 3"""
+    if left_side == sqrt(variable):
+        val = right_side**2
+        return EquationStep(
+            resulting_equation_text=f"{variable} = {val}",
+            move_description="square both sides",
+            is_fully_solved=True,
+        )
+    return None
+
+
+def _extract_quadratic_solution(
+    left_side: Expr, right_side: Expr, variable: Symbol
+) -> Optional[EquationStep]:
+    """Handle quadratic equations using solveset for all roots"""
+    # Only if left side is a quadratic in variable
+    if left_side.is_Pow:
+        # x**2 = c case (already handled by _extract_root_if_possible)
+        return None
+    if left_side.is_Add or left_side.is_Mul:
+        # Check if it's a quadratic expression
+        # Try to solve using solveset for quadratic
+        equation = left_side - right_side
+        solutions = solveset(equation, variable, domain=S.Reals)
+        from sympy.sets import EmptySet
+        if solutions != EmptySet and len(solutions) <= 2:
+            solution_list = sorted(list(solutions), key=lambda s: float(s) if s.is_real else float('-inf'))
+            solutions_text = ", ".join(str(s) for s in solution_list)
+            return EquationStep(
+                resulting_equation_text=f"{variable} = {solutions_text}",
+                move_description="apply the quadratic formula",
+                is_fully_solved=True,
+            )
+    return None
+
+
+
+
+def _extract_factored_form_solution(
+    left_side: Expr, right_side: Expr, variable: Symbol
+) -> Optional[EquationStep]:
+    """Handle (x+a)(x+b) = 0 → x = -a or x = -b"""
+    if right_side != 0:
+        return None
+    if not left_side.is_Mul:
+        return None
+    # Get all factors
+    factors = left_side.args
+    binomial_factors = [f for f in factors if f.is_Add or (f.is_Mul and variable in f.free_symbols)]
+    if not binomial_factors or len(binomial_factors) < 2:
+        return None
+    solutions = []
+    from sympy.sets import EmptySet
+    for factor in binomial_factors:
+        sol = solveset(factor, variable, domain=S.Reals)
+        if sol != EmptySet:
+            for s in sorted(list(sol), key=lambda x: float(x) if x.is_real else float('-inf')):
+                solutions.append(str(s))
+    if solutions:
+        return EquationStep(
+            resulting_equation_text=f"{variable} = {' or '.join(solutions)}",
+            move_description="apply the zero product property",
+            is_fully_solved=True,
+        )
+    return None
+
+def _expand_factored_form_equation(
+    left_side: Expr, right_side: Expr, variable: Symbol
+) -> Optional[EquationStep]:
+    """Handle factored form equations like (x+1)(x-2) = 0"""
+    # Check if left side is a product of binomials
+    if left_side.is_Mul:
+        # Check if it's a product of terms
+        for arg in left_side.args:
+            if arg.is_Add and len(arg.args) == 2 and variable in arg.free_symbols:
+                # Found a binomial factor = variable + constant
+                pass
+        # For factored form = 0, apply zero product property
+        if right_side == 0:
+            # Get all the factors
+            factors = left_side.args if left_side.is_Mul else [left_side]
+            binomial_factors = []
+            for factor in factors:
+                if factor.is_Add or (factor.is_Mul and variable in factor.free_symbols):
+                    binomial_factors.append(factor)
+            if binomial_factors:
+                # Generate solutions for each factor
+                solutions = []
+                for factor in binomial_factors:
+                    # Solve factor = 0 for variable
+                    sol = solveset(factor, variable, domain=S.Reals)
+                    if sol != EmptySet:
+                        for s in sorted(list(sol), key=lambda x: float(x) if x.is_real else float('-inf')):
+                            solutions.append(str(s))
+                if solutions:
+                    solutions_text = " or ".join(solutions)
+                    return EquationStep(
+                        resulting_equation_text=f"{variable} = {solutions_text}",
+                        move_description="apply the zero product property",
+                        is_fully_solved=True,
+                    )
+    return None
 
 
 def _format_equation(left_side: Expr, right_side: Expr) -> str:

@@ -7,9 +7,7 @@ final class PencilCanvasController: ObservableObject {
     @Published var lastTouchInfo = "—"
     fileprivate weak var view: PencilCanvasView?
 
-    func clear() {
-        view?.clearStrokes()
-    }
+    func clear() { view?.clearCanvas() }
 
     func inject(command: String) {
         let points = PencilCanvasController.parse(command)
@@ -33,7 +31,7 @@ final class PencilCanvasController: ObservableObject {
 struct PencilCanvas: UIViewRepresentable {
     @ObservedObject var controller: PencilCanvasController
 
-    func makeUIView(context: Context) -> PencilCanvasView {
+    func makeUIView(context _: Context) -> PencilCanvasView {
         let view = PencilCanvasView()
         view.onStrokesChanged = { [weak controller] count in controller?.strokeCount = count }
         view.onTouchReport = { [weak controller] info in controller?.lastTouchInfo = info }
@@ -41,31 +39,52 @@ struct PencilCanvas: UIViewRepresentable {
         return view
     }
 
-    func updateUIView(_ uiView: PencilCanvasView, context: Context) {}
+    func updateUIView(_: PencilCanvasView, context _: Context) {}
 }
 
-final class PencilCanvasView: UIView {
+final class PencilCanvasView: StrokeInputSource {
     var onStrokesChanged: ((Int) -> Void)?
     var onTouchReport: ((String) -> Void)?
-    private var strokes: [[CGPoint]] = []
-    private var current: [CGPoint] = []
-    private var activePencilTouch: UITouch?
+    private let engine = StrokeEngine()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        isMultipleTouchEnabled = true
         backgroundColor = UIColor.secondarySystemBackground
         accessibilityIdentifier = QAID.drawCanvas
         isAccessibilityElement = true
+
+        onStrokeStarted = { [weak self] point in
+            self?.engine.begin(at: point)
+            self?.setNeedsDisplay()
+        }
+        onStrokeContinued = { [weak self] point in
+            self?.engine.extend(with: point)
+            self?.setNeedsDisplay()
+        }
+        onStrokeFinished = { [weak self] point in
+            guard let self else { return }
+            self.engine.end(at: point)
+            self.setNeedsDisplay()
+            self.onStrokesChanged?(self.engine.strokes.count)
+        }
+        onStrokeDiscarded = { [weak self] in
+            self?.engine.cancel()
+            self?.setNeedsDisplay()
+        }
     }
 
-    required init?(coder: NSCoder) { fatalError() }
-
-    private func drawsAsPencil(_ touch: UITouch, _ event: UIEvent?) -> Bool {
-        touch.type == .pencil || (event?.modifierFlags.contains(.shift) ?? false)
+    func clearCanvas() {
+        engine.clear()
+        onStrokesChanged?(0)
+        setNeedsDisplay()
     }
 
-    private func report(_ touch: UITouch, _ event: UIEvent?) {
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if let touch = touches.first { reportTouch(touch, event) }
+        super.touchesBegan(touches, with: event)
+    }
+
+    private func reportTouch(_ touch: UITouch, _ event: UIEvent?) {
         let kind: String
         switch touch.type {
         case .pencil: kind = "pencil"
@@ -80,58 +99,9 @@ final class PencilCanvasView: UIView {
         onTouchReport?(info)
     }
 
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let touch = touches.first else { return }
-        report(touch, event)
-        guard activePencilTouch == nil, drawsAsPencil(touch, event) else { return }
-        activePencilTouch = touch
-        current = [touch.location(in: self)]
-        setNeedsDisplay()
-    }
-
-    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let activePencilTouch, touches.contains(activePencilTouch) else { return }
-        current.append(activePencilTouch.location(in: self))
-        setNeedsDisplay()
-    }
-
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let activePencilTouch, touches.contains(activePencilTouch) else { return }
-        current.append(activePencilTouch.location(in: self))
-        if !current.isEmpty { strokes.append(current) }
-        current = []
-        self.activePencilTouch = nil
-        onStrokesChanged?(strokes.count)
-        setNeedsDisplay()
-    }
-
-    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let activePencilTouch, touches.contains(activePencilTouch) else { return }
-        current = []
-        self.activePencilTouch = nil
-        setNeedsDisplay()
-    }
-
-    func clearStrokes() {
-        strokes = []
-        current = []
-        onStrokesChanged?(0)
-        setNeedsDisplay()
-    }
-
-    override func draw(_ rect: CGRect) {
+    override func draw(_: CGRect) {
         guard let ctx = UIGraphicsGetCurrentContext() else { return }
-        ctx.setStrokeColor(UIColor.systemBlue.cgColor)
-        ctx.setLineWidth(3)
-        ctx.setLineCap(.round)
-        ctx.setLineJoin(.round)
-        for stroke in strokes + [current] {
-            guard let first = stroke.first else { continue }
-            ctx.beginPath()
-            ctx.move(to: first)
-            for point in stroke.dropFirst() { ctx.addLine(to: point) }
-            ctx.strokePath()
-        }
+        StrokeRenderer.draw(engine.strokes, active: engine.activeStroke, in: ctx)
     }
 
     #if DEBUG
