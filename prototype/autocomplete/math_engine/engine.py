@@ -163,7 +163,7 @@ def _fraction_parts(expr):
     return None
 
 
-def _is_fraction_fully_simplified(parts) -> bool:
+def _fraction_is_already_simplest(parts) -> bool:
     numerator, denominator = parts
     return denominator != 0 and abs(denominator) != 1 and gcd(numerator, denominator) == 1
 
@@ -183,37 +183,29 @@ def _radical_parts(expr):
     return None
 
 
-def _is_radical_fully_simplified(parts) -> bool:
+def _radical_is_already_simplest(parts) -> bool:
     (radicand,) = parts
     return radicand != 1 and all(exponent < 2 for exponent in factorint(radicand).values())
 
 
-@dataclass(frozen=True)
-class NumericForm:
-    extract_parts: Callable
-    is_fully_simplified: Callable
-
-
-_NUMERIC_FORMS: tuple[NumericForm, ...] = (
-    NumericForm(_fraction_parts, _is_fraction_fully_simplified),
-    NumericForm(_radical_parts, _is_radical_fully_simplified),
-)
-
-
-def _classify_literal(expr):
-    for form in _NUMERIC_FORMS:
-        parts = form.extract_parts(expr)
-        if parts is not None:
-            return form.is_fully_simplified(parts)
-    return None
-
-
 def _is_reducible_literal(expr) -> bool:
-    return not _is_zero_denominator_fraction(expr) and _classify_literal(expr) is False
+    fraction = _fraction_parts(expr)
+    if fraction is not None:
+        return fraction[1] != 0 and not _fraction_is_already_simplest(fraction)
+    radical = _radical_parts(expr)
+    if radical is not None:
+        return not _radical_is_already_simplest(radical)
+    return False
 
 
 def _is_simplest_literal(expr) -> bool:
-    return _classify_literal(expr) is True
+    fraction = _fraction_parts(expr)
+    if fraction is not None:
+        return _fraction_is_already_simplest(fraction)
+    radical = _radical_parts(expr)
+    if radical is not None:
+        return _radical_is_already_simplest(radical)
+    return False
 
 
 def _expression_contains_power_term(line: ParsedExpression) -> bool:
