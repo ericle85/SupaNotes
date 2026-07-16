@@ -85,6 +85,8 @@ def translate_ctc_line_to_sympy(line_text: str):
     stripped_text = line_text.strip()
     if _UNSUPPORTED_CONSTRUCT.search(stripped_text):
         raise TranslationError(f"unsupported latex construct: {stripped_text!r}")
+    if stripped_text.endswith("=") and stripped_text.count("=") == 1:
+        return translate_ctc_line_to_sympy(stripped_text[:-1])
     if _looks_like_latex(stripped_text):
         return _translate_latex(stripped_text)
     return _translate_plain_text(stripped_text)
