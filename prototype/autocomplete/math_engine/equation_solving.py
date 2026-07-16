@@ -37,6 +37,7 @@ def generate_next_solving_step(line: ParsedEquation) -> EquationStep:
     for build_step in (
         _move_variable_terms_from_right_to_left,
         _move_constant_terms_from_left_to_right,
+        _divide_out_leading_numeric_factor,
         _divide_both_sides_by_coefficient,
         _divide_by_power_coefficient,
         _extract_radical_solution,
@@ -98,6 +99,21 @@ def _move_constant_terms_from_left_to_right(
     return EquationStep(
         resulting_equation_text=_format_equation(left_side - moved_terms, right_side - moved_terms),
         move_description=f"subtract {moved_terms} from both sides",
+        is_fully_solved=False,
+    )
+
+
+def _divide_out_leading_numeric_factor(
+    left_side: Expr, right_side: Expr, variable: Symbol
+) -> Optional[EquationStep]:
+    coefficient, remaining_factor = left_side.as_coeff_Mul()
+    if not coefficient.is_number or coefficient == 1 or coefficient == 0:
+        return None
+    if not remaining_factor.is_Add or variable not in remaining_factor.free_symbols:
+        return None
+    return EquationStep(
+        resulting_equation_text=_format_equation(remaining_factor, right_side / coefficient),
+        move_description=f"divide both sides by {coefficient}",
         is_fully_solved=False,
     )
 
@@ -213,8 +229,8 @@ def _extract_exp_log_solution(
     elif left_side.func in (log,):
         arg = left_side.args[0]
         if arg == variable:
-            # ln(x) = c → x = e^c
-            val = exp(right_side)
+            base = left_side.args[1] if len(left_side.args) > 1 else E
+            val = base ** right_side
             return EquationStep(
                 resulting_equation_text=f"{to_latex(variable)} = {to_latex(val)}",
                 move_description="exponentiate both sides",

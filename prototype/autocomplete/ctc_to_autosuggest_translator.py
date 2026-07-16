@@ -1,13 +1,8 @@
 import re
-from sympy import Expr, Eq, Symbol, E, I, pi, log, srepr
+from sympy import Symbol, Eq, srepr
 from sympy.core.relational import Relational
 from sympy.parsing.latex import parse_latex
 from sympy.parsing.latex.errors import LaTeXParsingError
-from sympy.parsing.sympy_parser import (
-    parse_expr,
-    standard_transformations,
-    implicit_multiplication_application,
-)
 
 
 class TranslationError(Exception):
@@ -20,30 +15,17 @@ _UNSUPPORTED_CONSTRUCT = re.compile(
 
 _DECORATOR_COMMANDS = r"vec|hat|dot|ddot|bar|tilde|overline|mathrm|text|mathbf|boldsymbol"
 
+_BARE_FUNCTIONS = (
+    "arcsin|arccos|arctan|sinh|cosh|tanh|coth|sin|cos|tan|cot|sec|csc|"
+    "log|ln|exp|lim|max|min|gcd|det|deg|dim|arg"
+)
+
 _LATEX_NORMALIZERS = (
     (re.compile(r"\\frac(\d)(\d)"), r"\\frac{\1}{\2}"),
     (re.compile(r"\\(?:" + _DECORATOR_COMMANDS + r")\{([^{}]*)\}"), r"\1"),
     (re.compile(r"\^\s*\\circ"), ""),
+    (re.compile(r"(?<![A-Za-z\\])(?:" + _BARE_FUNCTIONS + r")(?=\s*\()"), lambda m: "\\" + m.group(0)),
 )
-
-_GREEK_NAMES = (
-    "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi "
-    "omicron rho sigma tau upsilon phi chi psi omega"
-).split()
-
-_PLAIN_TEXT_SYMBOLS = {
-    name: Symbol("lambda_" if name == "lambda" else name) for name in _GREEK_NAMES
-}
-_PLAIN_TEXT_SYMBOLS.update({name.capitalize(): Symbol(name.capitalize()) for name in _GREEK_NAMES})
-_PLAIN_TEXT_SYMBOLS.update({"pi": pi, "e": E, "E": E, "I": I, "ln": log})
-
-_PLAIN_TEXT_TRANSFORMS = standard_transformations + (implicit_multiplication_application,)
-
-
-def _looks_like_latex(text: str) -> bool:
-    if "\\" in text or "{" in text:
-        return True
-    return "^" in text and "**" not in text
 
 
 def _normalize_latex(text: str) -> str:
@@ -52,38 +34,16 @@ def _normalize_latex(text: str) -> str:
     return text
 
 
-def _parse_plain_text(text: str) -> Expr:
-    return parse_expr(
-        text.strip(),
-        local_dict=_PLAIN_TEXT_SYMBOLS,
-        transformations=_PLAIN_TEXT_TRANSFORMS,
-    )
-
-
-def _translate_latex(text: str):
-    try:
-        return parse_latex(_normalize_latex(text))
-    except (LaTeXParsingError, Exception) as parse_error:
-        raise TranslationError(f"latex parse failed: {parse_error}") from parse_error
-
-
-def _translate_plain_text(text: str):
-    if text.count("=") > 1:
-        raise TranslationError("line contains multiple equals signs")
-    try:
-        if "=" in text:
-            left_text, right_text = text.split("=")
-            return Eq(_parse_plain_text(left_text), _parse_plain_text(right_text), evaluate=False)
-        return _parse_plain_text(text)
-    except TranslationError:
-        raise
-    except Exception as parse_error:
-        raise TranslationError(f"could not parse expression: {parse_error}") from parse_error
-
-
 def ends_with_bare_equals(text: str) -> bool:
     stripped_text = text.strip()
     return stripped_text.endswith("=") and stripped_text.count("=") == 1
+
+
+def _parse_latex(text: str):
+    try:
+        return parse_latex(text)
+    except (LaTeXParsingError, Exception) as parse_error:
+        raise TranslationError(f"latex parse failed: {parse_error}") from parse_error
 
 
 def translate_ctc_line_to_sympy(line_text: str):
@@ -92,9 +52,13 @@ def translate_ctc_line_to_sympy(line_text: str):
         raise TranslationError(f"unsupported latex construct: {stripped_text!r}")
     if ends_with_bare_equals(stripped_text):
         return translate_ctc_line_to_sympy(stripped_text[:-1])
-    if _looks_like_latex(stripped_text):
-        return _translate_latex(stripped_text)
-    return _translate_plain_text(stripped_text)
+    normalized_text = _normalize_latex(stripped_text)
+    if normalized_text.count("=") > 1:
+        raise TranslationError("line contains multiple equals signs")
+    if "=" in normalized_text:
+        left_text, right_text = normalized_text.split("=")
+        return Eq(_parse_latex(left_text), _parse_latex(right_text), evaluate=False)
+    return _parse_latex(normalized_text)
 
 
 def _self_check() -> None:
@@ -109,8 +73,12 @@ def _self_check() -> None:
     )
     assert isinstance(translate_ctc_line_to_sympy(r"\sin(\theta) = \frac{1}{2}"), Relational)
     assert structure(translate_ctc_line_to_sympy(r"\vec{v}")) == structure(Symbol("v"))
-    assert structure(translate_ctc_line_to_sympy("2*x + 3 = 11").lhs) == structure(2 * Symbol("x") + 3)
+    assert structure(translate_ctc_line_to_sympy("2x + 3 = 11").lhs) == structure(2 * Symbol("x") + 3)
     assert structure(translate_ctc_line_to_sympy("(x+1)(x-2)")) == structure((Symbol("x") + 1) * (Symbol("x") - 2))
+    from sympy import sin, asin
+    assert structure(translate_ctc_line_to_sympy(r"sin(\pi)")) == structure(sin(Symbol("pi")))
+    assert structure(translate_ctc_line_to_sympy(r"2sin(\pi)").args[1]) == structure(sin(Symbol("pi")))
+    assert structure(translate_ctc_line_to_sympy("arcsin(x)")) == structure(asin(Symbol("x")))
     for unsupported in (r"\begin{matrix} a & b \\ c & d \end{matrix}", r"x \in \mathbb{R}"):
         try:
             translate_ctc_line_to_sympy(unsupported)
