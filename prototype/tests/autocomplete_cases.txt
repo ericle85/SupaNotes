@@ -104,7 +104,7 @@ xfail:cos(x)=0 => SOLVE_TRIG => x = 1.57079632679490
 xfail:sin(x)=1 => SOLVE_TRIG => x = 1.57079632679490
 xfail:tan(x)=1 => SOLVE_TRIG => x = 0.785398163397448
 xfail:(x-2)(x+3)(x-5)=0 => SOLVE_FACTOR_FORM => x = -3, 2, 5
-xfail:log(x,10)=2 => SOLVE_EXP_LOG => x = 100
+log(x,10)=2 => SOLVE_EXP_LOG => x = 100
 xfail:cos(x)=0.5 => SOLVE_TRIG => x = 1.0471975511965976
 xfail:tan(x)=0.5773502691896257 => SOLVE_TRIG => x = 0.5235987755982989
 x!=\Gamma(x+1)=\int_{0}^{\infty}\frac{t^{x}}{e^{t}}dt => NO_SUGGESTION => NO_SUGGESTION

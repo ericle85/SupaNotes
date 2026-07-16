@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Callable
-from sympy import Add, Symbol, sin, cos, tan, exp, log, sqrt, factorint, gcd, I, E, S
+from sympy import Add, Pow, sin, cos, tan, exp, log, factorint, gcd, I, S
 
 from autocomplete.document_context_model import DocumentContext
 from autocomplete.document_line_parser import ParsedEquation, ParsedExpression, UnparsableLine
@@ -33,21 +33,12 @@ def generate_next_line(context: DocumentContext, intent: ClassifiedIntent) -> Su
     line = context.current_line
     if isinstance(line, UnparsableLine):
         return SuggestedNextLine("", MathOperation.SIMPLIFY_EXPRESSION, line.parse_error_description)
-    operation = _resolve_operation(line)
     if isinstance(line, ParsedEquation):
-        return _execute_equation(line, operation)
-    return _execute_expression(line, operation)
+        return _execute_equation(line, _resolve_equation(line))
+    return _execute_expression(line, _resolve_expression(line))
 
 
 _SINGLE_VAR_INDICATORS = ("x", "y", "z", "t", "w")
-
-
-def _resolve_operation(line) -> MathOperation:
-    if isinstance(line, ParsedEquation):
-        return _resolve_equation(line)
-    if isinstance(line, ParsedExpression):
-        return _resolve_expression(line)
-    return MathOperation.SIMPLIFY_EXPRESSION
 
 
 def _resolve_equation(line: ParsedEquation) -> MathOperation:
@@ -68,33 +59,20 @@ def _either_side(predicate: Callable) -> Callable[[ParsedEquation], bool]:
     return lambda line: predicate(line.left_side) or predicate(line.right_side)
 
 
-def _contains_func(*funcs) -> Callable:
-    def check(expr) -> bool:
-        if hasattr(expr, "func") and expr.func in funcs:
-            return True
-        if hasattr(expr, "atoms"):
-            return any(hasattr(atom, "func") and atom.func in funcs for atom in expr.atoms())
-        return False
-    return check
-
-
-_contains_trig = _contains_func(sin, cos, tan)
-_contains_log = _contains_func(log)
-_exp_func_check = _contains_func(exp)
+def _contains_trig(expr) -> bool:
+    return expr.has(sin, cos, tan)
 
 
 def _contains_exp(expr) -> bool:
-    return _exp_func_check(expr) or (expr.is_Pow and expr.base == E)
+    return expr.has(exp)
+
+
+def _contains_log(expr) -> bool:
+    return expr.has(log)
 
 
 def _contains_sqrt(expr) -> bool:
-    if expr.is_Pow and expr.exp == S.Half:
-        return True
-    if hasattr(expr, "func") and expr.func == sqrt:
-        return True
-    if hasattr(expr, "atoms"):
-        return any(atom.is_Pow and atom.exp == S.Half for atom in expr.atoms())
-    return False
+    return any(power.exp == S.Half for power in expr.atoms(Pow))
 
 
 def _has_single_unknown(line: ParsedEquation) -> bool:
@@ -120,15 +98,9 @@ def _is_factor_form_equation(line: ParsedEquation) -> bool:
 
 
 def _is_quadratic_equation(line: ParsedEquation) -> bool:
-    symbols = line.left_side.free_symbols | line.right_side.free_symbols
-    return _is_quadratic(line.left_side, symbols)
-
-
-def _is_quadratic(expr, symbols) -> bool:
-    for symbol in symbols:
-        polynomial = expr.as_poly(symbol) if expr.as_poly(symbol) else None
-        degree = polynomial.degree() if polynomial else -1
-        if degree == 2:
+    for symbol in line.left_side.free_symbols | line.right_side.free_symbols:
+        polynomial = line.left_side.as_poly(symbol)
+        if polynomial is not None and polynomial.degree() == 2:
             return True
     return False
 
@@ -211,17 +183,23 @@ _equation_rules: tuple[EquationRule, ...] = (
     (_is_quadratic_equation, MathOperation.SOLVE_QUADRATIC),
 )
 
+
+def _is_complex_number(line: ParsedExpression) -> bool:
+    return I in line.expression.atoms()
+
+
+def _is_numeric_awaiting_equals(line: ParsedExpression) -> bool:
+    return not line.expression.free_symbols and not line.has_trailing_equals
+
+
 _expression_rules: tuple[ExpressionRule, ...] = (
-    (lambda line: I in line.expression.atoms(), MathOperation.CONVERT_POLAR),
-    (
-        lambda line: not line.expression.free_symbols and not line.has_trailing_equals,
-        MathOperation.AWAITING_TRAILING_EQUALS,
-    ),
+    (_is_complex_number, MathOperation.CONVERT_POLAR),
+    (_is_numeric_awaiting_equals, MathOperation.AWAITING_TRAILING_EQUALS),
     (lambda line: _is_zero_denominator_fraction(line.expression), MathOperation.UNDEFINED_RESULT),
     (lambda line: _is_simplest(line.expression) is False, MathOperation.SIMPLIFY_EXPRESSION),
     (lambda line: _is_simplest(line.expression) is True, MathOperation.CONVERT_TO_DECIMAL),
     (lambda line: _needs_expansion(line.expression), MathOperation.EXPAND_EXPRESSION),
-    (lambda line: _expression_contains_power_term(line), MathOperation.FACTOR_EXPRESSION),
+    (_expression_contains_power_term, MathOperation.FACTOR_EXPRESSION),
     (lambda line: _needs_cancellation(line.expression), MathOperation.CANCEL_EXPRESSION),
 )
 
