@@ -1,5 +1,5 @@
 import re
-from sympy import Symbol, Eq, srepr
+from sympy import Symbol, Eq, srepr, pi
 from sympy.core.relational import Relational
 from sympy.parsing.latex import parse_latex
 from sympy.parsing.latex.errors import LaTeXParsingError
@@ -39,9 +39,12 @@ def ends_with_bare_equals(text: str) -> bool:
     return stripped_text.endswith("=") and stripped_text.count("=") == 1
 
 
+_LATEX_CONSTANTS = {Symbol("pi"): pi}
+
+
 def _parse_latex(text: str):
     try:
-        return parse_latex(text)
+        return parse_latex(text).subs(_LATEX_CONSTANTS)
     except (LaTeXParsingError, Exception) as parse_error:
         raise TranslationError(f"latex parse failed: {parse_error}") from parse_error
 
@@ -69,15 +72,16 @@ def _self_check() -> None:
         Symbol("alpha") / Symbol("beta")
     )
     assert structure(translate_ctc_line_to_sympy(r"e^{i\pi} + 1 = 0").lhs) == structure(
-        Symbol("e") ** (Symbol("i") * Symbol("pi")) + 1
+        Symbol("e") ** (Symbol("i") * pi) + 1
     )
     assert isinstance(translate_ctc_line_to_sympy(r"\sin(\theta) = \frac{1}{2}"), Relational)
     assert structure(translate_ctc_line_to_sympy(r"\vec{v}")) == structure(Symbol("v"))
     assert structure(translate_ctc_line_to_sympy("2x + 3 = 11").lhs) == structure(2 * Symbol("x") + 3)
     assert structure(translate_ctc_line_to_sympy("(x+1)(x-2)")) == structure((Symbol("x") + 1) * (Symbol("x") - 2))
-    from sympy import sin, asin
-    assert structure(translate_ctc_line_to_sympy(r"sin(\pi)")) == structure(sin(Symbol("pi")))
-    assert structure(translate_ctc_line_to_sympy(r"2sin(\pi)").args[1]) == structure(sin(Symbol("pi")))
+    from sympy import sin, asin, S
+    assert translate_ctc_line_to_sympy(r"sin(\pi)") == S.Zero
+    assert translate_ctc_line_to_sympy(r"\sin(\frac{\pi}{2})") == S.One
+    assert structure(translate_ctc_line_to_sympy(r"2sin(\theta)").args[1]) == structure(sin(Symbol("theta")))
     assert structure(translate_ctc_line_to_sympy("arcsin(x)")) == structure(asin(Symbol("x")))
     for unsupported in (r"\begin{matrix} a & b \\ c & d \end{matrix}", r"x \in \mathbb{R}"):
         try:

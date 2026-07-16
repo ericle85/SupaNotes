@@ -80,7 +80,7 @@ xfail:\tau=rFsin(\theta) => SIMPLIFY_EXPRESSION => tau = F*r*sin(theta)
 \rho=\frac{m}{V} => SIMPLIFY_EXPRESSION => \rho = \frac{m}{V}
 E=mc^{2} => SIMPLIFY_EXPRESSION => E = c^{2} m
 p=\frac{h}{\lambda} => SIMPLIFY_EXPRESSION => p = \frac{h}{\lambda}
-\omega=2\pi f => SIMPLIFY_EXPRESSION => \omega = 2 f \pi
+\omega=2\pi f => SIMPLIFY_EXPRESSION => \omega = 2 \pi f
 \theta=\alpha+\beta => SIMPLIFY_EXPRESSION => \theta = \alpha + \beta
 \sigma=\frac{\alpha}{\beta} => SIMPLIFY_EXPRESSION => \sigma = \frac{\alpha}{\beta}
 F=\alpha m => SIMPLIFY_EXPRESSION => F = \alpha m
