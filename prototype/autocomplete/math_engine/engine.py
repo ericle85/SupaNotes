@@ -102,10 +102,10 @@ def _has_single_unknown(line: ParsedEquation) -> bool:
     if len(all_symbols) <= 1:
         return True
     names = {symbol.name for symbol in all_symbols}
-    if any(len(name) > 1 and name[0].islower() and name.isalpha() for name in names):
-        return False
     if any(symbol.name == "x" for symbol in all_symbols):
         return True
+    if any(len(name) > 1 and name[0].islower() and name.isalpha() for name in names):
+        return False
     return any(indicator in names for indicator in _SINGLE_VAR_INDICATORS)
 
 
@@ -150,7 +150,7 @@ def _needs_cancellation(expr) -> bool:
 def _expression_contains_power_term(line: ParsedExpression) -> bool:
     expr = line.expression
     terms = expr.args if isinstance(expr, Add) else (expr,)
-    return any(term.is_Pow for term in terms)
+    return any(term.is_Pow or (term.is_Mul and any(factor.is_Pow for factor in term.args)) for term in terms)
 
 
 EquationRule = tuple[Callable[[ParsedEquation], bool], MathOperation]

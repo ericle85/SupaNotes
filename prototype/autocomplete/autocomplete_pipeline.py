@@ -16,7 +16,7 @@ class AutocompleteResult:
 def run_autocomplete_on_document_text(document_text: str) -> AutocompleteResult:
     parsed_lines = parse_document_text(document_text)
     context = build_context_for_last_line(parsed_lines)
-    intent = classify_intent(context)
+    intent = classify_intent(context) # TODO
     suggestion = generate_next_line(context, intent)
     return AutocompleteResult(
         current_line_text=context.current_line.original_text,

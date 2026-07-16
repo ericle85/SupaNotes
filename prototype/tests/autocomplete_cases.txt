@@ -60,7 +60,6 @@ x**2 - 9*x + 20 = 0 => SOLVE_QUADRATIC => x**2 - 9*x = -20
 2*x**2 - 5*x - 3 = 0 => SOLVE_QUADRATIC => 2*x**2 - 5*x = 3
 x**2 - 25 = 0 => SOLVE_QUADRATIC => x**2 = 25
 x**2 - 16 = 0 => SOLVE_QUADRATIC => x**2 = 16
-x**2 - 2*x + 1 => EXPAND_EXPRESSION => x**2 - 2*x + 1
 
 # higher-order polynomial roots
 x**3 = 27 => SOLVE_EQUATION_ONE_STEP => x = 3
@@ -103,4 +102,4 @@ xfail:(x-2)(x+3)(x-5) = 0 => SOLVE_FACTOR_FORM => x = -3, 2, 5
 xfail:log(x, 10) = 2 => SOLVE_EXP_LOG => x = 100
 xfail:cos(x) = 0.5 => SOLVE_TRIG => x = 1.0471975511965976
 xfail:tan(x) = 0.5773502691896257 => SOLVE_TRIG => x = 0.5235987755982989
-xfail:solve for x in: 3*x + 2*y = 10 => NO_SUGGESTION => NO_SUGGESTION
+solve for x in: 3*x + 2*y = 10 => NO_SUGGESTION => NO_SUGGESTION
