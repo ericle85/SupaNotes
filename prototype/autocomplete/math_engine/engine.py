@@ -163,11 +163,6 @@ def _fraction_parts(expr):
     return None
 
 
-def _fraction_is_already_simplest(parts) -> bool:
-    numerator, denominator = parts
-    return denominator != 0 and abs(denominator) != 1 and gcd(numerator, denominator) == 1
-
-
 def _is_zero_denominator_fraction(expr) -> bool:
     parts = _fraction_parts(expr)
     return parts is not None and parts[1] == 0
@@ -183,29 +178,16 @@ def _radical_parts(expr):
     return None
 
 
-def _radical_is_already_simplest(parts) -> bool:
-    (radicand,) = parts
-    return radicand != 1 and all(exponent < 2 for exponent in factorint(radicand).values())
-
-
-def _is_reducible_literal(expr) -> bool:
+def _is_simplest(expr):
     fraction = _fraction_parts(expr)
     if fraction is not None:
-        return fraction[1] != 0 and not _fraction_is_already_simplest(fraction)
+        numerator, denominator = fraction
+        return denominator != 0 and abs(denominator) != 1 and gcd(numerator, denominator) == 1
     radical = _radical_parts(expr)
     if radical is not None:
-        return not _radical_is_already_simplest(radical)
-    return False
-
-
-def _is_simplest_literal(expr) -> bool:
-    fraction = _fraction_parts(expr)
-    if fraction is not None:
-        return _fraction_is_already_simplest(fraction)
-    radical = _radical_parts(expr)
-    if radical is not None:
-        return _radical_is_already_simplest(radical)
-    return False
+        (radicand,) = radical
+        return radicand != 1 and all(exponent < 2 for exponent in factorint(radicand).values())
+    return None
 
 
 def _expression_contains_power_term(line: ParsedExpression) -> bool:
@@ -236,8 +218,8 @@ _expression_rules: tuple[ExpressionRule, ...] = (
         MathOperation.AWAITING_TRAILING_EQUALS,
     ),
     (lambda line: _is_zero_denominator_fraction(line.expression), MathOperation.UNDEFINED_RESULT),
-    (lambda line: _is_reducible_literal(line.expression), MathOperation.SIMPLIFY_EXPRESSION),
-    (lambda line: _is_simplest_literal(line.expression), MathOperation.CONVERT_TO_DECIMAL),
+    (lambda line: _is_simplest(line.expression) is False, MathOperation.SIMPLIFY_EXPRESSION),
+    (lambda line: _is_simplest(line.expression) is True, MathOperation.CONVERT_TO_DECIMAL),
     (lambda line: _needs_expansion(line.expression), MathOperation.EXPAND_EXPRESSION),
     (lambda line: _expression_contains_power_term(line), MathOperation.FACTOR_EXPRESSION),
     (lambda line: _needs_cancellation(line.expression), MathOperation.CANCEL_EXPRESSION),
