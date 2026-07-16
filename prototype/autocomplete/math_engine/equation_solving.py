@@ -6,16 +6,14 @@ from sympy import (
     asin, acos, atan, E,
 )
 from sympy.sets import EmptySet
+from sympy.core.alphabets import greeks
 from autocomplete.document_line_parser import ParsedEquation
 from autocomplete.math_engine.latex_format import to_latex
 
 
 _preferred_unknown_variable_names = (
     "x", "y", "z", "t", "w", "u", "v", "s", "r", "q", "p", "n", "m", "k",
-    # Greek letters for physics/engineering
-    "alpha", "beta", "gamma", "delta", "epsilon", "mu", "rho", "sigma", "theta",
-    "phi", "psi", "omega", "lambda", "eta", "xi", "tau",
-)
+) + greeks
 
 
 @dataclass(frozen=True)

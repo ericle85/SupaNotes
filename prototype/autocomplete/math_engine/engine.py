@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Callable
 from sympy import Add, Pow, sin, cos, tan, exp, log, factorint, gcd, I, S
+from sympy.core.alphabets import greeks
 
 from autocomplete.document_context_model import DocumentContext
 from autocomplete.document_line_parser import ParsedEquation, ParsedExpression, UnparsableLine
@@ -38,9 +39,6 @@ def generate_next_line(context: DocumentContext, intent: ClassifiedIntent) -> Su
     return _execute_expression(line, _resolve_expression(line))
 
 
-_SINGLE_VAR_INDICATORS = ("x", "y", "z", "t", "w")
-
-
 def _resolve_equation(line: ParsedEquation) -> MathOperation:
     for matches, operation in _equation_rules:
         if matches(line):
@@ -75,16 +73,23 @@ def _contains_sqrt(expr) -> bool:
     return any(power.exp == S.Half for power in expr.atoms(Pow))
 
 
+_GREEK_NAMES = frozenset(greeks)
+
+
+def _is_manipulable_variable(name: str) -> bool:
+    if len(name) == 1 and name.isalpha():
+        return True
+    return name.lower().removeprefix("var") in _GREEK_NAMES
+
+
+# Every Greek symbol is solvable: a multi-symbol equation routes to SOLVE targeting
+# the highest-preference symbol. Chosen so the app can later let the user tap a
+# suggestion and pick "solve for tau", "solve for omega", ... re-targeting the solve.
 def _has_single_unknown(line: ParsedEquation) -> bool:
-    all_symbols = line.left_side.free_symbols | line.right_side.free_symbols
-    if len(all_symbols) <= 1:
+    names = {symbol.name for symbol in line.left_side.free_symbols | line.right_side.free_symbols}
+    if len(names) <= 1:
         return True
-    names = {symbol.name for symbol in all_symbols}
-    if any(symbol.name == "x" for symbol in all_symbols):
-        return True
-    if any(len(name) > 1 and name[0].islower() and name.isalpha() for name in names):
-        return False
-    return any(indicator in names for indicator in _SINGLE_VAR_INDICATORS)
+    return all(_is_manipulable_variable(name) for name in names) or "x" in names
 
 
 def _is_factor_form_equation(line: ParsedEquation) -> bool:

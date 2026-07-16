@@ -73,21 +73,22 @@ x^{5}=32 => SOLVE_EQUATION_ONE_STEP => x = 2
 2^{x}=8 => SOLVE_EQUATION_ONE_STEP => 2^{x} = 8
 3^{x}=27 => SOLVE_EQUATION_ONE_STEP => 3^{x} = 27
 
-# Greek letter / physics equations (SIMPLIFY, not SOLVE)
-\alpha+\beta=1 => SIMPLIFY_EXPRESSION => \alpha + \beta = 1
-F=ma => SIMPLIFY_EXPRESSION => F = a m
+# Greek / single-letter equations: every symbol is solvable, so these route to
+# SOLVE targeting the highest-preference symbol (one step at a time).
+\alpha+\beta=1 => SOLVE_EQUATION_ONE_STEP => \alpha = 1 - \beta
+F=ma => SOLVE_EQUATION_ONE_STEP => F - a m = 0
 xfail:\tau=rFsin(\theta) => SIMPLIFY_EXPRESSION => tau = F*r*sin(theta)
-\rho=\frac{m}{V} => SIMPLIFY_EXPRESSION => \rho = \frac{m}{V}
-E=mc^{2} => SIMPLIFY_EXPRESSION => E = c^{2} m
-p=\frac{h}{\lambda} => SIMPLIFY_EXPRESSION => p = \frac{h}{\lambda}
-\omega=2\pi f => SIMPLIFY_EXPRESSION => \omega = 2 \pi f
-\theta=\alpha+\beta => SIMPLIFY_EXPRESSION => \theta = \alpha + \beta
-\sigma=\frac{\alpha}{\beta} => SIMPLIFY_EXPRESSION => \sigma = \frac{\alpha}{\beta}
-F=\alpha m => SIMPLIFY_EXPRESSION => F = \alpha m
-a=\frac{F}{m} => SIMPLIFY_EXPRESSION => a = \frac{F}{m}
-v^{2}=u^{2}+2as => SIMPLIFY_EXPRESSION => v^{2} = 2 a s + u^{2}
+\rho=\frac{m}{V} => SOLVE_EQUATION_ONE_STEP => \rho - \frac{m}{V} = 0
+E=mc^{2} => SOLVE_EQUATION_ONE_STEP => E - c^{2} m = 0
+p=\frac{h}{\lambda} => SOLVE_EQUATION_ONE_STEP => p = \frac{h}{\lambda}
+\omega=2\pi f => SOLVE_EQUATION_ONE_STEP => \omega = 2 \pi f
+\theta=\alpha+\beta => SOLVE_EQUATION_ONE_STEP => - \alpha + \theta = \beta
+\sigma=\frac{\alpha}{\beta} => SOLVE_EQUATION_ONE_STEP => - \frac{\alpha}{\beta} + \sigma = 0
+F=\alpha m => SOLVE_EQUATION_ONE_STEP => F - \alpha m = 0
+a=\frac{F}{m} => SOLVE_EQUATION_ONE_STEP => - \frac{F}{m} + a = 0
+v^{2}=u^{2}+2as => SOLVE_QUADRATIC => - u^{2} + v^{2} = 2 a s
 \delta_{t}=\frac{v-u}{a} => SIMPLIFY_EXPRESSION => delta_{t} = \frac{- u + v}{a}
-\theta=\omega t => SIMPLIFY_EXPRESSION => \theta = \omega t
+\theta=\omega t => SOLVE_EQUATION_ONE_STEP => - \omega t + \theta = 0
 
 # Greek letter equation (solving for x)
 \alpha x+\beta=\gamma => SOLVE_EQUATION_ONE_STEP => \alpha x = - \beta + \gamma
