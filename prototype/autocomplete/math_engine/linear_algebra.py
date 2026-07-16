@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Optional
 from sympy import Matrix
 from autocomplete.document_line_parser import ParsedExpression
+from autocomplete.math_engine.latex_format import to_latex
 
 
 @dataclass(frozen=True)
@@ -113,22 +114,22 @@ def _apply_row_elimination(
 
 
 def _format_matrix(matrix: Matrix) -> str:
-    return str(matrix)
+    return to_latex(matrix)
 
 
 def compute_determinant(line: ParsedExpression) -> str:
-    return str(line.expression.det())
+    return to_latex(line.expression.det())
 
 
 def compute_inverse_matrix(line: ParsedExpression) -> str:
-    return str(line.expression.inv())
+    return to_latex(line.expression.inv())
 
 
 def compute_eigenvalues(line: ParsedExpression) -> str:
     eigenvalue_to_multiplicity = line.expression.eigenvals()
     eigenvalues_in_stable_order = sorted(eigenvalue_to_multiplicity, key=str)
     eigenvalues_repeated_by_multiplicity = [
-        str(eigenvalue)
+        to_latex(eigenvalue)
         for eigenvalue in eigenvalues_in_stable_order
         for _ in range(eigenvalue_to_multiplicity[eigenvalue])
     ]

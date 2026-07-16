@@ -9,27 +9,27 @@
 # following variable token, matching dataset.py tokenization (for example, \omega t).
 
 # linear equations, numeric coefficients
-2x+3=11 => SOLVE_EQUATION_ONE_STEP => 2*x = 8
-3x+2=x+8 => SOLVE_EQUATION_ONE_STEP => 2*x + 2 = 8
+2x+3=11 => SOLVE_EQUATION_ONE_STEP => 2 x = 8
+3x+2=x+8 => SOLVE_EQUATION_ONE_STEP => 2 x + 2 = 8
 2x=8 => SOLVE_EQUATION_ONE_STEP => x = 4
 \frac{x}{2}=5 => SOLVE_EQUATION_ONE_STEP => x = 10
 \frac{x}{3}=4 => SOLVE_EQUATION_ONE_STEP => x = 12
 -3x=9 => SOLVE_EQUATION_ONE_STEP => x = -3
-2x-5=1 => SOLVE_EQUATION_ONE_STEP => 2*x = 6
-2(x+1)=6 => SOLVE_EQUATION_ONE_STEP => 2*x = 4
+2x-5=1 => SOLVE_EQUATION_ONE_STEP => 2 x = 6
+2(x+1)=6 => SOLVE_EQUATION_ONE_STEP => 2 x = 4
 
 # linear equations, symbolic coefficients
-ax=b => SOLVE_EQUATION_ONE_STEP => x = b/a
-ax+b=c => SOLVE_EQUATION_ONE_STEP => a*x = -b + c
+ax=b => SOLVE_EQUATION_ONE_STEP => x = \frac{b}{a}
+ax+b=c => SOLVE_EQUATION_ONE_STEP => a x = - b + c
 
 # expression simplification
-2x+3x+4 => SIMPLIFY_EXPRESSION => 5*x + 4
-x+x+x => SIMPLIFY_EXPRESSION => 3*x
+2x+3x+4 => SIMPLIFY_EXPRESSION => 5 x + 4
+x+x+x => SIMPLIFY_EXPRESSION => 3 x
 xfail:2x+x^{2}+3x => FACTOR_EXPRESSION => x*(x + 5)
 
 # expression factoring
 xfail:x^{2}+5x+6 => FACTOR_EXPRESSION => (x + 2)*(x + 3)
-x^{2}-9 => FACTOR_EXPRESSION => (x - 3)*(x + 3)
+x^{2}-9 => FACTOR_EXPRESSION => \left(x - 3\right) \left(x + 3\right)
 xfail:x^{2}+7x+12 => FACTOR_EXPRESSION => (x + 3)*(x + 4)
 xfail:x^{2}-7x+12 => FACTOR_EXPRESSION => (x - 4)*(x - 3)
 xfail:2x^{2}+7x+3 => FACTOR_EXPRESSION => (x + 3)*(2*x + 1)
@@ -47,7 +47,7 @@ sin(x)=0.5 => SOLVE_TRIG => x = 0.523598775598299
 
 # exponential / logarithmic
 xfail:e^{x}=2 => SOLVE_EXP_LOG => x = log(2)
-ln(x)=3 => SOLVE_EXP_LOG => x = exp(3)
+ln(x)=3 => SOLVE_EXP_LOG => x = e^{3}
 \sqrt{x}=3 => SOLVE_RADICAL => x = 9
 \sqrt{x}=5 => SOLVE_RADICAL => x = 25
 
@@ -56,41 +56,41 @@ x^{2}=4 => SOLVE_QUADRATIC => x = -2, 2
 x^{2}=9 => SOLVE_QUADRATIC => x = -3, 3
 x^{2}=0 => SOLVE_QUADRATIC => x = 0
 x^{4}=16 => SOLVE_EQUATION_ONE_STEP => x = -2, 2
-2x^{2}=8 => SOLVE_QUADRATIC => x**2 = 4
+2x^{2}=8 => SOLVE_QUADRATIC => x^{2} = 4
 
 # quadratic equations (full form) - solver does one step at a time
-x^{2}-4x+3=0 => SOLVE_QUADRATIC => x**2 - 1*4*x = -3
+x^{2}-4x+3=0 => SOLVE_QUADRATIC => x^{2} - 4 x = -3
 xfail:x^{2}+6x+9=0 => SOLVE_QUADRATIC => x**2 + 6*x = -9
-x^{2}-9x+20=0 => SOLVE_QUADRATIC => x**2 - 1*9*x = -20
-2x^{2}-5x-3=0 => SOLVE_QUADRATIC => 2*x**2 - 1*5*x = 3
-x^{2}-25=0 => SOLVE_QUADRATIC => x**2 = 25
-x^{2}-16=0 => SOLVE_QUADRATIC => x**2 = 16
+x^{2}-9x+20=0 => SOLVE_QUADRATIC => x^{2} - 9 x = -20
+2x^{2}-5x-3=0 => SOLVE_QUADRATIC => 2 x^{2} - 5 x = 3
+x^{2}-25=0 => SOLVE_QUADRATIC => x^{2} = 25
+x^{2}-16=0 => SOLVE_QUADRATIC => x^{2} = 16
 
 # higher-order polynomial roots
 x^{3}=27 => SOLVE_EQUATION_ONE_STEP => x = 3
 x^{3}=-8 => SOLVE_EQUATION_ONE_STEP => x = -2
 x^{5}=32 => SOLVE_EQUATION_ONE_STEP => x = 2
-2^{x}=8 => SOLVE_EQUATION_ONE_STEP => 2**x = 8
-3^{x}=27 => SOLVE_EQUATION_ONE_STEP => 3**x = 27
+2^{x}=8 => SOLVE_EQUATION_ONE_STEP => 2^{x} = 8
+3^{x}=27 => SOLVE_EQUATION_ONE_STEP => 3^{x} = 27
 
 # Greek letter / physics equations (SIMPLIFY, not SOLVE)
-\alpha+\beta=1 => SIMPLIFY_EXPRESSION => alpha + beta = 1
-F=ma => SIMPLIFY_EXPRESSION => F = a*m
+\alpha+\beta=1 => SIMPLIFY_EXPRESSION => \alpha + \beta = 1
+F=ma => SIMPLIFY_EXPRESSION => F = a m
 xfail:\tau=rFsin(\theta) => SIMPLIFY_EXPRESSION => tau = F*r*sin(theta)
-\rho=\frac{m}{V} => SIMPLIFY_EXPRESSION => rho = m/V
-E=mc^{2} => SIMPLIFY_EXPRESSION => E = c**2*m
-p=\frac{h}{\lambda} => SIMPLIFY_EXPRESSION => p = h/lambda
-\omega=2\pi f => SIMPLIFY_EXPRESSION => omega = 2*f*pi
-\theta=\alpha+\beta => SIMPLIFY_EXPRESSION => theta = alpha + beta
-\sigma=\frac{\alpha}{\beta} => SIMPLIFY_EXPRESSION => sigma = alpha/beta
-F=\alpha m => SIMPLIFY_EXPRESSION => F = alpha*m
-a=\frac{F}{m} => SIMPLIFY_EXPRESSION => a = F/m
-v^{2}=u^{2}+2as => SIMPLIFY_EXPRESSION => v**2 = 2*a*s + u**2
-\delta_{t}=\frac{v-u}{a} => SIMPLIFY_EXPRESSION => delta_{t} = (-u + v)/a
-\theta=\omega t => SIMPLIFY_EXPRESSION => theta = omega*t
+\rho=\frac{m}{V} => SIMPLIFY_EXPRESSION => \rho = \frac{m}{V}
+E=mc^{2} => SIMPLIFY_EXPRESSION => E = c^{2} m
+p=\frac{h}{\lambda} => SIMPLIFY_EXPRESSION => p = \frac{h}{\lambda}
+\omega=2\pi f => SIMPLIFY_EXPRESSION => \omega = 2 f \pi
+\theta=\alpha+\beta => SIMPLIFY_EXPRESSION => \theta = \alpha + \beta
+\sigma=\frac{\alpha}{\beta} => SIMPLIFY_EXPRESSION => \sigma = \frac{\alpha}{\beta}
+F=\alpha m => SIMPLIFY_EXPRESSION => F = \alpha m
+a=\frac{F}{m} => SIMPLIFY_EXPRESSION => a = \frac{F}{m}
+v^{2}=u^{2}+2as => SIMPLIFY_EXPRESSION => v^{2} = 2 a s + u^{2}
+\delta_{t}=\frac{v-u}{a} => SIMPLIFY_EXPRESSION => delta_{t} = \frac{- u + v}{a}
+\theta=\omega t => SIMPLIFY_EXPRESSION => \theta = \omega t
 
 # Greek letter equation (solving for x)
-\alpha x+\beta=\gamma => SOLVE_EQUATION_ONE_STEP => alpha*x = -beta + gamma
+\alpha x+\beta=\gamma => SOLVE_EQUATION_ONE_STEP => \alpha x = - \beta + \gamma
 
 # radical equations
 xfail:\sqrt{2x}=4 => SOLVE_EQUATION_ONE_STEP => x = 8

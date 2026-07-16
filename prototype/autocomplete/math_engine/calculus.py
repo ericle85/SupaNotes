@@ -1,15 +1,16 @@
 from sympy import Symbol, diff, integrate, limit, series, sympify
 from autocomplete.document_line_parser import ParsedExpression
+from autocomplete.math_engine.latex_format import to_latex
 
 
 def differentiate_expression(line: ParsedExpression, variable_name: str) -> str:
     variable = Symbol(variable_name)
-    return str(diff(line.expression, variable))
+    return to_latex(diff(line.expression, variable))
 
 
 def integrate_expression(line: ParsedExpression, variable_name: str) -> str:
     variable = Symbol(variable_name)
-    return str(integrate(line.expression, variable))
+    return to_latex(integrate(line.expression, variable))
 
 
 def compute_limit_at_point(
@@ -17,7 +18,7 @@ def compute_limit_at_point(
 ) -> str:
     variable = Symbol(variable_name)
     approached_point = sympify(approached_value)
-    return str(limit(line.expression, variable, approached_point))
+    return to_latex(limit(line.expression, variable, approached_point))
 
 
 def expand_as_taylor_series(
@@ -30,4 +31,4 @@ def expand_as_taylor_series(
     truncated_series = series(
         line.expression, variable, sympify(expansion_point), number_of_terms
     ).removeO()
-    return str(truncated_series)
+    return to_latex(truncated_series)

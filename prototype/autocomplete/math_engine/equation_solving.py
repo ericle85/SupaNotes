@@ -7,6 +7,7 @@ from sympy import (
 )
 from sympy.sets import EmptySet
 from autocomplete.document_line_parser import ParsedEquation
+from autocomplete.math_engine.latex_format import to_latex
 
 
 _preferred_unknown_variable_names = (
@@ -152,16 +153,16 @@ def _extract_root_if_possible(
 
     if solutions == EmptySet:
         return EquationStep(
-            resulting_equation_text=f"{variable} = ∅",
+            resulting_equation_text=f"{to_latex(variable)} = \\emptyset",
             move_description=f"no real solution to x**{n} = {right_side}",
             is_fully_solved=True,
         )
 
     solution_list = sorted(list(solutions), key=lambda s: float(s) if s.is_real else float('-inf'))
-    solutions_text = ", ".join(str(s) for s in solution_list)
+    solutions_text = ", ".join(to_latex(s) for s in solution_list)
     move_desc = "take the square root" if n == 2 else f"take the {n}-th root"
     return EquationStep(
-        resulting_equation_text=f"{variable} = {solutions_text}",
+        resulting_equation_text=f"{to_latex(variable)} = {solutions_text}",
         move_description=move_desc,
         is_fully_solved=True,
     )
@@ -187,7 +188,7 @@ def _extract_trig_solution(
             elif func_name == 'tan':
                 val = atan(right_side)
             return EquationStep(
-                resulting_equation_text=f"{variable} = {val}",
+                resulting_equation_text=f"{to_latex(variable)} = {to_latex(val)}",
                 move_description=f"take the {func_name} inverse",
                 is_fully_solved=True,
             )
@@ -205,7 +206,7 @@ def _extract_exp_log_solution(
             # e^x = c → x = ln(c)
             val = log(right_side)
             return EquationStep(
-                resulting_equation_text=f"{variable} = {val}",
+                resulting_equation_text=f"{to_latex(variable)} = {to_latex(val)}",
                 move_description="take the natural logarithm",
                 is_fully_solved=True,
             )
@@ -215,7 +216,7 @@ def _extract_exp_log_solution(
             # ln(x) = c → x = e^c
             val = exp(right_side)
             return EquationStep(
-                resulting_equation_text=f"{variable} = {val}",
+                resulting_equation_text=f"{to_latex(variable)} = {to_latex(val)}",
                 move_description="exponentiate both sides",
                 is_fully_solved=True,
             )
@@ -223,7 +224,7 @@ def _extract_exp_log_solution(
     elif left_side.is_Pow and left_side.base == E and left_side.exp == variable:
         val = log(right_side)
         return EquationStep(
-            resulting_equation_text=f"{variable} = {val}",
+            resulting_equation_text=f"{to_latex(variable)} = {to_latex(val)}",
             move_description="take the natural logarithm",
             is_fully_solved=True,
         )
@@ -237,7 +238,7 @@ def _extract_radical_solution(
     if left_side == sqrt(variable):
         val = right_side**2
         return EquationStep(
-            resulting_equation_text=f"{variable} = {val}",
+            resulting_equation_text=f"{to_latex(variable)} = {to_latex(val)}",
             move_description="square both sides",
             is_fully_solved=True,
         )
@@ -260,9 +261,9 @@ def _extract_quadratic_solution(
         from sympy.sets import EmptySet
         if solutions != EmptySet and len(solutions) <= 2:
             solution_list = sorted(list(solutions), key=lambda s: float(s) if s.is_real else float('-inf'))
-            solutions_text = ", ".join(str(s) for s in solution_list)
+            solutions_text = ", ".join(to_latex(s) for s in solution_list)
             return EquationStep(
-                resulting_equation_text=f"{variable} = {solutions_text}",
+                resulting_equation_text=f"{to_latex(variable)} = {solutions_text}",
                 move_description="apply the quadratic formula",
                 is_fully_solved=True,
             )
@@ -290,10 +291,10 @@ def _extract_factored_form_solution(
         sol = solveset(factor, variable, domain=S.Reals)
         if sol != EmptySet:
             for s in sorted(list(sol), key=lambda x: float(x) if x.is_real else float('-inf')):
-                solutions.append(str(s))
+                solutions.append(to_latex(s))
     if solutions:
         return EquationStep(
-            resulting_equation_text=f"{variable} = {' or '.join(solutions)}",
+            resulting_equation_text=f"{to_latex(variable)} = {' or '.join(solutions)}",
             move_description="apply the zero product property",
             is_fully_solved=True,
         )
@@ -326,11 +327,11 @@ def _expand_factored_form_equation(
                     sol = solveset(factor, variable, domain=S.Reals)
                     if sol != EmptySet:
                         for s in sorted(list(sol), key=lambda x: float(x) if x.is_real else float('-inf')):
-                            solutions.append(str(s))
+                            solutions.append(to_latex(s))
                 if solutions:
                     solutions_text = " or ".join(solutions)
                     return EquationStep(
-                        resulting_equation_text=f"{variable} = {solutions_text}",
+                        resulting_equation_text=f"{to_latex(variable)} = {solutions_text}",
                         move_description="apply the zero product property",
                         is_fully_solved=True,
                     )
@@ -338,4 +339,4 @@ def _expand_factored_form_equation(
 
 
 def _format_equation(left_side: Expr, right_side: Expr) -> str:
-    return f"{left_side} = {right_side}"
+    return f"{to_latex(left_side)} = {to_latex(right_side)}"
