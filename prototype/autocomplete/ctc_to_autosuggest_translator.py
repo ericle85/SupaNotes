@@ -81,11 +81,16 @@ def _translate_plain_text(text: str):
         raise TranslationError(f"could not parse expression: {parse_error}") from parse_error
 
 
+def ends_with_bare_equals(text: str) -> bool:
+    stripped_text = text.strip()
+    return stripped_text.endswith("=") and stripped_text.count("=") == 1
+
+
 def translate_ctc_line_to_sympy(line_text: str):
     stripped_text = line_text.strip()
     if _UNSUPPORTED_CONSTRUCT.search(stripped_text):
         raise TranslationError(f"unsupported latex construct: {stripped_text!r}")
-    if stripped_text.endswith("=") and stripped_text.count("=") == 1:
+    if ends_with_bare_equals(stripped_text):
         return translate_ctc_line_to_sympy(stripped_text[:-1])
     if _looks_like_latex(stripped_text):
         return _translate_latex(stripped_text)

@@ -4,6 +4,7 @@ from sympy import Expr
 from sympy.core.relational import Relational
 from autocomplete.ctc_to_autosuggest_translator import (
     translate_ctc_line_to_sympy,
+    ends_with_bare_equals,
     TranslationError,
 )
 
@@ -19,6 +20,7 @@ class ParsedEquation:
 class ParsedExpression:
     expression: Expr
     original_text: str
+    has_trailing_equals: bool = False
 
 
 @dataclass(frozen=True)
@@ -45,7 +47,11 @@ def parse_single_line(line_text: str) -> ParsedLine:
             right_side=translated.rhs,
             original_text=stripped_text,
         )
-    return ParsedExpression(expression=translated, original_text=stripped_text)
+    return ParsedExpression(
+        expression=translated,
+        original_text=stripped_text,
+        has_trailing_equals=ends_with_bare_equals(stripped_text),
+    )
 
 
 def parse_document_text(document_text: str) -> list[ParsedLine]:

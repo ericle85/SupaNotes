@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Callable
-from sympy import Add, Symbol, sin, cos, tan, exp, log, sqrt, I, E, S
+from sympy import Add, Symbol, sin, cos, tan, exp, log, sqrt, factorint, gcd, I, E, S
 
 from autocomplete.document_context_model import DocumentContext
 from autocomplete.document_line_parser import ParsedEquation, ParsedExpression, UnparsableLine
@@ -147,8 +147,79 @@ def _needs_cancellation(expr) -> bool:
     return False
 
 
+def _fraction_parts(expr):
+    if expr.is_Pow and expr.exp == -1 and expr.base.is_Integer:
+        return (S.One, expr.base)
+    if expr.is_Mul and not expr.free_symbols:
+        numerator = S.One
+        denominator = None
+        for factor in expr.args:
+            if factor.is_Integer:
+                numerator = factor
+            elif factor.is_Pow and factor.exp == -1 and factor.base.is_Integer:
+                denominator = factor.base
+        if denominator is not None:
+            return (numerator, denominator)
+    return None
+
+
+def _is_fraction_fully_simplified(parts) -> bool:
+    numerator, denominator = parts
+    return denominator != 0 and abs(denominator) != 1 and gcd(numerator, denominator) == 1
+
+
+def _is_zero_denominator_fraction(expr) -> bool:
+    parts = _fraction_parts(expr)
+    return parts is not None and parts[1] == 0
+
+
+def _radical_parts(expr):
+    if expr.is_Pow and expr.exp == S.Half and expr.base.is_Integer and expr.base > 0:
+        return (expr.base,)
+    if expr.is_Mul and not expr.free_symbols:
+        for factor in expr.args:
+            if factor.is_Pow and factor.exp == S.Half and factor.base.is_Integer and factor.base > 0:
+                return (factor.base,)
+    return None
+
+
+def _is_radical_fully_simplified(parts) -> bool:
+    (radicand,) = parts
+    return radicand != 1 and all(exponent < 2 for exponent in factorint(radicand).values())
+
+
+@dataclass(frozen=True)
+class NumericForm:
+    extract_parts: Callable
+    is_fully_simplified: Callable
+
+
+_NUMERIC_FORMS: tuple[NumericForm, ...] = (
+    NumericForm(_fraction_parts, _is_fraction_fully_simplified),
+    NumericForm(_radical_parts, _is_radical_fully_simplified),
+)
+
+
+def _classify_literal(expr):
+    for form in _NUMERIC_FORMS:
+        parts = form.extract_parts(expr)
+        if parts is not None:
+            return form.is_fully_simplified(parts)
+    return None
+
+
+def _is_reducible_literal(expr) -> bool:
+    return not _is_zero_denominator_fraction(expr) and _classify_literal(expr) is False
+
+
+def _is_simplest_literal(expr) -> bool:
+    return _classify_literal(expr) is True
+
+
 def _expression_contains_power_term(line: ParsedExpression) -> bool:
     expr = line.expression
+    if not expr.free_symbols:
+        return False
     terms = expr.args if isinstance(expr, Add) else (expr,)
     return any(term.is_Pow or (term.is_Mul and any(factor.is_Pow for factor in term.args)) for term in terms)
 
@@ -168,6 +239,13 @@ _equation_rules: tuple[EquationRule, ...] = (
 
 _expression_rules: tuple[ExpressionRule, ...] = (
     (lambda line: I in line.expression.atoms(), MathOperation.CONVERT_POLAR),
+    (
+        lambda line: not line.expression.free_symbols and not line.has_trailing_equals,
+        MathOperation.AWAITING_TRAILING_EQUALS,
+    ),
+    (lambda line: _is_zero_denominator_fraction(line.expression), MathOperation.UNDEFINED_RESULT),
+    (lambda line: _is_reducible_literal(line.expression), MathOperation.SIMPLIFY_EXPRESSION),
+    (lambda line: _is_simplest_literal(line.expression), MathOperation.CONVERT_TO_DECIMAL),
     (lambda line: _needs_expansion(line.expression), MathOperation.EXPAND_EXPRESSION),
     (lambda line: _expression_contains_power_term(line), MathOperation.FACTOR_EXPRESSION),
     (lambda line: _needs_cancellation(line.expression), MathOperation.CANCEL_EXPRESSION),
@@ -186,6 +264,8 @@ _expression_transforms = {
     MathOperation.FACTOR_EXPRESSION: expression_transforms.factor_expression,
     MathOperation.EXPAND_EXPRESSION: expression_transforms.expand_expression,
     MathOperation.CANCEL_EXPRESSION: expression_transforms.cancel_expression,
+    MathOperation.CONVERT_TO_DECIMAL: expression_transforms.convert_expression_to_decimal,
+    MathOperation.UNDEFINED_RESULT: expression_transforms.suggest_undefined_result,
 }
 
 _expression_single_arg = {
@@ -225,6 +305,8 @@ def _execute_equation(line: ParsedEquation, operation: MathOperation) -> Suggest
 
 
 def _execute_expression(line: ParsedExpression, operation: MathOperation) -> SuggestedNextLine:
+    if operation == MathOperation.AWAITING_TRAILING_EQUALS:
+        return SuggestedNextLine("", operation, "write \"=\" to request a result")
     transform = _expression_transforms.get(operation)
     if transform is not None:
         return SuggestedNextLine(transform(line), operation)

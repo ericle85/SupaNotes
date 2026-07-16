@@ -1,4 +1,4 @@
-from sympy import simplify, factor, expand, cancel
+from sympy import simplify, factor, expand, cancel, N
 from autocomplete.document_line_parser import ParsedExpression, ParsedEquation
 from autocomplete.math_engine.latex_format import to_latex
 
@@ -17,6 +17,14 @@ def simplify_expression(line: ParsedExpression) -> str:
     if simplified != expr:
         return to_latex(simplified)
     return to_latex(expr)
+
+
+def convert_expression_to_decimal(line: ParsedExpression) -> str:
+    return to_latex(N(line.expression))
+
+
+def suggest_undefined_result(line: ParsedExpression) -> str:
+    return "undefined"
 
 
 def factor_expression(line: ParsedExpression) -> str:

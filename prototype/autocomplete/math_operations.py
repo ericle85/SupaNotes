@@ -16,6 +16,9 @@ class MathOperation(Enum):
     FACTOR_EXPRESSION = auto()
     EXPAND_EXPRESSION = auto()
     CANCEL_EXPRESSION = auto()
+    CONVERT_TO_DECIMAL = auto()
+    UNDEFINED_RESULT = auto()
+    AWAITING_TRAILING_EQUALS = auto()
     
     # Calculus
     DIFFERENTIATE = auto()
