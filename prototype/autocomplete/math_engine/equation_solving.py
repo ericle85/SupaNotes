@@ -27,6 +27,14 @@ def equation_contains_solvable_variable(line: ParsedEquation) -> bool:
     return bool(line.left_side.free_symbols | line.right_side.free_symbols)
 
 
+def is_equation_solved(line: ParsedEquation) -> bool:
+    variable = _select_target_variable(line)
+    left, right = line.left_side, line.right_side
+    isolated_left = left == variable and variable not in right.free_symbols
+    isolated_right = right == variable and variable not in left.free_symbols
+    return isolated_left or isolated_right
+
+
 def generate_next_solving_step(line: ParsedEquation) -> EquationStep:
     variable = _select_target_variable(line)
     left_side = line.left_side

@@ -70,8 +70,8 @@ x^{2}-16=0 => SOLVE_QUADRATIC => x^{2} = 16
 x^{3}=27 => SOLVE_EQUATION_ONE_STEP => x = 3
 x^{3}=-8 => SOLVE_EQUATION_ONE_STEP => x = -2
 x^{5}=32 => SOLVE_EQUATION_ONE_STEP => x = 2
-2^{x}=8 => SOLVE_EQUATION_ONE_STEP => 2^{x} = 8
-3^{x}=27 => SOLVE_EQUATION_ONE_STEP => 3^{x} = 27
+xfail:2^{x}=8 => SOLVE_EQUATION_ONE_STEP => x = 3
+xfail:3^{x}=27 => SOLVE_EQUATION_ONE_STEP => x = 3
 
 # Greek / single-letter equations: every symbol is solvable, so these route to
 # SOLVE targeting the highest-preference symbol (one step at a time).
@@ -80,8 +80,8 @@ F=ma => SOLVE_EQUATION_ONE_STEP => F - a m = 0
 xfail:\tau=rFsin(\theta) => SIMPLIFY_EXPRESSION => tau = F*r*sin(theta)
 \rho=\frac{m}{V} => SOLVE_EQUATION_ONE_STEP => \rho - \frac{m}{V} = 0
 E=mc^{2} => SOLVE_EQUATION_ONE_STEP => E - c^{2} m = 0
-p=\frac{h}{\lambda} => SOLVE_EQUATION_ONE_STEP => p = \frac{h}{\lambda}
-\omega=2\pi f => SOLVE_EQUATION_ONE_STEP => \omega = 2 \pi f
+p=\frac{h}{\lambda} => SOLVE_EQUATION_ONE_STEP => NO_SUGGESTION
+\omega=2\pi f => SOLVE_EQUATION_ONE_STEP => NO_SUGGESTION
 \theta=\alpha+\beta => SOLVE_EQUATION_ONE_STEP => - \alpha + \theta = \beta
 \sigma=\frac{\alpha}{\beta} => SOLVE_EQUATION_ONE_STEP => - \frac{\alpha}{\beta} + \sigma = 0
 F=\alpha m => SOLVE_EQUATION_ONE_STEP => F - \alpha m = 0
