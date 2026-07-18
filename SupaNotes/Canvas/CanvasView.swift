@@ -8,6 +8,11 @@ final class DrawingCanvasController: ObservableObject {
     func clear() {
         canvas?.clearStrokes()
     }
+
+    func saveOCRFixture() throws -> URL {
+        guard let canvas else { throw OCRFixtureExportError.invalidCanvasSize }
+        return try canvas.saveOCRFixture()
+    }
 }
 
 struct CanvasView: UIViewRepresentable {
@@ -55,7 +60,17 @@ final class DrawingCanvas: StrokeInputSource {
 
     func clearStrokes() {
         engine.clear()
+        resetStrokeTiming()
         setNeedsDisplay()
+    }
+
+    func saveOCRFixture() throws -> URL {
+        let screenScale = traitCollection.displayScale > 0 ? traitCollection.displayScale : 1
+        return try OCRFixtureExporter.export(
+            strokes: engine.strokes,
+            canvasSize: bounds.size,
+            screenScale: screenScale
+        )
     }
 
     override func draw(_: CGRect) {

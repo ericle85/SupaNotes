@@ -64,6 +64,7 @@ playground.xcworkspace
 # .swiftpm
 
 .build/
+.swiftlint-cache/
 
 # CocoaPods
 #
@@ -126,3 +127,4 @@ skills/
 .pi-subagents/
 
 *.pt
+prototype/fixtures/

@@ -3,6 +3,7 @@ import UIKit
 
 struct StrokePoint {
     var location: CGPoint
+    var timestamp: TimeInterval
     var force: CGFloat
     var azimuth: CGFloat
     var altitude: CGFloat
