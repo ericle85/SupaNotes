@@ -16,11 +16,13 @@ import json
 import mimetypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
+
+from ocr_pipeline.fixtures import is_relative_to, list_fixtures, load_fixture
+from ocr_pipeline.replay import build_replay_state
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_FIXTURES_DIR = REPO_ROOT / "prototype" / "fixtures"
-TRUTH_FILENAMES = ("truth.json", "truth_template.json", "template.json")
 
 HTML = r"""
 <!doctype html>
@@ -282,6 +284,7 @@ HTML = r"""
               <option value="1" selected>1×</option>
               <option value="2">2×</option>
               <option value="4">4×</option>
+              <option value="8">8×</option>
             </select>
           </label>
           <label>Idle OCR trigger (sec)
@@ -358,11 +361,15 @@ HTML = r"""
       muted: css.getPropertyValue('--muted').trim()
     };
 
-    function bboxUnion(a, b) {
-      if (!a) return b ? [...b] : null;
-      if (!b) return [...a];
-      return [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])];
-    }
+    let replayState = {
+      completedStrokeCount: 0,
+      totalStrokeCount: 0,
+      groups: [],
+      blocks: [],
+      calls: [],
+      document: {}
+    };
+    let stateRequestSerial = 0;
 
     function strokeTimes(stroke) {
       const points = stroke.points || [];
@@ -370,105 +377,28 @@ HTML = r"""
       return { start: points[0].t || 0, end: points[points.length - 1].t || 0 };
     }
 
-    function normalizeFixture(raw) {
-      const truth = raw.truth || { blocks: [], expectedMarkdown: '' };
-      const truthByStroke = new Map();
-      for (const block of truth.blocks || []) {
-        for (const strokeId of block.strokes || []) truthByStroke.set(strokeId, block);
-      }
+    function prepareFixtureForDrawing(raw) {
       const strokes = (raw.strokes.strokes || []).map(stroke => ({
         ...stroke,
-        times: strokeTimes(stroke),
-        truthBlock: truthByStroke.get(stroke.id) || null
+        times: strokeTimes(stroke)
       }));
       const canvasInfo = raw.strokes.canvas || { width: 612, height: 792 };
-      return { ...raw, strokes: { ...raw.strokes, strokes }, truth, canvasInfo };
+      return { ...raw, strokes: { ...raw.strokes, strokes }, canvasInfo };
     }
 
-    function classifyGroup(group) {
-      const truthBlocks = [...new Set(group.strokes.map(stroke => stroke.truthBlock).filter(Boolean))];
-      if (truthBlocks.length === 1) {
-        const block = truthBlocks[0];
-        if (block.kind === 'math' || block.latex) return 'math';
-        if (block.kind === 'text' || block.text) return 'text';
-      }
-      const textish = group.strokes.length > 8 && group.bbox && (group.bbox[2] - group.bbox[0]) > 180;
-      return textish ? 'text' : 'math';
-    }
-
-    function recognizedContent(group) {
-      const truthBlocks = [...new Set(group.strokes.map(stroke => stroke.truthBlock).filter(Boolean))];
-      if (truthBlocks.length === 1) {
-        const block = truthBlocks[0];
-        return block.text || block.latex || '';
-      }
-      return '';
-    }
-
-    function groupCompletedStrokes(completed) {
-      const sorted = [...completed].sort((a, b) => (a.bbox?.[1] ?? 0) - (b.bbox?.[1] ?? 0));
-      const groups = [];
-      for (const stroke of sorted) {
-        const bbox = stroke.bbox;
-        if (!bbox) continue;
-        const centerY = (bbox[1] + bbox[3]) / 2;
-        const height = Math.max(1, bbox[3] - bbox[1]);
-        let best = null;
-        let bestDistance = Infinity;
-        for (const group of groups) {
-          const threshold = Math.max(34, Math.max(group.height, height) * 1.15);
-          const distance = Math.abs(centerY - group.centerY);
-          if (distance < threshold && distance < bestDistance) {
-            best = group;
-            bestDistance = distance;
-          }
-        }
-        if (!best) {
-          groups.push({ strokes: [stroke], bbox: [...bbox], centerY, height, lastT: stroke.times.end });
-        } else {
-          best.strokes.push(stroke);
-          best.bbox = bboxUnion(best.bbox, bbox);
-          best.centerY = (best.bbox[1] + best.bbox[3]) / 2;
-          best.height = Math.max(1, best.bbox[3] - best.bbox[1]);
-          best.lastT = Math.max(best.lastT, stroke.times.end);
-        }
-      }
-      return groups
-        .map(group => ({ ...group, kind: classifyGroup(group), content: recognizedContent(group) }))
-        .sort((a, b) => a.bbox[1] - b.bbox[1] || a.bbox[0] - b.bbox[0]);
-    }
-
-    function modelAt(time) {
-      if (!fixture) return { completed: [], groups: [], blocks: [] };
+    async function fetchReplayState(time) {
+      if (!fixture) return;
+      const serial = ++stateRequestSerial;
       const idleSeconds = Number(idleInput.value) || 0.8;
-      const completed = fixture.strokes.strokes.filter(stroke => stroke.times.end <= time);
-      const groups = groupCompletedStrokes(completed);
-      const blocks = groups
-        .filter(group => time >= group.lastT + idleSeconds)
-        .map((group, index) => ({
-          id: `block_${String(index + 1).padStart(3, '0')}`,
-          kind: group.kind,
-          bbox: group.bbox.map(value => Math.round(value * 10) / 10),
-          strokes: group.strokes.map(stroke => stroke.id),
-          text: group.kind === 'text' ? group.content : '',
-          latex: group.kind === 'math' ? group.content : '',
-          source: group.kind === 'math' ? 'math_ctc' : 'apple_vision_pending',
-          recognizedAt: Math.round((group.lastT + idleSeconds) * 100) / 100
-        }));
-      return { completed, groups, blocks };
-    }
-
-    function finalOcrCalls() {
-      if (!fixture) return [];
-      const idleSeconds = Number(idleInput.value) || 0.8;
-      const allGroups = groupCompletedStrokes(fixture.strokes.strokes);
-      return allGroups.map((group, index) => ({
-        index,
-        at: group.lastT + idleSeconds,
-        kind: group.kind,
-        content: group.content,
-        bbox: group.bbox
-      })).sort((a, b) => a.at - b.at);
+      const url = `/api/replay_state/${encodeURIComponent(fixture.name)}?time=${encodeURIComponent(time.toFixed(3))}&idle=${encodeURIComponent(idleSeconds)}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(await response.text());
+      const nextState = await response.json();
+      if (serial === stateRequestSerial) {
+        replayState = nextState;
+        renderTimelineMarks();
+        draw();
+      }
     }
 
     function setupCanvas() {
@@ -525,30 +455,21 @@ HTML = r"""
         if (stroke.times.start <= currentTime) drawStroke(stroke, currentTime);
       }
 
-      const state = modelAt(currentTime);
-      const calledKeys = new Set(state.blocks.map(block => block.strokes.join('|')));
-      for (const group of state.groups) {
-        drawUnderline(group, calledKeys.has(group.strokes.map(stroke => stroke.id).join('|')));
+      const calledKeys = new Set(replayState.blocks.map(block => block.strokes.join('|')));
+      for (const group of replayState.groups) {
+        drawUnderline(group, calledKeys.has(group.strokes.join('|')));
       }
 
-      const documentModel = {
-        pageId: fixture.name,
-        time: Math.round(currentTime * 100) / 100,
-        idleTriggerSeconds: Number(idleInput.value) || 0.8,
-        blocks: state.blocks,
-        expectedMarkdown: fixture.truth.expectedMarkdown || ''
-      };
-
       timeValue.textContent = `${currentTime.toFixed(2)}s / ${duration.toFixed(2)}s`;
-      strokeValue.textContent = `${state.completed.length} / ${fixture.strokes.strokes.length}`;
-      groupValue.textContent = String(state.groups.length);
-      blockValue.textContent = String(state.blocks.length);
-      modelView.textContent = JSON.stringify(documentModel, null, 2);
+      strokeValue.textContent = `${replayState.completedStrokeCount} / ${replayState.totalStrokeCount}`;
+      groupValue.textContent = String(replayState.groups.length);
+      blockValue.textContent = String(replayState.blocks.length);
+      modelView.textContent = JSON.stringify(replayState.document, null, 2);
       renderCalls();
     }
 
     function renderCalls() {
-      const calls = finalOcrCalls();
+      const calls = replayState.calls || [];
       callList.innerHTML = '';
       for (const call of calls) {
         const div = document.createElement('div');
@@ -561,7 +482,7 @@ HTML = r"""
     }
 
     function renderTimelineMarks() {
-      const calls = finalOcrCalls();
+      const calls = replayState.calls || [];
       timelineMarks.innerHTML = '';
       for (const call of calls) {
         const mark = document.createElement('span');
@@ -580,6 +501,9 @@ HTML = r"""
       currentTime = Math.max(0, Math.min(duration, time));
       timeline.value = String(currentTime);
       draw();
+      fetchReplayState(currentTime).catch(error => {
+        modelView.textContent = `Failed to build replay state: ${error.message}`;
+      });
     }
 
     function tick(timestamp) {
@@ -601,13 +525,13 @@ HTML = r"""
     async function loadFixture(name) {
       const response = await fetch(`/api/fixture/${encodeURIComponent(name)}`);
       if (!response.ok) throw new Error(await response.text());
-      fixture = normalizeFixture(await response.json());
+      fixture = prepareFixtureForDrawing(await response.json());
       duration = Math.max(1, ...fixture.strokes.strokes.map(stroke => stroke.times.end)) + 1.5;
       timeline.min = '0';
       timeline.max = String(duration);
       timeline.step = '0.01';
       setupCanvas();
-      renderTimelineMarks();
+      await fetchReplayState(0);
       setTime(0);
     }
 
@@ -632,8 +556,9 @@ HTML = r"""
       setTime(Number(timeline.value));
     });
     idleInput.addEventListener('input', () => {
-      renderTimelineMarks();
-      draw();
+      fetchReplayState(currentTime).catch(error => {
+        modelView.textContent = `Failed to build replay state: ${error.message}`;
+      });
     });
     playPause.addEventListener('click', () => {
       playing = !playing;
@@ -696,6 +621,17 @@ class ReplayHandler(BaseHTTPRequestHandler):
             except ValueError as error:
                 self.send_json({"error": str(error)}, 404)
             return
+        if path.startswith("/api/replay_state/"):
+            name = unquote(path.removeprefix("/api/replay_state/"))
+            query = parse_qs(parsed.query)
+            time_seconds = parse_float(query.get("time", ["0"])[0], default=0.0)
+            idle_seconds = parse_float(query.get("idle", ["0.8"])[0], default=0.8)
+            try:
+                fixture = load_fixture(self.fixtures_dir, name)
+                self.send_json(build_replay_state(fixture, time_seconds, idle_seconds))
+            except ValueError as error:
+                self.send_json({"error": str(error)}, 404)
+            return
         if path.startswith("/rendered/") and path.endswith(".png"):
             name = unquote(Path(path).stem)
             try:
@@ -718,60 +654,11 @@ class ReplayHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
-def is_relative_to(path: Path, parent: Path) -> bool:
+def parse_float(value: str, default: float) -> float:
     try:
-        path.relative_to(parent)
-        return True
+        return float(value)
     except ValueError:
-        return False
-
-
-def truth_path(case_dir: Path) -> Path | None:
-    for filename in TRUTH_FILENAMES:
-        candidate = case_dir / filename
-        if candidate.exists():
-            return candidate
-    return None
-
-
-def read_json(path: Path) -> object:
-    return json.loads(path.read_text())
-
-
-def list_fixtures(fixtures_dir: Path) -> list[dict[str, object]]:
-    items: list[dict[str, object]] = []
-    for case_dir in sorted(fixtures_dir.glob("case_*")):
-        strokes_path = case_dir / "strokes.json"
-        if not case_dir.is_dir() or not strokes_path.exists():
-            continue
-        strokes = read_json(strokes_path)
-        stroke_items = strokes.get("strokes", []) if isinstance(strokes, dict) else []
-        items.append(
-            {
-                "name": case_dir.name,
-                "strokeCount": len(stroke_items),
-                "hasTruth": truth_path(case_dir) is not None,
-            }
-        )
-    return items
-
-
-def load_fixture(fixtures_dir: Path, name: str) -> dict[str, object]:
-    safe_name = Path(name).name
-    case_dir = (fixtures_dir / safe_name).resolve()
-    if safe_name != name or not is_relative_to(case_dir, fixtures_dir.resolve()):
-        raise ValueError("invalid fixture name")
-    strokes_path = case_dir / "strokes.json"
-    if not strokes_path.exists():
-        raise ValueError("fixture not found")
-    template_path = truth_path(case_dir)
-    truth = read_json(template_path) if template_path else {"blocks": [], "expectedMarkdown": ""}
-    return {
-        "name": safe_name,
-        "strokes": read_json(strokes_path),
-        "truth": truth,
-        "truthFile": template_path.name if template_path else None,
-    }
+        return default
 
 
 def main() -> None:
