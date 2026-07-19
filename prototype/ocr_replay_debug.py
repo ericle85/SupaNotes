@@ -30,7 +30,7 @@ HTML = r"""
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SupaNotes OCR Replay Debugger</title>
+  <title>OCR Replay Debugger</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -228,10 +228,11 @@ HTML = r"""
       top: 0;
       width: 2px;
       height: 14px;
-      background: var(--math);
+      background: var(--pending);
       border-radius: 999px;
     }
 
+    .mark.math { background: var(--math); }
     .mark.text { background: var(--text); }
 
     .callList {
@@ -267,7 +268,7 @@ HTML = r"""
   </style>
 </head>
 <body>
-  <h1>SupaNotes OCR Replay Debugger</h1>
+  <h1>OCR Replay Debugger</h1>
   <div class="app">
     <main>
       <section class="toolbar" aria-label="Replay controls">
@@ -430,7 +431,8 @@ HTML = r"""
       ctx.save();
       ctx.lineWidth = 4;
       ctx.lineCap = 'round';
-      ctx.strokeStyle = called ? (group.kind === 'math' ? colors.math : colors.text) : colors.pending;
+      const kindColor = { math: colors.math, text: colors.text }[group.kind] || colors.pending;
+      ctx.strokeStyle = called ? kindColor : colors.pending;
       if (!called) ctx.setLineDash([8, 7]);
       ctx.beginPath();
       ctx.moveTo(x0, y);
@@ -662,7 +664,7 @@ def parse_float(value: str, default: float) -> float:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Serve the SupaNotes OCR replay debugger.")
+    parser = argparse.ArgumentParser(description="Serve the OCR replay debugger.")
     parser.add_argument("--fixtures", type=Path, default=DEFAULT_FIXTURES_DIR)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)

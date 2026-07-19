@@ -58,40 +58,19 @@ def normalize_fixture(fixture: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def classify_group(group: dict[str, Any]) -> str:
-    truth_blocks = unique_truth_blocks(group["strokes"])
-    if len(truth_blocks) == 1:
-        block = truth_blocks[0]
-        if block.get("kind") == "math" or block.get("latex"):
-            return "math"
-        if block.get("kind") == "text" or block.get("text"):
-            return "text"
-
-    bbox = group.get("bbox")
-    textish = len(group.get("strokes", [])) > 8 and bbox and (bbox[2] - bbox[0]) > 180
-    return "text" if textish else "math"
+UNRECOGNIZED_GROUP = {"kind": "not labeled", "content": ""}
 
 
-def recognized_content(group: dict[str, Any]) -> str:
-    truth_blocks = unique_truth_blocks(group["strokes"])
-    if len(truth_blocks) == 1:
-        block = truth_blocks[0]
-        return block.get("text") or block.get("latex") or ""
-    return ""
+def recognize_group(group: dict[str, Any]) -> dict[str, str]:
+    """OCR pipeline seam.
 
-
-def unique_truth_blocks(strokes: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    blocks: list[dict[str, Any]] = []
-    seen: set[int] = set()
-    for stroke in strokes:
-        block = stroke.get("truthBlock")
-        if block is None:
-            continue
-        marker = id(block)
-        if marker not in seen:
-            seen.add(marker)
-            blocks.append(block)
-    return blocks
+    The live OCR pipeline plugs in here: given a group's strokes it must report
+    what it recognized (``content``) and how it classified the line (``kind``:
+    ``"math"``, ``"text"``, or ``"not labeled"``). Until the pipeline is wired
+    in, every group stays unrecognized so the debugger overlay reflects reality
+    instead of the fixture answer key.
+    """
+    return dict(UNRECOGNIZED_GROUP)
 
 
 def group_completed_strokes(completed: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -132,13 +111,5 @@ def group_completed_strokes(completed: list[dict[str, Any]]) -> list[dict[str, A
             best_group["height"] = max(1.0, best_group["bbox"][3] - best_group["bbox"][1])
             best_group["lastT"] = max(best_group["lastT"], stroke["times"]["end"])
 
-    enriched = []
-    for group in groups:
-        enriched.append(
-            {
-                **group,
-                "kind": classify_group(group),
-                "content": recognized_content(group),
-            }
-        )
+    enriched = [{**group, **recognize_group(group)} for group in groups]
     return sorted(enriched, key=lambda group: (group["bbox"][1], group["bbox"][0]))
