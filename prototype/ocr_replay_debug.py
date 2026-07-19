@@ -261,6 +261,40 @@ HTML = r"""
     .badge.math { color: var(--math); }
     .badge.text { color: var(--text); }
 
+    .ocrTooltip {
+      position: fixed;
+      z-index: 10;
+      max-width: 320px;
+      pointer-events: none;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--fg);
+      box-shadow: 0 8px 24px rgb(0 0 0 / 24%);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .ocrTooltip .kind {
+      font-weight: 650;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 11px;
+    }
+
+    .ocrTooltip .kind.math { color: var(--math); }
+    .ocrTooltip .kind.text { color: var(--text); }
+
+    .ocrTooltip pre {
+      margin: 6px 0 0;
+      max-height: none;
+      border: none;
+      padding: 0;
+      background: transparent;
+      font-size: 12px;
+    }
+
     @media (max-width: 900px) {
       .app { grid-template-columns: 1fr; }
       .status { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -282,10 +316,10 @@ HTML = r"""
             <select id="speedSelect">
               <option value="0.25">0.25×</option>
               <option value="0.5">0.5×</option>
-              <option value="1" selected>1×</option>
+              <option value="1">1×</option>
               <option value="2">2×</option>
               <option value="4">4×</option>
-              <option value="8">8×</option>
+              <option value="8" selected>8×</option>
             </select>
           </label>
           <label>Idle OCR trigger (sec)
@@ -327,6 +361,7 @@ HTML = r"""
       </section>
     </aside>
   </div>
+  <div id="ocrTooltip" class="ocrTooltip" hidden></div>
 
   <script>
     const fixtureSelect = document.getElementById('fixtureSelect');
@@ -344,6 +379,9 @@ HTML = r"""
     const blockValue = document.getElementById('blockValue');
     const modelView = document.getElementById('modelView');
     const callList = document.getElementById('callList');
+    const ocrTooltip = document.getElementById('ocrTooltip');
+
+    let classifiedUnderlines = [];
 
     let fixtures = [];
     let fixture = null;
@@ -431,6 +469,7 @@ HTML = r"""
       ctx.save();
       ctx.lineWidth = 4;
       ctx.lineCap = 'round';
+      const classified = called && (group.kind === 'math' || group.kind === 'text');
       const kindColor = { math: colors.math, text: colors.text }[group.kind] || colors.pending;
       ctx.strokeStyle = called ? kindColor : colors.pending;
       if (!called) ctx.setLineDash([8, 7]);
@@ -443,6 +482,7 @@ HTML = r"""
       ctx.fillStyle = ctx.strokeStyle;
       ctx.fillText(`${group.kind}${called ? ' OCR' : ' pending'}`, x0, y + 17);
       ctx.restore();
+      if (classified) classifiedUnderlines.push({ x0, x1, y, kind: group.kind, content: group.content });
     }
 
     function draw() {
@@ -457,6 +497,7 @@ HTML = r"""
         if (stroke.times.start <= currentTime) drawStroke(stroke, currentTime);
       }
 
+      classifiedUnderlines = [];
       const calledKeys = new Set(replayState.blocks.map(block => block.strokes.join('|')));
       for (const group of replayState.groups) {
         drawUnderline(group, calledKeys.has(group.strokes.join('|')));
@@ -574,6 +615,31 @@ HTML = r"""
       lastFrame = null;
       setTime(0);
     });
+    function underlineAtEvent(event) {
+      const rect = canvas.getBoundingClientRect();
+      const width = fixture?.canvasInfo?.width || 612;
+      const height = fixture?.canvasInfo?.height || 792;
+      const cx = (event.clientX - rect.left) * (width / rect.width);
+      const cy = (event.clientY - rect.top) * (height / rect.height);
+      return classifiedUnderlines.find(hit => cx >= hit.x0 - 2 && cx <= hit.x1 + 2 && Math.abs(cy - hit.y) <= 8);
+    }
+
+    function showOcrTooltip(hit, event) {
+      const output = hit.content ? escapeHtml(hit.content) : '(empty CTC output)';
+      ocrTooltip.innerHTML = `<span class="kind ${hit.kind}">${hit.kind}</span><pre>${output}</pre>`;
+      ocrTooltip.hidden = false;
+      ocrTooltip.style.left = `${event.clientX + 14}px`;
+      ocrTooltip.style.top = `${event.clientY + 14}px`;
+    }
+
+    canvas.addEventListener('mousemove', event => {
+      const hit = underlineAtEvent(event);
+      canvas.style.cursor = hit ? 'help' : 'default';
+      if (hit) showOcrTooltip(hit, event);
+      else ocrTooltip.hidden = true;
+    });
+    canvas.addEventListener('mouseleave', () => { ocrTooltip.hidden = true; });
+
     window.addEventListener('resize', draw);
 
     init().catch(error => {
