@@ -42,9 +42,17 @@ interface FixtureListItem {
 
 type Bbox = [number, number, number, number];
 
+interface TokenConfidence {
+  token: string;
+  confidence: number;
+  alternatives: { token: string; confidence: number }[];
+}
+
 interface Group {
   kind: Kind;
   content: string;
+  confidence: number;
+  tokens: TokenConfidence[];
   bbox: Bbox;
   lastT: number;
   lastPenContactT: number;
@@ -85,6 +93,8 @@ interface ClassifiedUnderline {
   y: number;
   kind: Kind;
   content: string;
+  confidence: number;
+  tokens: TokenConfidence[];
 }
 
 const byId = <T extends HTMLElement>(id: string): T =>
@@ -230,7 +240,16 @@ const drawUnderline = (group: Group, called: boolean): void => {
     ctx.stroke();
   }
   ctx.restore();
-  if (classified) classifiedUnderlines.push({ x0, x1, y, kind: group.kind, content: group.content });
+  if (classified)
+    classifiedUnderlines.push({
+      x0,
+      x1,
+      y,
+      kind: group.kind,
+      content: group.content,
+      confidence: group.confidence,
+      tokens: group.tokens ?? [],
+    });
 };
 
 const drawGapGauge = (threshold: number): void => {
@@ -438,9 +457,47 @@ const underlineAtEvent = (event: MouseEvent): ClassifiedUnderline | undefined =>
   );
 };
 
+const REVEAL_STAGES = 2;
+const REVEAL_STEP = 40;
+
+let tooltipHit: ClassifiedUnderline | null = null;
+let tooltipStage = 0;
+let tooltipDelta = 0;
+
+const confidenceColor = (value: number): string => `hsl(${Math.round(value * 120)} 65% 45%)`;
+const confidencePercent = (value: number): string => `${Math.round(value * 100)}%`;
+
+const tokenColumn = (token: TokenConfidence, stage: number): string => {
+  const confidence = `<div class="tconf" style="color:${confidenceColor(token.confidence)}">${confidencePercent(token.confidence)}</div>`;
+  const alternatives =
+    stage >= 2 && token.alternatives.length
+      ? `<div class="talts">${token.alternatives
+          .map((alt) => `<div>${escapeHtml(alt.token)}<em>${confidencePercent(alt.confidence)}</em></div>`)
+          .join("")}</div>`
+      : "";
+  return `<div class="tcol">${confidence}<div class="tchar">${escapeHtml(token.token)}</div>${alternatives}</div>`;
+};
+
+const tooltipSections = (hit: ClassifiedUnderline, stage: number): string => {
+  const hasTokens = hit.tokens.length > 0;
+  const overall = hasTokens
+    ? `<span class="overall" style="color:${confidenceColor(hit.confidence)}">${confidencePercent(hit.confidence)}</span>`
+    : "";
+  const hint = stage < REVEAL_STAGES && hasTokens ? `<div class="hint">scroll to reveal ▾</div>` : "";
+  if (stage === 0 || !hasTokens) {
+    const output = hit.content ? escapeHtml(hit.content) : "(empty CTC output)";
+    return `<span class="kind ${hit.kind}">${hit.kind}</span><pre>${output} ${overall}</pre>${hint}`;
+  }
+  const columns = hit.tokens.map((token) => tokenColumn(token, stage)).join("");
+  return `<span class="kind ${hit.kind}">${hit.kind}</span> ${overall}<div class="tokens">${columns}</div>${hint}`;
+};
+
 const showOcrTooltip = (hit: ClassifiedUnderline, event: MouseEvent): void => {
-  const output = hit.content ? escapeHtml(hit.content) : "(empty CTC output)";
-  ocrTooltip.innerHTML = `<span class="kind ${hit.kind}">${hit.kind}</span><pre>${output}</pre>`;
+  if (hit !== tooltipHit) {
+    tooltipHit = hit;
+    tooltipDelta = 0;
+  }
+  ocrTooltip.innerHTML = tooltipSections(hit, tooltipStage);
   ocrTooltip.hidden = false;
   ocrTooltip.style.left = `${event.clientX + 14}px`;
   ocrTooltip.style.top = `${event.clientY + 14}px`;
@@ -450,11 +507,34 @@ canvas.addEventListener("mousemove", (event) => {
   const hit = underlineAtEvent(event);
   canvas.style.cursor = hit ? "help" : "default";
   if (hit) showOcrTooltip(hit, event);
-  else ocrTooltip.hidden = true;
+  else {
+    ocrTooltip.hidden = true;
+    tooltipHit = null;
+  }
 });
 canvas.addEventListener("mouseleave", () => {
   ocrTooltip.hidden = true;
+  tooltipHit = null;
 });
+canvas.addEventListener(
+  "wheel",
+  (event) => {
+    if (!tooltipHit || ocrTooltip.hidden) return;
+    event.preventDefault();
+    tooltipDelta += event.deltaY;
+    while (tooltipDelta >= REVEAL_STEP && tooltipStage < REVEAL_STAGES) {
+      tooltipStage += 1;
+      tooltipDelta -= REVEAL_STEP;
+    }
+    while (tooltipDelta <= -REVEAL_STEP && tooltipStage > 0) {
+      tooltipStage -= 1;
+      tooltipDelta += REVEAL_STEP;
+    }
+    tooltipDelta = Math.max(-REVEAL_STEP, Math.min(REVEAL_STEP, tooltipDelta));
+    ocrTooltip.innerHTML = tooltipSections(tooltipHit, tooltipStage);
+  },
+  { passive: false }
+);
 
 window.addEventListener("resize", draw);
 

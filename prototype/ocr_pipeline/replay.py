@@ -49,6 +49,8 @@ def group_for_client(group: dict[str, Any], last_contact_t: float) -> dict[str, 
     return {
         "kind": group["kind"],
         "content": group["content"],
+        "confidence": group.get("confidence", 0.0),
+        "tokens": group.get("tokens", []),
         "bbox": rounded_bbox(group["bbox"]),
         "lastT": round(group["lastT"], 3),
         "lastPenContactT": round(last_contact_t, 3),

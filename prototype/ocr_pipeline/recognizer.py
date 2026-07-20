@@ -25,6 +25,7 @@ DIM_FF = 1024
 MAX_SEQ = 2048
 INPUT_DIM = 6
 CONFIDENCE_THRESHOLD = 0.5
+TOP_K_ALTERNATIVES = 3
 
 LATEX_COMMAND = re.compile(r"\\[a-zA-Z]+")
 LATEX_MATH_COMMAND = re.compile(r"\\(frac|sqrt|sum|int|cdot|times|div|pm|leq|geq|neq|infty)")
@@ -73,16 +74,48 @@ def collapse_repeats(vocab: Vocabulary, predictions: list[int]) -> str:
     return "".join(tokens)
 
 
-def decode(model: CTCTransformer, vocab: Vocabulary, raw_strokes: list[list[tuple[float, float, float]]]) -> str:
+def step_alternatives(vocab: Vocabulary, step_probs: Any, chosen: int) -> list[dict[str, Any]]:
+    count = min(TOP_K_ALTERNATIVES + 2, step_probs.shape[-1])
+    top = torch.topk(step_probs, count)
+    candidates = (
+        {"token": vocab.idx2tok.get(idx, "?"), "confidence": round(prob, 4)}
+        for prob, idx in zip(top.values.tolist(), top.indices.tolist())
+        if idx != BLANK_TOKEN and idx != chosen
+    )
+    return list(candidates)[:TOP_K_ALTERNATIVES]
+
+
+def collapse_with_confidence(vocab: Vocabulary, steps: Any) -> dict[str, Any]:
+    probs = steps.exp()
+    ids = steps.argmax(dim=-1).tolist()
+    tokens = []
+    previous = -1
+    for index, token in enumerate(ids):
+        if token != previous and token != BLANK_TOKEN:
+            step_probs = probs[index]
+            tokens.append(
+                {
+                    "token": vocab.idx2tok.get(token, "?"),
+                    "confidence": round(step_probs[token].item(), 4),
+                    "alternatives": step_alternatives(vocab, step_probs, token),
+                }
+            )
+        previous = token
+    content = DOUBLED_BACKSLASH.sub("\\\\", "".join(token["token"] for token in tokens))
+    overall = round(sum(token["confidence"] for token in tokens) / len(tokens), 4) if tokens else 0.0
+    return {"content": content, "confidence": overall, "tokens": tokens}
+
+
+def decode(model: CTCTransformer, vocab: Vocabulary, raw_strokes: list[list[tuple[float, float, float]]]) -> dict[str, Any]:
     arrays = [np.array(stroke, dtype=np.float64) for stroke in raw_strokes if len(stroke) >= 2]
     if not arrays:
-        return ""
+        return {"content": "", "confidence": 0.0, "tokens": []}
     features = extract_point_features(normalize_strokes(arrays))[:MAX_SEQ_LEN]
     lengths = torch.tensor([len(features)])
     with torch.no_grad():
         log_probs, out_lengths = model(torch.from_numpy(features).unsqueeze(0).float(), lengths)
-    predictions = log_probs.argmax(dim=-1).T[0, : out_lengths[0].item()].tolist()
-    return DOUBLED_BACKSLASH.sub("\\\\", collapse_repeats(vocab, predictions))
+    steps = log_probs[: out_lengths[0].item(), 0, :]
+    return collapse_with_confidence(vocab, steps)
 
 
 def classify_kind(latex: str) -> str:
@@ -95,11 +128,17 @@ def classify_kind(latex: str) -> str:
     return "text"
 
 
-def recognize_group(group: dict[str, Any]) -> dict[str, str]:
+def recognize_group(group: dict[str, Any]) -> dict[str, Any]:
     strokes = strokes_in_writing_order(group["strokes"])
     if not strokes:
-        return {"kind": "not labeled", "content": ""}
+        return {"kind": "not labeled", "content": "", "confidence": 0.0, "tokens": []}
     model, vocab = load_recognizer()
-    latex = decode(model, vocab, strokes)
-    kind = classify_kind(latex)
-    return {"kind": kind, "content": latex if kind == "math" else ""}
+    result = decode(model, vocab, strokes)
+    kind = classify_kind(result["content"])
+    is_math = kind == "math"
+    return {
+        "kind": kind,
+        "content": result["content"] if is_math else "",
+        "confidence": result["confidence"] if is_math else 0.0,
+        "tokens": result["tokens"] if is_math else [],
+    }
