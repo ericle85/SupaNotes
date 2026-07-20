@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OCR Replay Debugger</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: Canvas;
+      --fg: CanvasText;
+      --muted: color-mix(in srgb, CanvasText 55%, Canvas);
+      --panel: color-mix(in srgb, Canvas 92%, CanvasText);
+      --border: color-mix(in srgb, CanvasText 20%, Canvas);
+      --math: #d43f3a;
+      --text: #2f7ee6;
+      --pending: #8a8a8a;
+      --ink: #101010;
+      --paper: #fff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 18px;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 20px;
+      font-weight: 650;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(320px, 1fr) minmax(300px, 420px);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .toolbar, .panel {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+      padding: 12px;
+    }
+
+    .toolbar {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    label {
+      display: inline-grid;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    select, input, button {
+      font: inherit;
+    }
+
+    select, input[type="number"] {
+      min-height: 34px;
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--fg);
+    }
+
+    button {
+      min-height: 34px;
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--fg);
+      cursor: pointer;
+    }
+
+    button.primary {
+      background: color-mix(in srgb, Highlight 22%, var(--bg));
+      border-color: color-mix(in srgb, Highlight 70%, var(--border));
+    }
+
+    input[type="range"] {
+      width: 100%;
+    }
+
+    .stageWrap {
+      width: 100%;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--bg) 70%, CanvasText);
+      padding: 12px;
+    }
+
+    canvas {
+      display: block;
+      width: min(100%, 612px);
+      height: auto;
+      margin: 0 auto;
+      background: var(--paper);
+      border-radius: 2px;
+      box-shadow: 0 8px 24px rgb(0 0 0 / 16%);
+    }
+
+    .status {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .stat {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px;
+      background: var(--bg);
+    }
+
+    .stat .label {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .stat .value {
+      margin-top: 2px;
+      font-variant-numeric: tabular-nums;
+      font-weight: 650;
+    }
+
+    .side {
+      display: grid;
+      gap: 12px;
+    }
+
+    .panel h2 {
+      margin: 0 0 8px;
+      font-size: 15px;
+      font-weight: 650;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .swatch {
+      display: inline-block;
+      width: 18px;
+      height: 3px;
+      vertical-align: middle;
+      margin-right: 4px;
+      border-radius: 999px;
+    }
+
+    .textLine { background: var(--text); }
+    .mathLine { background: var(--math); }
+    .pendingLine { background: var(--pending); }
+
+    pre {
+      margin: 0;
+      max-height: 360px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 12px;
+      line-height: 1.35;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      background: var(--bg);
+    }
+
+    .timelineMarks {
+      position: relative;
+      height: 18px;
+      margin-top: -2px;
+    }
+
+    .mark {
+      position: absolute;
+      top: 0;
+      width: 2px;
+      height: 14px;
+      background: var(--pending);
+      border-radius: 999px;
+    }
+
+    .mark.math { background: var(--math); }
+    .mark.text { background: var(--text); }
+
+    .callList {
+      display: grid;
+      gap: 6px;
+      font-size: 12px;
+    }
+
+    .callItem {
+      display: grid;
+      grid-template-columns: 56px 1fr auto;
+      gap: 8px;
+      align-items: baseline;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 2px 7px;
+      border: 1px solid var(--border);
+      font-size: 11px;
+    }
+
+    .badge.math { color: var(--math); }
+    .badge.text { color: var(--text); }
+
+    .ocrTooltip {
+      position: fixed;
+      z-index: 10;
+      max-width: 320px;
+      pointer-events: none;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--fg);
+      box-shadow: 0 8px 24px rgb(0 0 0 / 24%);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .ocrTooltip .kind {
+      font-weight: 650;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 11px;
+    }
+
+    .ocrTooltip .kind.math { color: var(--math); }
+    .ocrTooltip .kind.text { color: var(--text); }
+
+    .ocrTooltip pre {
+      margin: 6px 0 0;
+      max-height: none;
+      border: none;
+      padding: 0;
+      background: transparent;
+      font-size: 12px;
+    }
+
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; }
+      .status { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <h1>OCR Replay Debugger</h1>
+  <div class="app">
+    <main>
+      <section class="toolbar" aria-label="Replay controls">
+        <div class="row">
+          <label>Fixture
+            <select id="fixtureSelect"></select>
+          </label>
+          <button id="playPause" class="primary" type="button">Play</button>
+          <button id="restart" type="button">Restart</button>
+          <label>Speed
+            <select id="speedSelect">
+              <option value="0.25">0.25×</option>
+              <option value="0.5">0.5×</option>
+              <option value="1">1×</option>
+              <option value="2">2×</option>
+              <option value="4">4×</option>
+              <option value="8" selected>8×</option>
+            </select>
+          </label>
+          <label>Idle OCR trigger (sec)
+            <input id="idleInput" type="number" min="0.1" max="5" step="0.1" value="0.8" />
+          </label>
+          <label>Split gap (px): <span id="gapValue">46</span>
+            <input id="gapInput" type="range" min="10" max="200" step="1" value="46" />
+          </label>
+        </div>
+        <div>
+          <input id="timeline" type="range" min="0" max="1" step="0.01" value="0" aria-label="Replay timeline" />
+          <div id="timelineMarks" class="timelineMarks" aria-hidden="true"></div>
+        </div>
+        <div class="status">
+          <div class="stat"><div class="label">time</div><div id="timeValue" class="value">0.00s</div></div>
+          <div class="stat"><div class="label">completed strokes</div><div id="strokeValue" class="value">0</div></div>
+          <div class="stat"><div class="label">active groups</div><div id="groupValue" class="value">0</div></div>
+          <div class="stat"><div class="label">OCR blocks</div><div id="blockValue" class="value">0</div></div>
+        </div>
+      </section>
+      <div class="stageWrap">
+        <canvas id="canvas" width="612" height="792" aria-label="Replayed handwriting canvas"></canvas>
+      </div>
+    </main>
+
+    <aside class="side">
+      <section class="panel">
+        <h2>Overlay legend</h2>
+        <div class="legend">
+          <span><span class="swatch textLine"></span>text line</span>
+          <span><span class="swatch mathLine"></span>math line</span>
+          <span><span class="swatch pendingLine"></span>group seen, waiting for idle trigger</span>
+          <span><span class="swatch mathLine"></span>split gap &gt; setting (separate CTC call)</span>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>OCR calls</h2>
+        <div id="callList" class="callList"></div>
+      </section>
+      <section class="panel">
+        <h2>Live spatial document model</h2>
+        <pre id="modelView">{}</pre>
+      </section>
+    </aside>
+  </div>
+  <div id="ocrTooltip" class="ocrTooltip" hidden></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
