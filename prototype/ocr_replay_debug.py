@@ -325,6 +325,9 @@ HTML = r"""
           <label>Idle OCR trigger (sec)
             <input id="idleInput" type="number" min="0.1" max="5" step="0.1" value="0.8" />
           </label>
+          <label>Split gap (px): <span id="gapValue">46</span>
+            <input id="gapInput" type="range" min="10" max="200" step="1" value="46" />
+          </label>
         </div>
         <div>
           <input id="timeline" type="range" min="0" max="1" step="0.01" value="0" aria-label="Replay timeline" />
@@ -349,6 +352,7 @@ HTML = r"""
           <span><span class="swatch textLine"></span>text line</span>
           <span><span class="swatch mathLine"></span>math line</span>
           <span><span class="swatch pendingLine"></span>group seen, waiting for idle trigger</span>
+          <span><span class="swatch mathLine"></span>split gap &gt; setting (separate CTC call)</span>
         </div>
       </section>
       <section class="panel">
@@ -369,6 +373,8 @@ HTML = r"""
     const restart = document.getElementById('restart');
     const speedSelect = document.getElementById('speedSelect');
     const idleInput = document.getElementById('idleInput');
+    const gapInput = document.getElementById('gapInput');
+    const gapValue = document.getElementById('gapValue');
     const timeline = document.getElementById('timeline');
     const timelineMarks = document.getElementById('timelineMarks');
     const canvas = document.getElementById('canvas');
@@ -429,7 +435,8 @@ HTML = r"""
       if (!fixture) return;
       const serial = ++stateRequestSerial;
       const idleSeconds = Number(idleInput.value) || 0.8;
-      const url = `/api/replay_state/${encodeURIComponent(fixture.name)}?time=${encodeURIComponent(time.toFixed(3))}&idle=${encodeURIComponent(idleSeconds)}`;
+      const gap = Number(gapInput.value) || 46;
+      const url = `/api/replay_state/${encodeURIComponent(fixture.name)}?time=${encodeURIComponent(time.toFixed(3))}&idle=${encodeURIComponent(idleSeconds)}&gap=${encodeURIComponent(gap)}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error(await response.text());
       const nextState = await response.json();
@@ -478,11 +485,65 @@ HTML = r"""
       ctx.lineTo(x1, y);
       ctx.stroke();
       ctx.setLineDash([]);
+      const idle = Number(idleInput.value) || 0.8;
+      const remaining = Math.max(0, (group.lastT + idle) - currentTime);
       ctx.font = '12px ui-sans-serif, system-ui';
       ctx.fillStyle = ctx.strokeStyle;
-      ctx.fillText(`${group.kind}${called ? ' OCR' : ' pending'}`, x0, y + 17);
+      ctx.fillText(called ? `${group.kind} OCR` : `${group.kind} pending ${remaining.toFixed(1)}s`, x0, y + 17);
+      if (!called && idle > 0) {
+        const progress = Math.max(0, Math.min(1, 1 - remaining / idle));
+        ctx.strokeStyle = colors.pending;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x0, y + 22);
+        ctx.lineTo(x0 + (x1 - x0) * progress, y + 22);
+        ctx.stroke();
+      }
       ctx.restore();
       if (classified) classifiedUnderlines.push({ x0, x1, y, kind: group.kind, content: group.content });
+    }
+
+    function drawGapGauge(threshold) {
+      const y = 14;
+      const x0 = 12;
+      const x1 = x0 + threshold;
+      ctx.save();
+      ctx.strokeStyle = colors.math;
+      ctx.fillStyle = colors.math;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(x0, y - 7); ctx.lineTo(x0, y + 7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x1, y - 7); ctx.lineTo(x1, y + 7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+      ctx.font = '11px ui-sans-serif, system-ui';
+      ctx.fillText(`split gap ${threshold}px`, x1 + 6, y + 4);
+      ctx.restore();
+    }
+
+    function drawSplitGuides() {
+      const threshold = Number(gapInput.value) || 46;
+      const guides = replayState.gapGuides || [];
+      ctx.save();
+      ctx.font = '10px ui-sans-serif, system-ui';
+      for (const guide of guides) {
+        const top = guide.y0 - 6;
+        const bottom = guide.y1 + 6;
+        ctx.strokeStyle = guide.isSplit ? colors.math : colors.muted;
+        ctx.lineWidth = guide.isSplit ? 2 : 1;
+        ctx.setLineDash(guide.isSplit ? [] : [3, 4]);
+        ctx.beginPath();
+        ctx.moveTo(guide.x, top);
+        ctx.lineTo(guide.x, bottom);
+        ctx.stroke();
+        if (guide.isSplit || guide.gap >= 8) {
+          ctx.setLineDash([]);
+          ctx.fillStyle = guide.isSplit ? colors.math : colors.muted;
+          ctx.fillText(`${guide.gap.toFixed(0)}px`, guide.x + 2, top + 10);
+        }
+      }
+      ctx.setLineDash([]);
+      ctx.restore();
+      drawGapGauge(threshold);
     }
 
     function draw() {
@@ -502,6 +563,7 @@ HTML = r"""
       for (const group of replayState.groups) {
         drawUnderline(group, calledKeys.has(group.strokes.join('|')));
       }
+      drawSplitGuides();
 
       timeValue.textContent = `${currentTime.toFixed(2)}s / ${duration.toFixed(2)}s`;
       strokeValue.textContent = `${replayState.completedStrokeCount} / ${replayState.totalStrokeCount}`;
@@ -540,13 +602,21 @@ HTML = r"""
       return String(value).replace(/[&<>'"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
     }
 
-    function setTime(time) {
-      currentTime = Math.max(0, Math.min(duration, time));
-      timeline.value = String(currentTime);
-      draw();
+    let lastFetchWall = -Infinity;
+
+    function requestReplayState(force) {
+      if (!force && playing && performance.now() - lastFetchWall < 180) return;
+      lastFetchWall = performance.now();
       fetchReplayState(currentTime).catch(error => {
         modelView.textContent = `Failed to build replay state: ${error.message}`;
       });
+    }
+
+    function setTime(time, force) {
+      currentTime = Math.max(0, Math.min(duration, time));
+      timeline.value = String(currentTime);
+      draw();
+      requestReplayState(force);
     }
 
     function tick(timestamp) {
@@ -555,10 +625,10 @@ HTML = r"""
       const elapsed = (timestamp - lastFrame) / 1000 * Number(speedSelect.value);
       lastFrame = timestamp;
       if (currentTime + elapsed >= duration) {
-        setTime(duration);
         playing = false;
         playPause.textContent = 'Play';
         lastFrame = null;
+        setTime(duration, true);
         return;
       }
       setTime(currentTime + elapsed);
@@ -603,11 +673,19 @@ HTML = r"""
         modelView.textContent = `Failed to build replay state: ${error.message}`;
       });
     });
+    gapInput.addEventListener('input', () => {
+      gapValue.textContent = gapInput.value;
+      draw();
+      fetchReplayState(currentTime).catch(error => {
+        modelView.textContent = `Failed to build replay state: ${error.message}`;
+      });
+    });
     playPause.addEventListener('click', () => {
       playing = !playing;
       playPause.textContent = playing ? 'Pause' : 'Play';
       lastFrame = null;
       if (playing) requestAnimationFrame(tick);
+      else requestReplayState(true);
     });
     restart.addEventListener('click', () => {
       playing = false;
@@ -694,9 +772,11 @@ class ReplayHandler(BaseHTTPRequestHandler):
             query = parse_qs(parsed.query)
             time_seconds = parse_float(query.get("time", ["0"])[0], default=0.0)
             idle_seconds = parse_float(query.get("idle", ["0.8"])[0], default=0.8)
+            gap_value = query.get("gap", [""])[0]
+            gap_threshold = parse_float(gap_value, default=0.0) if gap_value else None
             try:
                 fixture = load_fixture(self.fixtures_dir, name)
-                self.send_json(build_replay_state(fixture, time_seconds, idle_seconds))
+                self.send_json(build_replay_state(fixture, time_seconds, idle_seconds, gap_threshold))
             except ValueError as error:
                 self.send_json({"error": str(error)}, 404)
             return

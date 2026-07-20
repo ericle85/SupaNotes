@@ -62,20 +62,57 @@ UNRECOGNIZED_GROUP = {"kind": "not labeled", "content": ""}
 
 
 def recognize_group(group: dict[str, Any]) -> dict[str, str]:
-    """OCR pipeline seam.
+    try:
+        from .recognizer import recognize_group as recognize_with_ctc
 
-    The live OCR pipeline plugs in here: given a group's strokes it must report
-    what it recognized (``content``) and how it classified the line (``kind``:
-    ``"math"``, ``"text"``, or ``"not labeled"``). Until the pipeline is wired
-    in, every group stays unrecognized so the debugger overlay reflects reality
-    instead of the fixture answer key.
-    """
-    return dict(UNRECOGNIZED_GROUP)
+        return recognize_with_ctc(group)
+    except Exception:
+        return dict(UNRECOGNIZED_GROUP)
 
 
-def group_completed_strokes(completed: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def build_group(strokes: list[dict[str, Any]]) -> dict[str, Any]:
+    bbox = None
+    last_t = 0.0
+    for stroke in strokes:
+        bbox = bbox_union(bbox, stroke.get("bbox"))
+        last_t = max(last_t, stroke["times"]["end"])
+    return {
+        "strokes": strokes,
+        "bbox": bbox,
+        "centerY": (bbox[1] + bbox[3]) / 2,
+        "height": max(1.0, bbox[3] - bbox[1]),
+        "lastT": last_t,
+    }
+
+
+def default_gap_threshold(line: dict[str, Any]) -> float:
+    return max(40.0, line["height"] * 1.2)
+
+
+def split_line_into_chunks(
+    line: dict[str, Any], gap_threshold: float | None = None
+) -> list[dict[str, Any]]:
+    strokes = [stroke for stroke in line["strokes"] if stroke.get("bbox")]
+    if len(strokes) < 2:
+        return [line]
+    threshold = gap_threshold if gap_threshold is not None else default_gap_threshold(line)
+    ordered = sorted(strokes, key=lambda stroke: stroke["bbox"][0])
+    chunks = [[ordered[0]]]
+    running_right = ordered[0]["bbox"][2]
+    for stroke in ordered[1:]:
+        if stroke["bbox"][0] - running_right > threshold:
+            chunks.append([stroke])
+        else:
+            chunks[-1].append(stroke)
+        running_right = max(running_right, stroke["bbox"][2])
+    if len(chunks) == 1:
+        return [line]
+    return [build_group(chunk) for chunk in chunks]
+
+
+def vertical_lines(completed: list[dict[str, Any]]) -> list[dict[str, Any]]:
     sorted_strokes = sorted(completed, key=lambda stroke: ((stroke.get("bbox") or [0, 0, 0, 0])[1]))
-    groups: list[dict[str, Any]] = []
+    lines: list[dict[str, Any]] = []
 
     for stroke in sorted_strokes:
         bbox = stroke.get("bbox")
@@ -84,18 +121,18 @@ def group_completed_strokes(completed: list[dict[str, Any]]) -> list[dict[str, A
 
         center_y = (bbox[1] + bbox[3]) / 2
         height = max(1.0, bbox[3] - bbox[1])
-        best_group: dict[str, Any] | None = None
+        best_line: dict[str, Any] | None = None
         best_distance = float("inf")
 
-        for group in groups:
-            threshold = max(34.0, max(group["height"], height) * 1.15)
-            distance = abs(center_y - group["centerY"])
+        for line in lines:
+            threshold = max(34.0, max(line["height"], height) * 1.15)
+            distance = abs(center_y - line["centerY"])
             if distance < threshold and distance < best_distance:
-                best_group = group
+                best_line = line
                 best_distance = distance
 
-        if best_group is None:
-            groups.append(
+        if best_line is None:
+            lines.append(
                 {
                     "strokes": [stroke],
                     "bbox": list(bbox),
@@ -105,11 +142,48 @@ def group_completed_strokes(completed: list[dict[str, Any]]) -> list[dict[str, A
                 }
             )
         else:
-            best_group["strokes"].append(stroke)
-            best_group["bbox"] = bbox_union(best_group["bbox"], bbox)
-            best_group["centerY"] = (best_group["bbox"][1] + best_group["bbox"][3]) / 2
-            best_group["height"] = max(1.0, best_group["bbox"][3] - best_group["bbox"][1])
-            best_group["lastT"] = max(best_group["lastT"], stroke["times"]["end"])
+            best_line["strokes"].append(stroke)
+            best_line["bbox"] = bbox_union(best_line["bbox"], bbox)
+            best_line["centerY"] = (best_line["bbox"][1] + best_line["bbox"][3]) / 2
+            best_line["height"] = max(1.0, best_line["bbox"][3] - best_line["bbox"][1])
+            best_line["lastT"] = max(best_line["lastT"], stroke["times"]["end"])
 
-    enriched = [{**group, **recognize_group(group)} for group in groups]
-    return sorted(enriched, key=lambda group: (group["bbox"][1], group["bbox"][0]))
+    return lines
+
+
+def gap_guides(
+    completed: list[dict[str, Any]], gap_threshold: float | None = None
+) -> list[dict[str, Any]]:
+    guides = []
+    for line in vertical_lines(completed):
+        strokes = sorted(
+            [stroke for stroke in line["strokes"] if stroke.get("bbox")],
+            key=lambda stroke: stroke["bbox"][0],
+        )
+        threshold = gap_threshold if gap_threshold is not None else default_gap_threshold(line)
+        running_right = None
+        for stroke in strokes:
+            bbox = stroke["bbox"]
+            if running_right is not None and bbox[0] - running_right > 0:
+                gap = bbox[0] - running_right
+                guides.append(
+                    {
+                        "x": round(bbox[0] - gap / 2, 1),
+                        "y0": round(line["bbox"][1], 1),
+                        "y1": round(line["bbox"][3], 1),
+                        "gap": round(gap, 1),
+                        "isSplit": gap > threshold,
+                    }
+                )
+            running_right = bbox[2] if running_right is None else max(running_right, bbox[2])
+    return guides
+
+
+def group_completed_strokes(
+    completed: list[dict[str, Any]], gap_threshold: float | None = None
+) -> list[dict[str, Any]]:
+    chunks: list[dict[str, Any]] = []
+    for line in vertical_lines(completed):
+        chunks.extend(split_line_into_chunks(line, gap_threshold))
+    enriched = [{**chunk, **recognize_group(chunk)} for chunk in chunks]
+    return sorted(enriched, key=lambda chunk: (chunk["bbox"][1], chunk["bbox"][0]))

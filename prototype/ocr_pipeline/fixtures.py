@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-TRUTH_FILENAMES = ("truth.json", "truth_template.json", "template.json")
+TRUTH_FILENAMES = ("truth.json", "template.json", "truth_template.json")
 
 
 def is_relative_to(path: Path, parent: Path) -> bool:

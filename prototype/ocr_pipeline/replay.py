@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .grouping import group_completed_strokes, normalize_fixture
+from .grouping import gap_guides, group_completed_strokes, normalize_fixture
 
 
 def rounded_bbox(bbox: list[float]) -> list[float]:
@@ -40,9 +40,11 @@ def ordered_strokes(group: dict[str, Any]) -> list[dict[str, Any]]:
     return sorted(group["strokes"], key=lambda stroke: (stroke["times"]["start"], stroke["id"]))
 
 
-def build_final_ocr_calls(fixture: dict[str, Any], idle_seconds: float) -> list[dict[str, Any]]:
+def build_final_ocr_calls(
+    fixture: dict[str, Any], idle_seconds: float, gap_threshold: float | None = None
+) -> list[dict[str, Any]]:
     normalized = normalize_fixture(fixture)
-    groups = group_completed_strokes(normalized["strokes"].get("strokes", []))
+    groups = group_completed_strokes(normalized["strokes"].get("strokes", []), gap_threshold)
     calls = []
     for index, group in enumerate(groups):
         calls.append(
@@ -57,11 +59,16 @@ def build_final_ocr_calls(fixture: dict[str, Any], idle_seconds: float) -> list[
     return sorted(calls, key=lambda call: call["at"])
 
 
-def build_replay_state(fixture: dict[str, Any], time_seconds: float, idle_seconds: float) -> dict[str, Any]:
+def build_replay_state(
+    fixture: dict[str, Any],
+    time_seconds: float,
+    idle_seconds: float,
+    gap_threshold: float | None = None,
+) -> dict[str, Any]:
     normalized = normalize_fixture(fixture)
     strokes = normalized["strokes"].get("strokes", [])
     completed = [stroke for stroke in strokes if stroke["times"]["end"] <= time_seconds]
-    groups = group_completed_strokes(completed)
+    groups = group_completed_strokes(completed, gap_threshold)
     blocks = [
         block_from_group(group, index, idle_seconds)
         for index, group in enumerate(groups)
@@ -80,6 +87,7 @@ def build_replay_state(fixture: dict[str, Any], time_seconds: float, idle_second
         "totalStrokeCount": len(strokes),
         "groups": [group_for_client(group) for group in groups],
         "blocks": blocks,
-        "calls": build_final_ocr_calls(fixture, idle_seconds),
+        "calls": build_final_ocr_calls(fixture, idle_seconds, gap_threshold),
+        "gapGuides": gap_guides(completed, gap_threshold),
         "document": document,
     }
