@@ -132,15 +132,7 @@ def vertical_lines(completed: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 best_distance = distance
 
         if best_line is None:
-            lines.append(
-                {
-                    "strokes": [stroke],
-                    "bbox": list(bbox),
-                    "centerY": center_y,
-                    "height": height,
-                    "lastT": stroke["times"]["end"],
-                }
-            )
+            lines.append(build_group([stroke]))
         else:
             best_line["strokes"].append(stroke)
             best_line["bbox"] = bbox_union(best_line["bbox"], bbox)

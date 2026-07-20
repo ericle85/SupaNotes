@@ -63,32 +63,26 @@ def strokes_in_writing_order(strokes: list[dict[str, Any]]) -> list[list[tuple[f
     return result
 
 
-_DECODE_CACHE: dict[tuple, str] = {}
-
-
-def decode(model: CTCTransformer, vocab: Vocabulary, raw_strokes: list[list[tuple[float, float, float]]]) -> str:
-    arrays = [np.array(stroke, dtype=np.float64) for stroke in raw_strokes if len(stroke) >= 2]
-    if not arrays:
-        return ""
-    key = tuple(tuple(map(tuple, stroke)) for stroke in raw_strokes if len(stroke) >= 2)
-    cached = _DECODE_CACHE.get(key)
-    if cached is not None:
-        return cached
-    features = extract_point_features(normalize_strokes(arrays))[:MAX_SEQ_LEN]
-    feature_tensor = torch.from_numpy(features).unsqueeze(0).float()
-    lengths = torch.tensor([len(features)])
-    with torch.no_grad():
-        log_probs, out_lengths = model(feature_tensor, lengths)
-    predictions = log_probs.argmax(dim=-1).T[0, : out_lengths[0].item()].tolist()
+def collapse_repeats(vocab: Vocabulary, predictions: list[int]) -> str:
     tokens = []
     previous = -1
     for token in predictions:
         if token != previous and token != BLANK_TOKEN:
             tokens.append(vocab.idx2tok.get(token, "?"))
         previous = token
-    result = DOUBLED_BACKSLASH.sub("\\\\", "".join(tokens))
-    _DECODE_CACHE[key] = result
-    return result
+    return "".join(tokens)
+
+
+def decode(model: CTCTransformer, vocab: Vocabulary, raw_strokes: list[list[tuple[float, float, float]]]) -> str:
+    arrays = [np.array(stroke, dtype=np.float64) for stroke in raw_strokes if len(stroke) >= 2]
+    if not arrays:
+        return ""
+    features = extract_point_features(normalize_strokes(arrays))[:MAX_SEQ_LEN]
+    lengths = torch.tensor([len(features)])
+    with torch.no_grad():
+        log_probs, out_lengths = model(torch.from_numpy(features).unsqueeze(0).float(), lengths)
+    predictions = log_probs.argmax(dim=-1).T[0, : out_lengths[0].item()].tolist()
+    return DOUBLED_BACKSLASH.sub("\\\\", collapse_repeats(vocab, predictions))
 
 
 def classify_kind(latex: str) -> str:
