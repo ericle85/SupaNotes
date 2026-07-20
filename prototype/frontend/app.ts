@@ -47,6 +47,7 @@ interface Group {
   content: string;
   bbox: Bbox;
   lastT: number;
+  lastPenContactT: number;
   strokes: string[];
 }
 
@@ -211,7 +212,7 @@ const drawUnderline = (group: Group, called: boolean): void => {
   ctx.stroke();
   ctx.setLineDash([]);
   const idle = Number(idleInput.value) || 0.8;
-  const remaining = Math.max(0, group.lastT + idle - currentTime);
+  const remaining = Math.max(0, group.lastPenContactT + idle - currentTime);
   ctx.font = "12px ui-sans-serif, system-ui";
   ctx.fillStyle = ctx.strokeStyle;
   ctx.fillText(
