@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Callable
-from sympy import Add, Pow, sin, cos, tan, exp, log, factorint, gcd, I, S
+from sympy import Add, Pow, sin, cos, tan, exp, log, factorint, gcd, I, N, S
 from sympy.core.alphabets import greeks
 
 from autocomplete.document_context_model import DocumentContext
@@ -34,9 +34,41 @@ def generate_next_line(context: DocumentContext, intent: ClassifiedIntent) -> Su
     line = context.current_line
     if isinstance(line, UnparsableLine):
         return SuggestedNextLine("", MathOperation.SIMPLIFY_EXPRESSION, line.parse_error_description)
+    evaluated = _try_evaluate_trailing_equals(line, context.preceding_lines)
+    if evaluated is not None:
+        return evaluated
     if isinstance(line, ParsedEquation):
         return _execute_equation(line, _resolve_equation(line))
     return _execute_expression(line, _resolve_expression(line))
+
+
+def _definitions_from_preceding(preceding_lines) -> dict:
+    return {
+        line.left_side: line.right_side
+        for line in preceding_lines
+        if isinstance(line, ParsedEquation)
+        and line.left_side.is_Symbol
+        and not line.right_side.free_symbols
+    }
+
+
+def _calculator_result_text(numeric) -> str:
+    value = float(numeric)
+    if value.is_integer():
+        return str(int(value))
+    return str(round(value, 2))
+
+
+def _try_evaluate_trailing_equals(line, preceding_lines):
+    if not isinstance(line, ParsedExpression) or not line.has_trailing_equals:
+        return None
+    resolved = line.expression.subs(_definitions_from_preceding(preceding_lines))
+    numeric = N(resolved)
+    if numeric.is_number and numeric.is_real is False:
+        return None
+    if resolved.free_symbols or not numeric.is_number:
+        return SuggestedNextLine("", MathOperation.EVALUATE_NUMERIC, "expression has unknown or non-numeric terms")
+    return SuggestedNextLine(_calculator_result_text(numeric), MathOperation.EVALUATE_NUMERIC)
 
 
 def _resolve_equation(line: ParsedEquation) -> MathOperation:

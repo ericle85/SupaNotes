@@ -17,6 +17,7 @@ class MathOperation(Enum):
     EXPAND_EXPRESSION = auto()
     CANCEL_EXPRESSION = auto()
     CONVERT_TO_DECIMAL = auto()
+    EVALUATE_NUMERIC = auto()
     UNDEFINED_RESULT = auto()
     AWAITING_TRAILING_EQUALS = auto()
     

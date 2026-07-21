@@ -7,6 +7,23 @@ from typing import Any
 from .grouping import gap_guides, group_completed_strokes, normalize_fixture
 
 
+def autocomplete_for_latex(latex_text: str) -> dict[str, Any] | None:
+    if not latex_text.strip():
+        return None
+    from autocomplete.autocomplete_pipeline import run_autocomplete_on_document_text
+
+    try:
+        result = run_autocomplete_on_document_text(latex_text)
+    except Exception as error:
+        return {"operation": "", "suggestion": "", "reason": f"pipeline error: {error}"}
+    suggestion = result.suggestion
+    return {
+        "operation": result.classified_intent.operation.name,
+        "suggestion": suggestion.suggested_text if suggestion.has_suggestion else "",
+        "reason": suggestion.diagnostic_reason,
+    }
+
+
 def rounded_bbox(bbox: list[float]) -> list[float]:
     return [round(value, 1) for value in bbox]
 
@@ -33,15 +50,17 @@ def last_pen_contact_before_idle(
 def block_from_group(group: dict[str, Any], index: int, fire_at: float) -> dict[str, Any]:
     kind = group["kind"]
     stroke_ids = [stroke["id"] for stroke in ordered_strokes(group)]
+    latex = group["content"] if kind == "math" else ""
     return {
         "id": f"block_{index + 1:03d}",
         "kind": kind,
         "bbox": rounded_bbox(group["bbox"]),
         "strokes": stroke_ids,
         "text": group["content"] if kind == "text" else "",
-        "latex": group["content"] if kind == "math" else "",
+        "latex": latex,
         "source": "math_ctc" if kind == "math" else "apple_vision_pending",
         "recognizedAt": round(fire_at, 2),
+        "autocomplete": autocomplete_for_latex(latex),
     }
 
 

@@ -59,8 +59,18 @@ interface Group {
   strokes: string[];
 }
 
+interface Autocomplete {
+  operation: string;
+  suggestion: string;
+  reason: string;
+}
+
 interface Block {
   strokes: string[];
+  kind: Kind;
+  latex?: string;
+  text?: string;
+  autocomplete?: Autocomplete | null;
 }
 
 interface OcrCall {
@@ -95,6 +105,7 @@ interface ClassifiedUnderline {
   content: string;
   confidence: number;
   tokens: TokenConfidence[];
+  autocomplete?: Autocomplete | null;
 }
 
 const byId = <T extends HTMLElement>(id: string): T =>
@@ -117,6 +128,7 @@ const groupValue = byId<HTMLDivElement>("groupValue");
 const blockValue = byId<HTMLDivElement>("blockValue");
 const modelView = byId<HTMLPreElement>("modelView");
 const callList = byId<HTMLDivElement>("callList");
+const autocompleteList = byId<HTMLDivElement>("autocompleteList");
 const ocrTooltip = byId<HTMLDivElement>("ocrTooltip");
 
 let classifiedUnderlines: ClassifiedUnderline[] = [];
@@ -240,7 +252,9 @@ const drawUnderline = (group: Group, called: boolean): void => {
     ctx.stroke();
   }
   ctx.restore();
-  if (classified)
+  if (classified) {
+    const key = group.strokes.join("|");
+    const block = replayState.blocks.find((candidate) => candidate.strokes.join("|") === key);
     classifiedUnderlines.push({
       x0,
       x1,
@@ -249,7 +263,9 @@ const drawUnderline = (group: Group, called: boolean): void => {
       content: group.content,
       confidence: group.confidence,
       tokens: group.tokens ?? [],
+      autocomplete: block?.autocomplete ?? null,
     });
+  }
 };
 
 const drawGapGauge = (threshold: number): void => {
@@ -320,6 +336,26 @@ const draw = (): void => {
   blockValue.textContent = String(replayState.blocks.length);
   modelView.textContent = JSON.stringify(replayState.document, null, 2);
   renderCalls();
+  renderAutocomplete();
+};
+
+const renderAutocomplete = (): void => {
+  const mathBlocks = replayState.blocks.filter((block) => block.kind === "math");
+  autocompleteList.innerHTML = "";
+  if (!mathBlocks.length) {
+    autocompleteList.innerHTML = `<div class="callItem" style="opacity:0.55"><span>no recognized math yet</span></div>`;
+    return;
+  }
+  for (const block of mathBlocks) {
+    const auto = block.autocomplete;
+    const suggestion = auto?.suggestion
+      ? escapeHtml(auto.suggestion)
+      : `<span style="opacity:0.55">${escapeHtml(auto?.reason || "no suggestion")}</span>`;
+    const div = document.createElement("div");
+    div.className = "callItem";
+    div.innerHTML = `<span>${escapeHtml(block.latex || "")}</span><span>→ ${suggestion}</span><span class="badge math">${escapeHtml(auto?.operation || "")}</span>`;
+    autocompleteList.appendChild(div);
+  }
 };
 
 const renderCalls = (): void => {
@@ -457,7 +493,7 @@ const underlineAtEvent = (event: MouseEvent): ClassifiedUnderline | undefined =>
   );
 };
 
-const REVEAL_STAGES = 2;
+const REVEAL_STAGES = 3;
 const REVEAL_STEP = 40;
 
 let tooltipHit: ClassifiedUnderline | null = null;
@@ -470,7 +506,7 @@ const confidencePercent = (value: number): string => `${Math.round(value * 100)}
 const tokenColumn = (token: TokenConfidence, stage: number): string => {
   const confidence = `<div class="tconf" style="color:${confidenceColor(token.confidence)}">${confidencePercent(token.confidence)}</div>`;
   const alternatives =
-    stage >= 2 && token.alternatives.length
+    stage >= 3 && token.alternatives.length
       ? `<div class="talts">${token.alternatives
           .map((alt) => `<div>${escapeHtml(alt.token)}<em>${confidencePercent(alt.confidence)}</em></div>`)
           .join("")}</div>`
@@ -478,18 +514,28 @@ const tokenColumn = (token: TokenConfidence, stage: number): string => {
   return `<div class="tcol">${confidence}<div class="tchar">${escapeHtml(token.token)}</div>${alternatives}</div>`;
 };
 
+const autocompleteSection = (auto: Autocomplete): string => {
+  const body = auto.suggestion
+    ? escapeHtml(auto.suggestion)
+    : `<span style="opacity:0.6">${escapeHtml(auto.reason || "no suggestion")}</span>`;
+  return `<div class="autocomplete">→ ${body} <span class="badge math">${escapeHtml(auto.operation)}</span></div>`;
+};
+
 const tooltipSections = (hit: ClassifiedUnderline, stage: number): string => {
   const hasTokens = hit.tokens.length > 0;
   const overall = hasTokens
     ? `<span class="overall" style="color:${confidenceColor(hit.confidence)}">${confidencePercent(hit.confidence)}</span>`
     : "";
+  const header = `<span class="kind ${hit.kind}">${hit.kind}</span>`;
+  const output = hit.content ? escapeHtml(hit.content) : "(empty CTC output)";
+  const contentBlock = `<pre>${output} ${overall}</pre>`;
+  const autoBlock = stage >= 1 && hit.autocomplete ? autocompleteSection(hit.autocomplete) : "";
+  const tokensBlock =
+    stage >= 2 && hasTokens
+      ? `<div class="tokens">${hit.tokens.map((token) => tokenColumn(token, stage)).join("")}</div>`
+      : "";
   const hint = stage < REVEAL_STAGES && hasTokens ? `<div class="hint">scroll to reveal ▾</div>` : "";
-  if (stage === 0 || !hasTokens) {
-    const output = hit.content ? escapeHtml(hit.content) : "(empty CTC output)";
-    return `<span class="kind ${hit.kind}">${hit.kind}</span><pre>${output} ${overall}</pre>${hint}`;
-  }
-  const columns = hit.tokens.map((token) => tokenColumn(token, stage)).join("");
-  return `<span class="kind ${hit.kind}">${hit.kind}</span> ${overall}<div class="tokens">${columns}</div>${hint}`;
+  return `${header}${contentBlock}${autoBlock}${tokensBlock}${hint}`;
 };
 
 const showOcrTooltip = (hit: ClassifiedUnderline, event: MouseEvent): void => {
