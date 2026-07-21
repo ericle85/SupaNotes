@@ -4,6 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>OCR Replay Debugger</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <style>
     :root {
       color-scheme: light dark;
@@ -211,6 +213,13 @@
       padding-bottom: 5px;
     }
 
+    #autocompleteList .callItem {
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+    }
+
+    #autocompleteList .callItem > span:first-child { white-space: nowrap; }
+
     .badge {
       display: inline-block;
       border-radius: 999px;
@@ -302,6 +311,8 @@
     }
 
     .ocrTooltip .hint { margin-top: 7px; font-size: 10px; color: var(--muted); }
+
+    .ocrTooltip .rendered { margin-top: 6px; font-size: 16px; }
 
     @media (max-width: 900px) {
       .app { grid-template-columns: 1fr; }

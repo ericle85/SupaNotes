@@ -106,6 +106,7 @@ interface ClassifiedUnderline {
   confidence: number;
   tokens: TokenConfidence[];
   autocomplete?: Autocomplete | null;
+  latex?: string | null;
 }
 
 const byId = <T extends HTMLElement>(id: string): T =>
@@ -264,6 +265,7 @@ const drawUnderline = (group: Group, called: boolean): void => {
       confidence: group.confidence,
       tokens: group.tokens ?? [],
       autocomplete: block?.autocomplete ?? null,
+      latex: block?.latex ?? null,
     });
   }
 };
@@ -353,7 +355,8 @@ const renderAutocomplete = (): void => {
       : `<span style="opacity:0.55">${escapeHtml(auto?.reason || "no suggestion")}</span>`;
     const div = document.createElement("div");
     div.className = "callItem";
-    div.innerHTML = `<span>${escapeHtml(block.latex || "")}</span><span>→ ${suggestion}</span><span class="badge math">${escapeHtml(auto?.operation || "")}</span>`;
+    const rendered = block.latex ? renderLatex(block.latex) : "";
+    div.innerHTML = `<span>${rendered}</span><span>→ ${suggestion}</span><span class="badge math">${escapeHtml(auto?.operation || "")}</span>`;
     autocompleteList.appendChild(div);
   }
 };
@@ -380,6 +383,18 @@ const renderTimelineMarks = (): void => {
     mark.style.left = `${Math.min(100, Math.max(0, (call.at / duration) * 100))}%`;
     mark.title = `${call.kind} OCR @ ${call.at.toFixed(2)}s`;
     timelineMarks.appendChild(mark);
+  }
+};
+
+declare const katex: {
+  renderToString(tex: string, options?: Record<string, unknown>): string;
+};
+
+const renderLatex = (latex: string): string => {
+  try {
+    return katex.renderToString(latex, { throwOnError: false, displayMode: false });
+  } catch {
+    return escapeHtml(latex);
   }
 };
 
@@ -529,13 +544,14 @@ const tooltipSections = (hit: ClassifiedUnderline, stage: number): string => {
   const header = `<span class="kind ${hit.kind}">${hit.kind}</span>`;
   const output = hit.content ? escapeHtml(hit.content) : "(empty CTC output)";
   const contentBlock = `<pre>${output} ${overall}</pre>`;
+  const rendered = hit.latex ? `<div class="rendered">${renderLatex(hit.latex)}</div>` : "";
   const autoBlock = stage >= 1 && hit.autocomplete ? autocompleteSection(hit.autocomplete) : "";
   const tokensBlock =
     stage >= 2 && hasTokens
       ? `<div class="tokens">${hit.tokens.map((token) => tokenColumn(token, stage)).join("")}</div>`
       : "";
   const hint = stage < REVEAL_STAGES && hasTokens ? `<div class="hint">scroll to reveal ▾</div>` : "";
-  return `${header}${contentBlock}${autoBlock}${tokensBlock}${hint}`;
+  return `${header}${contentBlock}${rendered}${autoBlock}${tokensBlock}${hint}`;
 };
 
 const showOcrTooltip = (hit: ClassifiedUnderline, event: MouseEvent): void => {
