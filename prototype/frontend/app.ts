@@ -59,10 +59,16 @@ interface Group {
   strokes: string[];
 }
 
+interface GhostText {
+  text: string;
+  placement: "left" | "right";
+}
+
 interface Autocomplete {
   operation: string;
   suggestion: string;
   reason: string;
+  ghostText?: GhostText | null;
 }
 
 interface Block {
@@ -220,6 +226,19 @@ const drawStroke = (stroke: DrawStroke, time: number): void => {
   ctx.stroke();
 };
 
+const drawGhostText = (bbox: Bbox, ghost: GhostText): void => {
+  const [gx0, gy0, gx1, gy1] = bbox;
+  const midY = (gy0 + gy1) / 2;
+  ctx.save();
+  ctx.font = "22px ui-sans-serif, system-ui";
+  ctx.fillStyle = colors.math;
+  ctx.globalAlpha = 0.4;
+  ctx.textBaseline = "middle";
+  ctx.textAlign = ghost.placement === "left" ? "right" : "left";
+  ctx.fillText(ghost.text, ghost.placement === "left" ? gx0 - 8 : gx1 + 8, midY);
+  ctx.restore();
+};
+
 const drawUnderline = (group: Group, called: boolean): void => {
   const [x0, , x1, y1] = group.bbox;
   const y = y1 + 10;
@@ -256,6 +275,8 @@ const drawUnderline = (group: Group, called: boolean): void => {
   if (classified) {
     const key = group.strokes.join("|");
     const block = replayState.blocks.find((candidate) => candidate.strokes.join("|") === key);
+    const ghost = block?.autocomplete?.ghostText;
+    if (ghost) drawGhostText(group.bbox, ghost);
     classifiedUnderlines.push({
       x0,
       x1,

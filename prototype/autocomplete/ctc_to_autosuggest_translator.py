@@ -39,6 +39,11 @@ def ends_with_bare_equals(text: str) -> bool:
     return stripped_text.endswith("=") and stripped_text.count("=") == 1
 
 
+def starts_with_bare_equals(text: str) -> bool:
+    stripped_text = text.strip()
+    return stripped_text.startswith("=") and stripped_text.count("=") == 1
+
+
 _LATEX_CONSTANTS = {Symbol("pi"): pi}
 
 
@@ -55,6 +60,8 @@ def translate_ctc_line_to_sympy(line_text: str):
         raise TranslationError(f"unsupported latex construct: {stripped_text!r}")
     if ends_with_bare_equals(stripped_text):
         return translate_ctc_line_to_sympy(stripped_text[:-1])
+    if starts_with_bare_equals(stripped_text):
+        return translate_ctc_line_to_sympy(stripped_text[1:])
     normalized_text = _normalize_latex(stripped_text)
     if normalized_text.count("=") > 1:
         raise TranslationError("line contains multiple equals signs")

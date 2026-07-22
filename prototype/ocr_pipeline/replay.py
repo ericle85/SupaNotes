@@ -17,10 +17,12 @@ def autocomplete_for_latex(latex_text: str) -> dict[str, Any] | None:
     except Exception as error:
         return {"operation": "", "suggestion": "", "reason": f"pipeline error: {error}"}
     suggestion = result.suggestion
+    ghost = suggestion.ghost_text
     return {
         "operation": result.classified_intent.operation.name,
         "suggestion": suggestion.suggested_text if suggestion.has_suggestion else "",
         "reason": suggestion.diagnostic_reason,
+        "ghostText": {"text": ghost.text, "placement": ghost.placement} if ghost else None,
     }
 
 

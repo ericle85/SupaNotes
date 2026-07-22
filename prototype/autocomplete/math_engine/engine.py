@@ -17,10 +17,17 @@ from autocomplete.math_engine import (
 
 
 @dataclass(frozen=True)
+class GhostText:
+    text: str
+    placement: str
+
+
+@dataclass(frozen=True)
 class SuggestedNextLine:
     suggested_text: str
     operation: MathOperation
     diagnostic_reason: str = ""
+    ghost_text: GhostText | None = None
 
     @property
     def has_suggestion(self) -> bool:
@@ -34,7 +41,7 @@ def generate_next_line(context: DocumentContext, intent: ClassifiedIntent) -> Su
     line = context.current_line
     if isinstance(line, UnparsableLine):
         return SuggestedNextLine("", MathOperation.SIMPLIFY_EXPRESSION, line.parse_error_description)
-    evaluated = _try_evaluate_trailing_equals(line, context.preceding_lines)
+    evaluated = _try_evaluate_numeric(line, context.preceding_lines)
     if evaluated is not None:
         return evaluated
     if isinstance(line, ParsedEquation):
@@ -59,8 +66,19 @@ def _calculator_result_text(numeric) -> str:
     return str(round(value, 2))
 
 
-def _try_evaluate_trailing_equals(line, preceding_lines):
-    if not isinstance(line, ParsedExpression) or not line.has_trailing_equals:
+def _numeric_equals_placement(line):
+    if not isinstance(line, ParsedExpression):
+        return None
+    if line.has_trailing_equals:
+        return "right"
+    if line.has_leading_equals:
+        return "left"
+    return None
+
+
+def _try_evaluate_numeric(line, preceding_lines):
+    placement = _numeric_equals_placement(line)
+    if placement is None:
         return None
     resolved = line.expression.subs(_definitions_from_preceding(preceding_lines))
     numeric = N(resolved)
@@ -68,7 +86,12 @@ def _try_evaluate_trailing_equals(line, preceding_lines):
         return None
     if resolved.free_symbols or not numeric.is_number:
         return SuggestedNextLine("", MathOperation.EVALUATE_NUMERIC, "expression has unknown or non-numeric terms")
-    return SuggestedNextLine(_calculator_result_text(numeric), MathOperation.EVALUATE_NUMERIC)
+    result_text = _calculator_result_text(numeric)
+    return SuggestedNextLine(
+        result_text,
+        MathOperation.EVALUATE_NUMERIC,
+        ghost_text=GhostText(result_text, placement),
+    )
 
 
 def _resolve_equation(line: ParsedEquation) -> MathOperation:
