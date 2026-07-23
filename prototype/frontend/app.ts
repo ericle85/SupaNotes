@@ -121,6 +121,8 @@ const byId = <T extends HTMLElement>(id: string): T =>
 const fixtureSelect = byId<HTMLSelectElement>("fixtureSelect");
 const playPause = byId<HTMLButtonElement>("playPause");
 const restart = byId<HTMLButtonElement>("restart");
+const toggleBoxes = byId<HTMLButtonElement>("toggleBoxes");
+let showBoxes = false;
 const speedSelect = byId<HTMLSelectElement>("speedSelect");
 const idleInput = byId<HTMLInputElement>("idleInput");
 const gapInput = byId<HTMLInputElement>("gapInput");
@@ -418,7 +420,17 @@ const draw = (): void => {
   classifiedUnderlines = [];
   const calledKeys = new Set(replayState.blocks.map((block) => block.strokes.join("|")));
   for (const group of replayState.groups) {
-    drawUnderline(group, calledKeys.has(group.strokes.join("|")));
+    const called = calledKeys.has(group.strokes.join("|"));
+    drawUnderline(group, called);
+    if (showBoxes) {
+      const [bx0, by0, bx1, by1] = group.bbox;
+      ctx.save();
+      ctx.strokeStyle = called ? kindColor(group.kind) : colors.pending;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(bx0, by0, bx1 - bx0, by1 - by0);
+      ctx.restore();
+    }
   }
   drawSplitGuides();
   drawUserStrokes();
@@ -580,6 +592,12 @@ playPause.addEventListener("click", () => {
   lastFrame = null;
   if (playing) requestAnimationFrame(tick);
   else requestReplayState(true);
+});
+toggleBoxes.addEventListener("click", () => {
+  showBoxes = !showBoxes;
+  toggleBoxes.textContent = showBoxes ? "Boxes: on" : "Boxes: off";
+  toggleBoxes.setAttribute("aria-pressed", String(showBoxes));
+  draw();
 });
 restart.addEventListener("click", () => {
   playing = false;
