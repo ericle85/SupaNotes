@@ -157,6 +157,16 @@ const colors = {
   muted: css.getPropertyValue("--muted").trim(),
 };
 
+interface UserStroke {
+  id: string;
+  points: StrokePoint[];
+  width: number;
+}
+
+let userStrokes: UserStroke[] = [];
+let drawingStroke: UserStroke | null = null;
+let drawnT = 0;
+
 let replayState: ReplayState = {
   completedStrokeCount: 0,
   totalStrokeCount: 0,
@@ -185,6 +195,43 @@ const prepareFixtureForDrawing = (raw: RawFixture): Fixture => {
 const kindColor = (kind: Kind): string =>
   ({ math: colors.math, text: colors.text } as Record<Kind, string>)[kind] ||
   colors.pending;
+
+async function fetchDrawnOcr(): Promise<void> {
+  if (!userStrokes.length) return;
+  const serial = ++stateRequestSerial;
+  const idleSeconds = Number(idleInput.value) || 0.8;
+  const gap = Number(gapInput.value) || 46;
+  const width = fixture?.canvasInfo?.width || 612;
+  const height = fixture?.canvasInfo?.height || 792;
+  const fixtureStrokes = fixture?.strokes.strokes ?? [];
+  const drawn = userStrokes.map((stroke) => ({
+    ...stroke,
+    bbox: [
+      Math.min(...stroke.points.map((point) => point.x)),
+      Math.min(...stroke.points.map((point) => point.y)),
+      Math.max(...stroke.points.map((point) => point.x)),
+      Math.max(...stroke.points.map((point) => point.y)),
+    ],
+  }));
+  const strokes = [...fixtureStrokes, ...drawn];
+  const body = {
+    strokes: { strokes, canvas: { width, height } },
+    time: duration + drawnT + idleSeconds + 0.5,
+    idle: idleSeconds,
+    gap,
+  };
+  const response = await fetch("/api/replay_state_live", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error(await response.text());
+  const nextState = (await response.json()) as ReplayState;
+  if (serial === stateRequestSerial) {
+    replayState = nextState;
+    draw();
+  }
+}
 
 async function fetchReplayState(time: number): Promise<void> {
   if (!fixture) return;
@@ -224,6 +271,23 @@ const drawStroke = (stroke: DrawStroke, time: number): void => {
   ctx.lineJoin = "round";
   ctx.strokeStyle = colors.ink;
   ctx.stroke();
+};
+
+const drawPolyline = (points: StrokePoint[]): void => {
+  if (points.length < 2) return;
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (const point of points.slice(1)) ctx.lineTo(point.x, point.y);
+  ctx.lineWidth = 3;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = colors.ink;
+  ctx.stroke();
+};
+
+const drawUserStrokes = (): void => {
+  for (const stroke of userStrokes) drawPolyline(stroke.points);
+  if (drawingStroke) drawPolyline(drawingStroke.points);
 };
 
 const drawGhostText = (bbox: Bbox, ghost: GhostText): void => {
@@ -357,6 +421,7 @@ const draw = (): void => {
     drawUnderline(group, calledKeys.has(group.strokes.join("|")));
   }
   drawSplitGuides();
+  drawUserStrokes();
 
   timeValue.textContent = `${currentTime.toFixed(2)}s / ${duration.toFixed(2)}s`;
   strokeValue.textContent = `${replayState.completedStrokeCount} / ${replayState.totalStrokeCount}`;
@@ -523,12 +588,18 @@ restart.addEventListener("click", () => {
   setTime(0);
 });
 
-const underlineAtEvent = (event: MouseEvent): ClassifiedUnderline | undefined => {
+const eventToCanvas = (event: MouseEvent): { x: number; y: number } => {
   const rect = canvas.getBoundingClientRect();
   const width = fixture?.canvasInfo?.width || 612;
   const height = fixture?.canvasInfo?.height || 792;
-  const cx = (event.clientX - rect.left) * (width / rect.width);
-  const cy = (event.clientY - rect.top) * (height / rect.height);
+  return {
+    x: (event.clientX - rect.left) * (width / rect.width),
+    y: (event.clientY - rect.top) * (height / rect.height),
+  };
+};
+
+const underlineAtEvent = (event: MouseEvent): ClassifiedUnderline | undefined => {
+  const { x: cx, y: cy } = eventToCanvas(event);
   return classifiedUnderlines.find(
     (hit) => cx >= hit.x0 - 2 && cx <= hit.x1 + 2 && Math.abs(cy - hit.y) <= 8
   );
@@ -591,7 +662,44 @@ const showOcrTooltip = (hit: ClassifiedUnderline, event: MouseEvent): void => {
   ocrTooltip.style.top = `${event.clientY + 14}px`;
 };
 
+const replayEnded = (): boolean => currentTime >= duration - 0.001;
+
+const pointNext = (event: MouseEvent): StrokePoint => {
+  const { x, y } = eventToCanvas(event);
+  drawnT += 0.05;
+  return { x, y, t: duration + drawnT };
+};
+
+canvas.addEventListener("mousedown", (event) => {
+  if (!event.shiftKey || !replayEnded()) return;
+  event.preventDefault();
+  ocrTooltip.hidden = true;
+  tooltipHit = null;
+  drawingStroke = { id: `u${userStrokes.length + 1}`, points: [pointNext(event)], width: 3 };
+});
+window.addEventListener("mouseup", () => {
+  if (!drawingStroke) return;
+  if (drawingStroke.points.length > 1) userStrokes.push(drawingStroke);
+  drawingStroke = null;
+  draw();
+  fetchDrawnOcr().catch((error: Error) => {
+    modelView.textContent = `Drawn OCR failed: ${error.message}`;
+  });
+});
+byId<HTMLButtonElement>("clearDrawing").addEventListener("click", () => {
+  userStrokes = [];
+  drawingStroke = null;
+  drawnT = 0;
+  fetchReplayState(currentTime).catch(() => draw());
+  draw();
+});
+
 canvas.addEventListener("mousemove", (event) => {
+  if (drawingStroke) {
+    drawingStroke.points.push(pointNext(event));
+    draw();
+    return;
+  }
   const hit = underlineAtEvent(event);
   canvas.style.cursor = hit ? "help" : "default";
   if (hit) showOcrTooltip(hit, event);

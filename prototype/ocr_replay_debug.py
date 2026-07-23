@@ -87,6 +87,25 @@ class ReplayHandler(BaseHTTPRequestHandler):
             return
         self.serve_frontend(path.lstrip("/"))
 
+    def do_POST(self) -> None:  # noqa: N802
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/replay_state_live":
+            length = int(self.headers.get("Content-Length", 0))
+            payload = json.loads(self.rfile.read(length) or b"{}")
+            fixture = {
+                "name": "live",
+                "strokes": payload.get("strokes", {}),
+                "truth": {"blocks": [], "expectedMarkdown": ""},
+                "truthFile": None,
+            }
+            time_seconds = parse_float(str(payload.get("time", 0)), default=0.0)
+            idle_seconds = parse_float(str(payload.get("idle", 0.8)), default=0.8)
+            gap = payload.get("gap")
+            gap_threshold = parse_float(str(gap), default=0.0) if gap not in (None, "") else None
+            self.send_json(build_replay_state(fixture, time_seconds, idle_seconds, gap_threshold))
+            return
+        self.send_json({"error": "not found"}, 404)
+
     def serve_frontend(self, relative: str) -> None:
         try:
             self.send_file(FRONTEND_DIR / relative, FRONTEND_DIR)
