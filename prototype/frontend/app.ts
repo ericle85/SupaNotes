@@ -234,8 +234,13 @@ const drawGhostText = (bbox: Bbox, ghost: GhostText): void => {
   ctx.fillStyle = colors.math;
   ctx.globalAlpha = 0.4;
   ctx.textBaseline = "middle";
-  ctx.textAlign = ghost.placement === "left" ? "right" : "left";
-  ctx.fillText(ghost.text, ghost.placement === "left" ? gx0 - 8 : gx1 + 8, midY);
+  if (ghost.placement === "left") {
+    ctx.textAlign = "right";
+    ctx.fillText(ghost.text, gx0 - 8, midY);
+  } else {
+    ctx.textAlign = "left";
+    ctx.fillText(ghost.text, gx1 + 8, midY);
+  }
   ctx.restore();
 };
 
