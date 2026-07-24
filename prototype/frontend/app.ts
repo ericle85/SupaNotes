@@ -80,9 +80,13 @@ interface Block {
 }
 
 interface OcrCall {
+  index: number;
   at: number;
   kind: Kind;
   content: string;
+  bbox?: Bbox;
+  bboxes?: Bbox[];
+  strokes?: string[];
 }
 
 interface GapGuide {
@@ -140,6 +144,7 @@ const autocompleteList = byId<HTMLDivElement>("autocompleteList");
 const ocrTooltip = byId<HTMLDivElement>("ocrTooltip");
 
 let classifiedUnderlines: ClassifiedUnderline[] = [];
+let selectedOcrCallIndex: number | null = null;
 
 let fixtures: FixtureListItem[] = [];
 let fixture: Fixture | null = null;
@@ -341,6 +346,35 @@ const drawSplitGuides = (): void => {
   drawGapGauge(threshold);
 };
 
+const bboxesForCall = (call: OcrCall): Bbox[] => {
+  if (call.bboxes?.length) return call.bboxes;
+  return call.bbox ? [call.bbox] : [];
+};
+
+const drawSelectedOcrCallBoxes = (): void => {
+  if (selectedOcrCallIndex == null) return;
+  const call = replayState.calls.find((candidate) => candidate.index === selectedOcrCallIndex);
+  if (!call) return;
+
+  ctx.save();
+  ctx.strokeStyle = kindColor(call.kind);
+  ctx.fillStyle = kindColor(call.kind);
+  ctx.lineWidth = 3;
+  ctx.setLineDash([]);
+  ctx.font = "12px ui-sans-serif, system-ui";
+  for (const [boxIndex, bbox] of bboxesForCall(call).entries()) {
+    const [x0, y0, x1, y1] = bbox;
+    const pad = 5;
+    ctx.globalAlpha = 0.18;
+    ctx.fillRect(x0 - pad, y0 - pad, x1 - x0 + pad * 2, y1 - y0 + pad * 2);
+    ctx.globalAlpha = 1;
+    ctx.strokeRect(x0 - pad, y0 - pad, x1 - x0 + pad * 2, y1 - y0 + pad * 2);
+    const label = bboxesForCall(call).length > 1 ? `CTC ${call.index + 1}.${boxIndex + 1}` : `CTC ${call.index + 1}`;
+    ctx.fillText(label, x0 - pad, Math.max(12, y0 - pad - 4));
+  }
+  ctx.restore();
+};
+
 const draw = (): void => {
   if (!fixture) return;
   const width = fixture.canvasInfo.width || 612;
@@ -369,6 +403,7 @@ const draw = (): void => {
     }
   }
   drawSplitGuides();
+  drawSelectedOcrCallBoxes();
 
   timeValue.textContent = `${currentTime.toFixed(2)}s / ${duration.toFixed(2)}s`;
   strokeValue.textContent = `${replayState.completedStrokeCount} / ${replayState.totalStrokeCount}`;
@@ -408,8 +443,23 @@ const renderCalls = (): void => {
   }
   for (const call of calls) {
     const div = document.createElement("div");
-    div.className = "callItem";
+    const selected = selectedOcrCallIndex === call.index;
+    div.className = `callItem selectable${selected ? " selected" : ""}`;
+    div.tabIndex = 0;
+    div.setAttribute("role", "button");
+    div.setAttribute("aria-pressed", String(selected));
+    div.title = "Toggle the CTC input bounding box for this inference";
     div.innerHTML = `<span>${call.at.toFixed(2)}s</span><span>${escapeHtml(call.content || "(empty CTC output)")}</span><span class="badge ${call.kind}">${call.kind}</span>`;
+    const toggle = (): void => {
+      selectedOcrCallIndex = selectedOcrCallIndex === call.index ? null : call.index;
+      draw();
+    };
+    div.addEventListener("click", toggle);
+    div.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      toggle();
+    });
     callList.appendChild(div);
   }
 };
@@ -494,6 +544,7 @@ async function loadFixture(name: string): Promise<void> {
   timeline.value = 0;
   replayState = emptyReplayState(fixture.strokes.strokes.length);
   classifiedUnderlines = [];
+  selectedOcrCallIndex = null;
   stateRequestSerial += 1;
   setupCanvas();
   draw();
@@ -546,6 +597,7 @@ restart.addEventListener("click", () => {
   currentTime = 0;
   timeline.value = 0;
   replayState = emptyReplayState(fixture?.strokes.strokes.length ?? 0);
+  selectedOcrCallIndex = null;
   draw();
   fetchReplayState(0, true).catch((error: Error) => {
     modelView.textContent = `Failed to reset replay state: ${error.message}`;
