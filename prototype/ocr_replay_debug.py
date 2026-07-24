@@ -20,6 +20,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 from ocr_pipeline.fixtures import is_relative_to, list_fixtures, load_fixture
+from ocr_pipeline.recognizer import load_recognizer
 from ocr_pipeline.replay import build_replay_state, clear_recognition_cache
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -134,6 +135,8 @@ def main() -> None:
             f"Frontend not built. Run: (cd {FRONTEND_DIR} && npm install && npm run build)"
         )
 
+    load_recognizer()
+    print("OCR model weights loaded.")
     ReplayHandler.fixtures_dir = fixtures_dir
     server = ThreadingHTTPServer((args.host, args.port), ReplayHandler)
     print(f"OCR replay debugger: http://{args.host}:{args.port}")
