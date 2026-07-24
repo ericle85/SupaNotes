@@ -358,19 +358,11 @@ const drawSelectedOcrCallBoxes = (): void => {
 
   ctx.save();
   ctx.strokeStyle = kindColor(call.kind);
-  ctx.fillStyle = kindColor(call.kind);
-  ctx.lineWidth = 3;
-  ctx.setLineDash([]);
-  ctx.font = "12px ui-sans-serif, system-ui";
-  for (const [boxIndex, bbox] of bboxesForCall(call).entries()) {
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 3]);
+  for (const bbox of bboxesForCall(call)) {
     const [x0, y0, x1, y1] = bbox;
-    const pad = 5;
-    ctx.globalAlpha = 0.18;
-    ctx.fillRect(x0 - pad, y0 - pad, x1 - x0 + pad * 2, y1 - y0 + pad * 2);
-    ctx.globalAlpha = 1;
-    ctx.strokeRect(x0 - pad, y0 - pad, x1 - x0 + pad * 2, y1 - y0 + pad * 2);
-    const label = bboxesForCall(call).length > 1 ? `CTC ${call.index + 1}.${boxIndex + 1}` : `CTC ${call.index + 1}`;
-    ctx.fillText(label, x0 - pad, Math.max(12, y0 - pad - 4));
+    ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
   }
   ctx.restore();
 };
@@ -396,7 +388,7 @@ const draw = (): void => {
       const [bx0, by0, bx1, by1] = group.bbox;
       ctx.save();
       ctx.strokeStyle = called ? kindColor(group.kind) : colors.pending;
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 2;
       ctx.setLineDash([4, 3]);
       ctx.strokeRect(bx0, by0, bx1 - bx0, by1 - by0);
       ctx.restore();
