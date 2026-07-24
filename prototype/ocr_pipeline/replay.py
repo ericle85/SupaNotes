@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import threading
 from functools import lru_cache
 from typing import Any
 
@@ -11,7 +10,6 @@ from .grouping import gap_guides, group_completed_strokes, normalize_fixture, re
 
 
 RecognitionResult = dict[str, Any]
-_recognition_cache_lock = threading.RLock()
 
 
 def autocomplete_for_latex(latex_text: str) -> dict[str, Any] | None:
@@ -93,20 +91,12 @@ def recognition_signature(group: dict[str, Any]) -> str:
 
 
 def recognized_group(group: dict[str, Any]) -> dict[str, Any]:
-    # functools.lru_cache is threadsafe for cache coherence, but it can still
-    # execute duplicate misses concurrently. The replay debugger uses a
-    # ThreadingHTTPServer and the frontend polls while playback is running, so
-    # the first slow CTC pass for a stroke snapshot must be serialized until the
-    # cache is populated. Otherwise the same OCR job can start several model
-    # inferences before the first result returns.
-    with _recognition_cache_lock:
-        recognition = cached_recognize_group(recognition_signature(group))
+    recognition = cached_recognize_group(recognition_signature(group))
     return {**group, **recognition}
 
 
 def clear_recognition_cache() -> None:
-    with _recognition_cache_lock:
-        cached_recognize_group.cache_clear()
+    cached_recognize_group.cache_clear()
 
 
 def block_from_group(group: dict[str, Any], index: int, fire_at: float) -> dict[str, Any]:
@@ -185,17 +175,6 @@ def ocr_call_history(
                 }
             )
     return calls
-
-
-def build_final_ocr_calls(
-    fixture: dict[str, Any], idle_seconds: float, gap_threshold: float | None = None
-) -> list[dict[str, Any]]:
-    normalized = normalize_fixture(fixture)
-    all_strokes = normalized["strokes"].get("strokes", [])
-    if not all_strokes:
-        return []
-    final_time = max(stroke["times"]["end"] for stroke in all_strokes) + idle_seconds
-    return ocr_call_history(all_strokes, final_time, idle_seconds, gap_threshold)
 
 
 def build_replay_state(

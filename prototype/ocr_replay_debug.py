@@ -15,7 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import mimetypes
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -138,7 +138,7 @@ def main() -> None:
     load_recognizer()
     print("OCR model weights loaded.")
     ReplayHandler.fixtures_dir = fixtures_dir
-    server = ThreadingHTTPServer((args.host, args.port), ReplayHandler)
+    server = HTTPServer((args.host, args.port), ReplayHandler)
     print(f"OCR replay debugger: http://{args.host}:{args.port}")
     print(f"Fixtures: {fixtures_dir}")
     try:
