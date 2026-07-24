@@ -1,11 +1,12 @@
 """Reusable OCR pipeline helpers for SupaNotes stroke fixtures."""
 
 from .fixtures import list_fixtures, load_fixture
-from .replay import build_replay_state, build_final_ocr_calls
+from .replay import build_replay_state, build_final_ocr_calls, clear_recognition_cache
 
 __all__ = [
     "build_final_ocr_calls",
     "build_replay_state",
+    "clear_recognition_cache",
     "list_fixtures",
     "load_fixture",
 ]

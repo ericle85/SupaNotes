@@ -180,23 +180,11 @@
       background: var(--bg);
     }
 
-    .timelineMarks {
-      position: relative;
-      height: 18px;
-      margin-top: -2px;
+    progress#timeline {
+      width: 100%;
+      height: 12px;
+      accent-color: var(--math);
     }
-
-    .mark {
-      position: absolute;
-      top: 0;
-      width: 2px;
-      height: 14px;
-      background: var(--pending);
-      border-radius: 999px;
-    }
-
-    .mark.math { background: var(--math); }
-    .mark.text { background: var(--text); }
 
     .callList {
       display: grid;
@@ -331,7 +319,6 @@
           </label>
           <button id="playPause" class="primary" type="button">Play</button>
           <button id="restart" type="button">Restart</button>
-          <button id="clearDrawing" type="button">Clear</button>
           <button id="toggleBoxes" type="button" aria-pressed="false">Boxes: off</button>
           <label>Speed
             <select id="speedSelect">
@@ -351,8 +338,7 @@
           </label>
         </div>
         <div>
-          <input id="timeline" type="range" min="0" max="1" step="0.01" value="0" aria-label="Replay timeline" />
-          <div id="timelineMarks" class="timelineMarks" aria-hidden="true"></div>
+          <progress id="timeline" max="1" value="0" aria-label="Replay progress"></progress>
         </div>
         <div class="status">
           <div class="stat"><div class="label">time</div><div id="timeValue" class="value">0.00s</div></div>
@@ -368,7 +354,7 @@
 
     <aside class="side">
       <section class="panel">
-        <h2>OCR calls</h2>
+        <h2>OCR inferences</h2>
         <div id="callList" class="callList"></div>
       </section>
       <section class="panel">

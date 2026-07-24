@@ -58,7 +58,7 @@ def normalize_fixture(fixture: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-UNRECOGNIZED_GROUP = {"kind": "not labeled", "content": ""}
+UNRECOGNIZED_GROUP = {"kind": "not labeled", "content": "", "confidence": 0.0, "tokens": []}
 
 
 def recognize_group(group: dict[str, Any]) -> dict[str, str]:
@@ -172,10 +172,14 @@ def gap_guides(
 
 
 def group_completed_strokes(
-    completed: list[dict[str, Any]], gap_threshold: float | None = None
+    completed: list[dict[str, Any]],
+    gap_threshold: float | None = None,
+    *,
+    recognize: bool = True,
 ) -> list[dict[str, Any]]:
     chunks: list[dict[str, Any]] = []
     for line in vertical_lines(completed):
         chunks.extend(split_line_into_chunks(line, gap_threshold))
-    enriched = [{**chunk, **recognize_group(chunk)} for chunk in chunks]
+    labels = (recognize_group(chunk) if recognize else dict(UNRECOGNIZED_GROUP) for chunk in chunks)
+    enriched = [{**chunk, **label} for chunk, label in zip(chunks, labels)]
     return sorted(enriched, key=lambda chunk: (chunk["bbox"][1], chunk["bbox"][0]))

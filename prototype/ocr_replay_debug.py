@@ -20,7 +20,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 from ocr_pipeline.fixtures import is_relative_to, list_fixtures, load_fixture
-from ocr_pipeline.replay import build_replay_state
+from ocr_pipeline.replay import build_replay_state, clear_recognition_cache
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_FIXTURES_DIR = REPO_ROOT / "prototype" / "fixtures"
@@ -31,7 +31,8 @@ class ReplayHandler(BaseHTTPRequestHandler):
     fixtures_dir: Path = DEFAULT_FIXTURES_DIR
 
     def log_message(self, format: str, *args: object) -> None:
-        print(f"{self.address_string()} - {format % args}")
+        # print(f"{self.address_string()} - {format % args}")
+        pass
 
     def send_json(self, payload: object, status: int = 200) -> None:
         body = json.dumps(payload).encode("utf-8")
@@ -73,6 +74,8 @@ class ReplayHandler(BaseHTTPRequestHandler):
             gap_value = query.get("gap", [""])[0]
             gap_threshold = parse_float(gap_value, default=0.0) if gap_value else None
             try:
+                if query.get("reset", [""])[0] in {"1", "true", "yes"}:
+                    clear_recognition_cache()
                 fixture = load_fixture(self.fixtures_dir, name)
                 self.send_json(build_replay_state(fixture, time_seconds, idle_seconds, gap_threshold))
             except ValueError as error:
@@ -88,22 +91,6 @@ class ReplayHandler(BaseHTTPRequestHandler):
         self.serve_frontend(path.lstrip("/"))
 
     def do_POST(self) -> None:  # noqa: N802
-        parsed = urlparse(self.path)
-        if parsed.path == "/api/replay_state_live":
-            length = int(self.headers.get("Content-Length", 0))
-            payload = json.loads(self.rfile.read(length) or b"{}")
-            fixture = {
-                "name": "live",
-                "strokes": payload.get("strokes", {}),
-                "truth": {"blocks": [], "expectedMarkdown": ""},
-                "truthFile": None,
-            }
-            time_seconds = parse_float(str(payload.get("time", 0)), default=0.0)
-            idle_seconds = parse_float(str(payload.get("idle", 0.8)), default=0.8)
-            gap = payload.get("gap")
-            gap_threshold = parse_float(str(gap), default=0.0) if gap not in (None, "") else None
-            self.send_json(build_replay_state(fixture, time_seconds, idle_seconds, gap_threshold))
-            return
         self.send_json({"error": "not found"}, 404)
 
     def serve_frontend(self, relative: str) -> None:

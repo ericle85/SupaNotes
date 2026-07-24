@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+import json
+import threading
+from functools import lru_cache
 from typing import Any
 
-from .grouping import gap_guides, group_completed_strokes, normalize_fixture
+from .grouping import gap_guides, group_completed_strokes, normalize_fixture, recognize_group
+
+
+RecognitionResult = dict[str, Any]
+_recognition_cache_lock = threading.RLock()
 
 
 def autocomplete_for_latex(latex_text: str) -> dict[str, Any] | None:
@@ -49,6 +56,59 @@ def last_pen_contact_before_idle(
     return contact
 
 
+def ordered_strokes(group: dict[str, Any]) -> list[dict[str, Any]]:
+    return sorted(group["strokes"], key=lambda stroke: (stroke["times"]["start"], stroke["id"]))
+
+
+def group_key(group: dict[str, Any]) -> tuple[str, ...]:
+    return tuple(stroke["id"] for stroke in ordered_strokes(group))
+
+
+@lru_cache(maxsize=1024)
+def cached_recognize_group(stroke_signature: str) -> RecognitionResult:
+    strokes = json.loads(stroke_signature)
+    return recognize_group({"strokes": strokes})
+
+
+def recognition_signature(group: dict[str, Any]) -> str:
+    """Build a stable, hashable key that also carries the stroke payload.
+
+    The replay debugger polls while playback is running. Caching by the exact
+    stroke snapshot lets each synthetic OCR job run the CTC model once instead
+    of re-running decode on every poll after the job has already fired.
+    """
+
+    return json.dumps(
+        [
+            {
+                "id": stroke.get("id", ""),
+                "points": stroke.get("points", []),
+                "times": stroke.get("times", {}),
+            }
+            for stroke in ordered_strokes(group)
+        ],
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def recognized_group(group: dict[str, Any]) -> dict[str, Any]:
+    # functools.lru_cache is threadsafe for cache coherence, but it can still
+    # execute duplicate misses concurrently. The replay debugger uses a
+    # ThreadingHTTPServer and the frontend polls while playback is running, so
+    # the first slow CTC pass for a stroke snapshot must be serialized until the
+    # cache is populated. Otherwise the same OCR job can start several model
+    # inferences before the first result returns.
+    with _recognition_cache_lock:
+        recognition = cached_recognize_group(recognition_signature(group))
+    return {**group, **recognition}
+
+
+def clear_recognition_cache() -> None:
+    with _recognition_cache_lock:
+        cached_recognize_group.cache_clear()
+
+
 def block_from_group(group: dict[str, Any], index: int, fire_at: float) -> dict[str, Any]:
     kind = group["kind"]
     stroke_ids = [stroke["id"] for stroke in ordered_strokes(group)]
@@ -79,8 +139,52 @@ def group_for_client(group: dict[str, Any], last_contact_t: float) -> dict[str, 
     }
 
 
-def ordered_strokes(group: dict[str, Any]) -> list[dict[str, Any]]:
-    return sorted(group["strokes"], key=lambda stroke: (stroke["times"]["start"], stroke["id"]))
+def idle_fire_times(strokes: list[dict[str, Any]], idle_seconds: float) -> list[float]:
+    intervals = stroke_intervals(strokes)
+    fire_times = []
+    for index, (_, end) in enumerate(intervals):
+        next_start = intervals[index + 1][0] if index + 1 < len(intervals) else None
+        if next_start is None or next_start - end >= idle_seconds:
+            fire_times.append(end + idle_seconds)
+    return fire_times
+
+
+def ocr_call_history(
+    strokes: list[dict[str, Any]],
+    time_seconds: float,
+    idle_seconds: float,
+    gap_threshold: float | None = None,
+) -> list[dict[str, Any]]:
+    """Return synthetic OCR jobs that would have fired by replay time.
+
+    Unlike the old final-call list, this never looks ahead to future strokes.
+    It samples only idle pauses that have already occurred and records a new
+    call when the stroke set for a grouped OCR target has changed.
+    """
+
+    calls = []
+    seen_snapshots: set[tuple[str, ...]] = set()
+    for fire_at in idle_fire_times(strokes, idle_seconds):
+        if fire_at > time_seconds:
+            break
+        completed_at_fire = [stroke for stroke in strokes if stroke["times"]["end"] <= fire_at]
+        for group in group_completed_strokes(completed_at_fire, gap_threshold, recognize=False):
+            key = group_key(group)
+            if key in seen_snapshots:
+                continue
+            seen_snapshots.add(key)
+            recognized = recognized_group(group)
+            calls.append(
+                {
+                    "index": len(calls),
+                    "at": round(fire_at, 3),
+                    "kind": recognized["kind"],
+                    "content": recognized["content"],
+                    "bbox": rounded_bbox(recognized["bbox"]),
+                    "strokes": list(key),
+                }
+            )
+    return calls
 
 
 def build_final_ocr_calls(
@@ -88,24 +192,10 @@ def build_final_ocr_calls(
 ) -> list[dict[str, Any]]:
     normalized = normalize_fixture(fixture)
     all_strokes = normalized["strokes"].get("strokes", [])
-    intervals = stroke_intervals(all_strokes)
-    groups = group_completed_strokes(all_strokes, gap_threshold)
-    calls = []
-    for index, group in enumerate(groups):
-        calls.append(
-            {
-                "index": index,
-                "at": round(
-                    last_pen_contact_before_idle(group["lastT"], intervals, idle_seconds)
-                    + idle_seconds,
-                    3,
-                ),
-                "kind": group["kind"],
-                "content": group["content"],
-                "bbox": rounded_bbox(group["bbox"]),
-            }
-        )
-    return sorted(calls, key=lambda call: call["at"])
+    if not all_strokes:
+        return []
+    final_time = max(stroke["times"]["end"] for stroke in all_strokes) + idle_seconds
+    return ocr_call_history(all_strokes, final_time, idle_seconds, gap_threshold)
 
 
 def build_replay_state(
@@ -119,15 +209,25 @@ def build_replay_state(
     started = [stroke for stroke in strokes if stroke["times"]["start"] <= time_seconds]
     intervals = stroke_intervals(started)
     completed = [stroke for stroke in strokes if stroke["times"]["end"] <= time_seconds]
-    groups = group_completed_strokes(completed, gap_threshold)
+    pending_groups = group_completed_strokes(completed, gap_threshold, recognize=False)
     contact_times = [
         last_pen_contact_before_idle(group["lastT"], intervals, idle_seconds)
-        for group in groups
+        for group in pending_groups
     ]
+
+    groups = []
+    block_groups = []
+    for group, contact_t in zip(pending_groups, contact_times):
+        if time_seconds >= contact_t + idle_seconds:
+            recognized = recognized_group(group)
+            groups.append(recognized)
+            block_groups.append((recognized, contact_t + idle_seconds))
+        else:
+            groups.append(group)
+
     blocks = [
-        block_from_group(group, index, contact_t + idle_seconds)
-        for index, (group, contact_t) in enumerate(zip(groups, contact_times))
-        if time_seconds >= contact_t + idle_seconds
+        block_from_group(group, index, fire_at)
+        for index, (group, fire_at) in enumerate(block_groups)
     ]
 
     document = {
@@ -145,7 +245,7 @@ def build_replay_state(
             for group, contact_t in zip(groups, contact_times)
         ],
         "blocks": blocks,
-        "calls": build_final_ocr_calls(fixture, idle_seconds, gap_threshold),
+        "calls": ocr_call_history(strokes, time_seconds, idle_seconds, gap_threshold),
         "gapGuides": gap_guides(completed, gap_threshold),
         "document": document,
     }

@@ -133,6 +133,7 @@ def recognize_group(group: dict[str, Any]) -> dict[str, Any]:
     if not strokes:
         return {"kind": "not labeled", "content": "", "confidence": 0.0, "tokens": []}
     model, vocab = load_recognizer()
+    print("Decoding for group with {} strokes...".format(len(strokes)))
     result = decode(model, vocab, strokes)
     kind = classify_kind(result["content"])
     is_math = kind == "math"
