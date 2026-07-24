@@ -8,6 +8,7 @@ from functools import lru_cache
 from typing import Any
 
 import numpy as np
+from sympy import latex
 import torch
 
 from ctc.model import CTCTransformer
@@ -29,7 +30,7 @@ TOP_K_ALTERNATIVES = 3
 
 LATEX_COMMAND = re.compile(r"\\[a-zA-Z]+")
 LATEX_MATH_COMMAND = re.compile(r"\\(frac|sqrt|sum|int|cdot|times|div|pm|leq|geq|neq|infty)")
-MATH_SYMBOL = re.compile(r"[0-9+=^_/*<>()-]")
+MATH_SYMBOL = re.compile(r"[0-9+=^_/*<>()&-]")
 WORD = re.compile(r"[A-Za-z]+")
 DOUBLED_BACKSLASH = re.compile(r"\\\\(?=[a-zA-Z])")
 
@@ -118,13 +119,13 @@ def decode(model: CTCTransformer, vocab: Vocabulary, raw_strokes: list[list[tupl
     return collapse_with_confidence(vocab, steps)
 
 
-def classify_kind(latex: str) -> str:
-    body = LATEX_COMMAND.sub(" ", latex)
-    longest_word = max((len(word) for word in WORD.findall(body)), default=0)
+def classify_kind(content: str) -> str:
+    latex_commands_removed = LATEX_COMMAND.sub(" ", content)
+    if MATH_SYMBOL.search(latex_commands_removed) or LATEX_MATH_COMMAND.search(content):
+        return "math"
+    longest_word = max((len(word) for word in WORD.findall(latex_commands_removed)), default=0)
     if longest_word >= 3:
         return "text"
-    if MATH_SYMBOL.search(body) or LATEX_MATH_COMMAND.search(latex):
-        return "math"
     return "text"
 
 
@@ -135,8 +136,9 @@ def recognize_group(group: dict[str, Any]) -> dict[str, Any]:
     model, vocab = load_recognizer()
     print("Decoding for group with {} strokes...".format(len(strokes)))
     result = decode(model, vocab, strokes)
+    print(result["confidence"], result["content"])
     kind = classify_kind(result["content"])
-    is_math = kind == "math"
+    is_math = (kind == "math")
     return {
         "kind": kind,
         "content": result["content"] if is_math else "",
