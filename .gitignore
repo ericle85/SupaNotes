@@ -129,3 +129,5 @@ skills/
 *.pt
 prototype/fixtures/
 pulled_fixtures/
+prototype/tests/router_decodes.json
+

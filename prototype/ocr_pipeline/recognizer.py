@@ -18,6 +18,7 @@ from ctc.preprocessing import normalize_strokes, extract_point_features, MAX_SEQ
 PROTOTYPE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CKPT_PATH = os.path.join(PROTOTYPE_DIR, "ctc_final.pt")
 VOCAB_PATH = os.path.join(PROTOTYPE_DIR, "vocab.json")
+ROUTER_PATH = os.path.join(PROTOTYPE_DIR, "router.joblib")
 
 D_MODEL = 256
 NHEAD = 8
@@ -145,10 +146,97 @@ def longest_letter_run(content: str) -> int:
     return max((len(run) for run in LETTER_RUN.findall(stripped)), default=0)
 
 
+def fraction(predicate, items) -> float:
+    return sum(1.0 for item in items if predicate(item)) / len(items) if items else 0.0
+
+
+def router_features(content: str, token_confidences: list[float]) -> list[float]:
+    confidences = token_confidences or [0.0]
+    ordered = sorted(confidences)
+    mean = sum(confidences) / len(confidences)
+    variance = sum((value - mean) ** 2 for value in confidences) / len(confidences)
+    quantile = lambda q: ordered[min(len(ordered) - 1, int(q * len(ordered)))]
+    letters_only = LATEX_COMMAND.sub(" ", content)
+    return [
+        mean,
+        ordered[0],
+        variance**0.5,
+        quantile(0.10),
+        quantile(0.25),
+        quantile(0.50),
+        fraction(lambda value: value < 0.5, confidences),
+        fraction(lambda value: value < 0.9, confidences),
+        min(longest_letter_run(content), 8) / 8.0,
+        fraction(str.isalpha, letters_only),
+        fraction(str.isdigit, letters_only),
+        fraction(lambda char: bool(MATH_SYMBOL.match(char)), letters_only),
+        fraction(lambda char: bool(MATH_BRACKET.match(char)), letters_only),
+        len(LATEX_COMMAND.findall(content)) / len(confidences),
+        1.0 if "=" in content else 0.0,
+        1.0 if ("_" in content or "^" in content) else 0.0,
+        1.0 if "\\frac" in content else 0.0,
+    ]
+
+
+def stroke_boxes(strokes) -> tuple:
+    arrays = [np.asarray(stroke, dtype=np.float64)[:, :2] for stroke in strokes if len(stroke) >= 2]
+    if not arrays:
+        return None
+    lows = np.array([array.min(axis=0) for array in arrays])
+    highs = np.array([array.max(axis=0) for array in arrays])
+    order = np.argsort((lows[:, 0] + highs[:, 0]) / 2)
+    return lows[order], highs[order]
+
+
+def stroke_layout_features(strokes) -> list[float]:
+    boxes = stroke_boxes(strokes)
+    if boxes is None:
+        return [0.0] * 8
+    lows, highs = boxes
+    widths, heights = highs[:, 0] - lows[:, 0], highs[:, 1] - lows[:, 1]
+    centers = (lows[:, 1] + highs[:, 1]) / 2
+    unit = float(np.median(heights)) or float(np.max(heights)) or 1.0
+    steps = np.abs(np.diff(centers)) if len(centers) > 1 else np.zeros(1)
+    overlap = np.minimum(highs[:-1, 0], highs[1:, 0]) - np.maximum(lows[:-1, 0], lows[1:, 0])
+    span = np.maximum(np.minimum(widths[:-1], widths[1:]), 1e-9)
+    return [
+        float(np.std(centers)) / unit,
+        float(np.mean(np.abs(centers - np.median(centers)) > 0.5 * unit)),
+        float(np.mean(steps)) / unit,
+        float(np.mean(overlap / span > 0.5)) if len(widths) > 1 else 0.0,
+        min(float(np.max(widths)) / unit, 20.0) / 20.0,
+        float(np.mean(widths > 2 * np.maximum(heights, 1e-9))),
+        float(np.std(heights)) / unit,
+        float(np.mean(heights < 0.5 * unit)),
+    ]
+
+
 def route_kind(content: str, confidence: float) -> str:
     if confidence < MATH_CONFIDENCE_GATE or longest_letter_run(content) >= LETTER_RUN_GATE:
         return "text"
     return classify_kind(content)
+
+
+@lru_cache(maxsize=1)
+def load_router():
+    if not os.path.exists(ROUTER_PATH):
+        return None
+    import joblib
+
+    return joblib.load(ROUTER_PATH)
+
+
+def route_group(content: str, token_confidences: list[float], strokes) -> str:
+    router = load_router()
+    if router is None:
+        mean = sum(token_confidences) / len(token_confidences) if token_confidences else 0.0
+        return route_kind(content, mean)
+    from scipy.sparse import csr_matrix, hstack
+
+    numeric = router_features(content, token_confidences) + stroke_layout_features(strokes)
+    features = hstack([router["vectorizer"].transform([content]), csr_matrix(np.array([numeric]))]).tocsr()
+    probability = router["model"].predict_proba(features)[0, 1]
+    return "math" if probability >= router["threshold"] else "text"
 
 
 def recognize_group(group: dict[str, Any]) -> dict[str, Any]:
@@ -159,7 +247,7 @@ def recognize_group(group: dict[str, Any]) -> dict[str, Any]:
     print("Decoding for group with {} strokes...".format(len(strokes)))
     result = decode(model, vocab, strokes)
     print(result["confidence"], result["content"])
-    kind = route_kind(result["content"], result["confidence"])
+    kind = route_group(result["content"], [token["confidence"] for token in result["tokens"]], strokes)
     is_math = (kind == "math")
     return {
         "kind": kind,
