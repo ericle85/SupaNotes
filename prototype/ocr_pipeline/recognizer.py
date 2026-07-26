@@ -28,11 +28,21 @@ INPUT_DIM = 6
 CONFIDENCE_THRESHOLD = 0.5
 TOP_K_ALTERNATIVES = 3
 MATH_CONFIDENCE_GATE = 0.85
+LETTER_RUN_GATE = 4
 
 LATEX_COMMAND = re.compile(r"\\[a-zA-Z]+")
 MATH_SYMBOL = re.compile(r"[0-9+=^_/*<>()&-]")
 MATH_BRACKET = re.compile(r"[\[\]:,|{}]")
 DOUBLED_BACKSLASH = re.compile(r"\\\\(?=[a-zA-Z])")
+LETTER_RUN = re.compile(r"[a-zA-Z]+")
+LATEX_ENVIRONMENT = re.compile(r"\\(?:begin|end)\{[a-zA-Z*]+\}")
+# ponytail: function names only strip at a letter boundary, so "nlog" stays a run of 4.
+# Dropping the boundary would shred English words ("along", "important"). Fix with a
+# real feature classifier if the residual misroutes matter.
+MATH_FUNCTION = re.compile(
+    r"(?<![a-zA-Z])(?:arcsin|arccos|arctan|sqrt|sinh|cosh|tanh"
+    r"|log|ln|exp|sin|cos|tan|sec|csc|cot|lim|max|min|sup|inf|det|dim|deg|gcd|mod|arg)"
+)
 
 
 @lru_cache(maxsize=1)
@@ -130,8 +140,13 @@ def classify_kind(content: str) -> str:
     return "text"
 
 
+def longest_letter_run(content: str) -> int:
+    stripped = MATH_FUNCTION.sub(" ", LATEX_COMMAND.sub(" ", LATEX_ENVIRONMENT.sub(" ", content)))
+    return max((len(run) for run in LETTER_RUN.findall(stripped)), default=0)
+
+
 def route_kind(content: str, confidence: float) -> str:
-    if confidence < MATH_CONFIDENCE_GATE:
+    if confidence < MATH_CONFIDENCE_GATE or longest_letter_run(content) >= LETTER_RUN_GATE:
         return "text"
     return classify_kind(content)
 

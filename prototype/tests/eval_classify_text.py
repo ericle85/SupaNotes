@@ -3,6 +3,7 @@ import sys
 import glob
 import contextlib
 import io
+import re
 
 import numpy as np
 
@@ -11,7 +12,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch
 
 from ctc.preprocessing import parse_inkml
-from ocr_pipeline.recognizer import load_recognizer, decode, classify_kind, route_kind, MATH_CONFIDENCE_GATE
+from ocr_pipeline.recognizer import (
+    load_recognizer,
+    decode,
+    classify_kind,
+    route_kind,
+    longest_letter_run,
+    MATH_CONFIDENCE_GATE,
+    LETTER_RUN_GATE,
+)
 
 DEEPWRITING = "/Volumes/Games/deepwriting/deepwriting_validation.npz"
 MATHWRITING = "/Volumes/Games/mathwriting/mathwriting-2024/test"
@@ -47,12 +56,28 @@ def decode_all(model, vocab, samples):
     for strokes in samples:
         with contextlib.redirect_stdout(io.StringIO()):
             result = decode(model, vocab, strokes)
-        rows.append((result["content"], result["confidence"]))
+        rows.append(result)
     return rows
 
 
-def report(name, stat):
-    print(f"{name:22} mean={stat.mean():.3f} p10={np.percentile(stat, 10):.3f} p50={np.percentile(stat, 50):.3f} p90={np.percentile(stat, 90):.3f}")
+def gate_only(row, gate, run_gate):
+    return "text" if row["confidence"] < gate else classify_kind(row["content"])
+
+
+def run_only(row, gate, run_gate):
+    return "text" if longest_letter_run(row["content"]) >= run_gate else classify_kind(row["content"])
+
+
+def gate_or_run(row, gate, run_gate):
+    if row["confidence"] < gate or longest_letter_run(row["content"]) >= run_gate:
+        return "text"
+    return classify_kind(row["content"])
+
+
+def accuracy(rule, english, math, gate, run_gate):
+    text_acc = np.mean([rule(row, gate, run_gate) == "text" for row in english])
+    math_acc = np.mean([rule(row, gate, run_gate) == "math" for row in math])
+    return text_acc, math_acc, (text_acc + math_acc) / 2
 
 
 def main():
@@ -64,35 +89,39 @@ def main():
 
     english = decode_all(model, vocab, english_samples())
     math = decode_all(model, vocab, math_samples(limit))
-
-    eng_conf = np.array([c for _, c in english])
-    math_conf = np.array([c for _, c in math])
-
     print(f"english n={len(english)}  math n={len(math)}\n")
-    report("english (deepwriting)", eng_conf)
-    report("math (mathwriting)", math_conf)
 
-    print("\nthreshold sweep:")
-    print(f"{'gate':>6} {'text caught':>12} {'math lost':>10} {'text acc':>9} {'math acc':>9} {'balanced':>9}")
-    for gate in [0.70, 0.75, 0.80, 0.85, 0.90, 0.95]:
-        eng_text = np.mean([(route_at(c, content, gate) == "text") for content, c in english])
-        math_math = np.mean([(route_at(c, content, gate) == "math") for content, c in math])
-        print(f"{gate:>6.2f} {(eng_conf < gate).mean():>11.1%} {(math_conf < gate).mean():>10.1%} {eng_text:>8.1%} {math_math:>8.1%} {(eng_text + math_math) / 2:>8.1%}")
+    print(f"{'rule':>12} {'gate':>6} {'run':>4} {'text acc':>9} {'math acc':>9} {'balanced':>9}")
+    best = None
+    for name, rule, gates, runs in [
+        ("gate", gate_only, [0.70, 0.75, 0.80, 0.85, 0.90, 0.95], [0]),
+        ("run", run_only, [0.0], [2, 3, 4, 5]),
+        ("gate+run", gate_or_run, [0.70, 0.75, 0.80, 0.85, 0.90], [3, 4, 5]),
+    ]:
+        for gate in gates:
+            for run_gate in runs:
+                text_acc, math_acc, balanced = accuracy(rule, english, math, gate, run_gate)
+                print(f"{name:>12} {gate:>6.2f} {run_gate:>4} {text_acc:>8.1%} {math_acc:>8.1%} {balanced:>8.1%}")
+                if best is None or balanced > best[0]:
+                    best = (balanced, name, gate, run_gate)
+        print()
 
-    print(f"\nwired gate = {MATH_CONFIDENCE_GATE}")
-    eng_correct = sum(route_kind(content, c) == "text" for content, c in english)
-    math_correct = sum(route_kind(content, c) == "math" for content, c in math)
-    print(f"english routed text: {eng_correct}/{len(english)} = {eng_correct / len(english):.1%}")
-    print(f"math routed math:    {math_correct}/{len(math)} = {math_correct / len(math):.1%}")
+    print(f"best: {best[1]} gate={best[2]} run={best[3]} balanced={best[0]:.1%}")
 
-    baseline = sum(classify_kind(content) == "text" for content, _ in english)
-    print(f"\nregex-only english→text (no gate): {baseline}/{len(english)} = {baseline / len(english):.1%}")
+    wired = accuracy(lambda row, g, r: route_kind(row["content"], row["confidence"]), english, math, 0, 0)
+    print(f"wired (gate={MATH_CONFIDENCE_GATE}, run={LETTER_RUN_GATE}): text {wired[0]:.1%} math {wired[1]:.1%} balanced {wired[2]:.1%}")
 
+    print("\nenglish misroutes (sample):")
+    misses = [row for row in english if route_kind(row["content"], row["confidence"]) == "math"]
+    for row in misses[:15]:
+        print(f"  {row['confidence']:.3f}  {row['content'][:70]!r}")
+    print(f"  ... {len(misses)} total")
 
-def route_at(confidence, content, gate):
-    if confidence < gate:
-        return "text"
-    return classify_kind(content)
+    print("\nmath misroutes (sample):")
+    misses = [row for row in math if route_kind(row["content"], row["confidence"]) == "text"]
+    for row in misses[:15]:
+        print(f"  {row['confidence']:.3f}  {row['content'][:70]!r}")
+    print(f"  ... {len(misses)} total")
 
 
 if __name__ == "__main__":
