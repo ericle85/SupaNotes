@@ -27,11 +27,11 @@ MAX_SEQ = 2048
 INPUT_DIM = 6
 CONFIDENCE_THRESHOLD = 0.5
 TOP_K_ALTERNATIVES = 3
+MATH_CONFIDENCE_GATE = 0.85
 
 LATEX_COMMAND = re.compile(r"\\[a-zA-Z]+")
-LATEX_MATH_COMMAND = re.compile(r"\\(frac|sqrt|sum|int|cdot|times|div|pm|leq|geq|neq|infty)")
 MATH_SYMBOL = re.compile(r"[0-9+=^_/*<>()&-]")
-WORD = re.compile(r"[A-Za-z]+")
+MATH_BRACKET = re.compile(r"[\[\]:,|{}]")
 DOUBLED_BACKSLASH = re.compile(r"\\\\(?=[a-zA-Z])")
 
 
@@ -121,12 +121,19 @@ def decode(model: CTCTransformer, vocab: Vocabulary, raw_strokes: list[list[tupl
 
 def classify_kind(content: str) -> str:
     latex_commands_removed = LATEX_COMMAND.sub(" ", content)
-    if MATH_SYMBOL.search(latex_commands_removed) or LATEX_MATH_COMMAND.search(content):
+    if (
+        LATEX_COMMAND.search(content)
+        or MATH_SYMBOL.search(latex_commands_removed)
+        or MATH_BRACKET.search(latex_commands_removed)
+    ):
         return "math"
-    longest_word = max((len(word) for word in WORD.findall(latex_commands_removed)), default=0)
-    if longest_word >= 3:
-        return "text"
     return "text"
+
+
+def route_kind(content: str, confidence: float) -> str:
+    if confidence < MATH_CONFIDENCE_GATE:
+        return "text"
+    return classify_kind(content)
 
 
 def recognize_group(group: dict[str, Any]) -> dict[str, Any]:
@@ -137,7 +144,7 @@ def recognize_group(group: dict[str, Any]) -> dict[str, Any]:
     print("Decoding for group with {} strokes...".format(len(strokes)))
     result = decode(model, vocab, strokes)
     print(result["confidence"], result["content"])
-    kind = classify_kind(result["content"])
+    kind = route_kind(result["content"], result["confidence"])
     is_math = (kind == "math")
     return {
         "kind": kind,
