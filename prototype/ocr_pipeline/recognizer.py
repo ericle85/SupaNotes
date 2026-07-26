@@ -11,14 +11,14 @@ import numpy as np
 from sympy import latex
 import torch
 
-from ctc.model import CTCTransformer
-from ctc.dataset import Vocabulary, BLANK_TOKEN
-from ctc.preprocessing import normalize_strokes, extract_point_features, MAX_SEQ_LEN
+from ocr_pipeline.ctc.model import CTCTransformer
+from ocr_pipeline.ctc.dataset import Vocabulary, BLANK_TOKEN
+from ocr_pipeline.ctc.preprocessing import normalize_strokes, extract_point_features, MAX_SEQ_LEN
 
-PROTOTYPE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CKPT_PATH = os.path.join(PROTOTYPE_DIR, "ctc_final.pt")
-VOCAB_PATH = os.path.join(PROTOTYPE_DIR, "vocab.json")
-ROUTER_PATH = os.path.join(PROTOTYPE_DIR, "router.joblib")
+MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
+CKPT_PATH = os.path.join(MODELS_DIR, "ctc_final.pt")
+VOCAB_PATH = os.path.join(MODELS_DIR, "vocab.json")
+ROUTER_PATH = os.path.join(MODELS_DIR, "router.joblib")
 
 D_MODEL = 256
 NHEAD = 8
@@ -226,6 +226,7 @@ def load_router():
     return joblib.load(ROUTER_PATH)
 
 
+# TODO: Check if we can do this without the confidence per token and we use the logits instead.
 def route_group(content: str, token_confidences: list[float], strokes) -> str:
     router = load_router()
     if router is None:

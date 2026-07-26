@@ -13,7 +13,7 @@ from ocr_pipeline.recognizer import ROUTER_PATH, router_features, stroke_layout_
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CACHE = os.path.join(HERE, "router_decodes.json")
-EXPORT = os.path.join(os.path.dirname(HERE), "router_weights.json")
+EXPORT = os.path.join(os.path.dirname(HERE), "ocr_pipeline", "models", "router_weights.json")
 
 
 def character_ngrams(content, low, high):

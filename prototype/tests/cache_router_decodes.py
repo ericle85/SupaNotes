@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import torch
 
-from ctc.preprocessing import parse_inkml
+from ocr_pipeline.ctc.preprocessing import parse_inkml
 from ocr_pipeline.recognizer import load_recognizer, decode
 
 DEEPWRITING = "/Volumes/Games/deepwriting/deepwriting_{}.npz"

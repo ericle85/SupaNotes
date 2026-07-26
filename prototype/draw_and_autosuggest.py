@@ -4,14 +4,14 @@ import tkinter as tk
 import numpy as np
 import torch
 
-from ctc.model import CTCTransformer
-from ctc.dataset import Vocabulary, BLANK_TOKEN
-from ctc.preprocessing import normalize_strokes, extract_point_features, MAX_SEQ_LEN
+from ocr_pipeline.ctc.model import CTCTransformer
+from ocr_pipeline.ctc.dataset import Vocabulary, BLANK_TOKEN
+from ocr_pipeline.ctc.preprocessing import normalize_strokes, extract_point_features, MAX_SEQ_LEN
 from autocomplete.autocomplete_pipeline import run_autocomplete_on_document_text
 
-PROTOTYPE_DIR = os.path.dirname(os.path.abspath(__file__))
-CKPT_PATH = os.path.join(PROTOTYPE_DIR, "ctc_final.pt")
-VOCAB_PATH = os.path.join(PROTOTYPE_DIR, "vocab.json")
+MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ocr_pipeline", "models")
+CKPT_PATH = os.path.join(MODELS_DIR, "ctc_final.pt")
+VOCAB_PATH = os.path.join(MODELS_DIR, "vocab.json")
 
 D_MODEL = 256
 NHEAD = 8

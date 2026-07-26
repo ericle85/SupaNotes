@@ -16,7 +16,7 @@ from ocr_pipeline.recognizer import router_features, route_kind
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CACHE = os.path.join(HERE, "router_decodes.json")
-MODEL = os.path.join(os.path.dirname(HERE), "router.joblib")
+MODEL = os.path.join(os.path.dirname(HERE), "ocr_pipeline", "models", "router.joblib")
 
 REGULARIZATIONS = [2.0, 5.0, 10.0]
 THRESHOLDS = np.arange(0.25, 0.80, 0.025)
