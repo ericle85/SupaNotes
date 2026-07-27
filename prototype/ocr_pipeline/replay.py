@@ -6,10 +6,15 @@ import json
 from functools import lru_cache
 from typing import Any
 
-from .grouping import gap_guides, group_completed_strokes, normalize_fixture, recognize_group
-
+from .grouping import (
+    gap_guides,
+    group_completed_strokes,
+    normalize_fixture,
+    recognize_group,
+)
 
 RecognitionResult = dict[str, Any]
+ERASE_EVENT_KINDS = {"eraseStroke", "eraseStrokes", "deleteStroke", "deleteStrokes"}
 
 
 def autocomplete_for_latex(latex_text: str) -> dict[str, Any] | None:
@@ -27,7 +32,9 @@ def autocomplete_for_latex(latex_text: str) -> dict[str, Any] | None:
         "operation": result.classified_intent.operation.name,
         "suggestion": suggestion.suggested_text if suggestion.has_suggestion else "",
         "reason": suggestion.diagnostic_reason,
-        "ghostText": {"text": ghost.text, "placement": ghost.placement} if ghost else None,
+        "ghostText": (
+            {"text": ghost.text, "placement": ghost.placement} if ghost else None
+        ),
     }
 
 
@@ -39,6 +46,60 @@ def stroke_intervals(strokes: list[dict[str, Any]]) -> list[tuple[float, float]]
     return sorted(
         (stroke["times"]["start"], stroke["times"]["end"]) for stroke in strokes
     )
+
+
+def fixture_events(fixture: dict[str, Any]) -> list[dict[str, Any]]:
+    strokes_container = fixture.get("strokes", {})
+    events = []
+    if isinstance(strokes_container, dict):
+        events.extend(strokes_container.get("events", []))
+    events.extend(fixture.get("events", []))
+    return events
+
+
+def event_time(event: dict[str, Any]) -> float:
+    return float(event.get("at", event.get("t", event.get("time", 0.0))))
+
+
+def event_kind(event: dict[str, Any]) -> str:
+    return str(event.get("kind", event.get("type", event.get("action", ""))))
+
+
+def event_stroke_ids(event: dict[str, Any]) -> list[str]:
+    stroke_ids = event.get(
+        "strokes", event.get("strokeIds", event.get("strokeIDs", []))
+    )
+    if isinstance(stroke_ids, str):
+        return [stroke_ids]
+    if not stroke_ids:
+        stroke_id = event.get("strokeId", event.get("strokeID"))
+        return [stroke_id] if isinstance(stroke_id, str) else []
+    return [stroke_id for stroke_id in stroke_ids if isinstance(stroke_id, str)]
+
+
+def erased_stroke_ids_at(events: list[dict[str, Any]], time_seconds: float) -> set[str]:
+    erased: set[str] = set()
+    for event in events:
+        if event_time(event) > time_seconds:
+            continue
+        if event_kind(event) in ERASE_EVENT_KINDS:
+            erased.update(event_stroke_ids(event))
+    return erased
+
+
+def active_strokes_at(
+    strokes: list[dict[str, Any]],
+    events: list[dict[str, Any]],
+    time_seconds: float,
+    *,
+    time_key: str,
+) -> list[dict[str, Any]]:
+    erased = erased_stroke_ids_at(events, time_seconds)
+    return [
+        stroke
+        for stroke in strokes
+        if stroke["id"] not in erased and stroke["times"][time_key] <= time_seconds
+    ]
 
 
 def last_pen_contact_before_idle(
@@ -55,7 +116,9 @@ def last_pen_contact_before_idle(
 
 
 def ordered_strokes(group: dict[str, Any]) -> list[dict[str, Any]]:
-    return sorted(group["strokes"], key=lambda stroke: (stroke["times"]["start"], stroke["id"]))
+    return sorted(
+        group["strokes"], key=lambda stroke: (stroke["times"]["start"], stroke["id"])
+    )
 
 
 def group_key(group: dict[str, Any]) -> tuple[str, ...]:
@@ -99,7 +162,9 @@ def clear_recognition_cache() -> None:
     cached_recognize_group.cache_clear()
 
 
-def block_from_group(group: dict[str, Any], index: int, fire_at: float) -> dict[str, Any]:
+def block_from_group(
+    group: dict[str, Any], index: int, fire_at: float
+) -> dict[str, Any]:
     kind = group["kind"]
     stroke_ids = [stroke["id"] for stroke in ordered_strokes(group)]
     latex = group["content"] if kind == "math" else ""
@@ -144,6 +209,7 @@ def ocr_call_history(
     time_seconds: float,
     idle_seconds: float,
     gap_threshold: float | None = None,
+    events: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Return synthetic OCR jobs that would have fired by replay time.
 
@@ -154,11 +220,14 @@ def ocr_call_history(
 
     calls = []
     seen_snapshots: set[tuple[str, ...]] = set()
+    events = events or []
     for fire_at in idle_fire_times(strokes, idle_seconds):
         if fire_at > time_seconds:
             break
-        completed_at_fire = [stroke for stroke in strokes if stroke["times"]["end"] <= fire_at]
-        for group in group_completed_strokes(completed_at_fire, gap_threshold, recognize=False):
+        completed_at_fire = active_strokes_at(strokes, events, fire_at, time_key="end")
+        for group in group_completed_strokes(
+            completed_at_fire, gap_threshold, recognize=False
+        ):
             key = group_key(group)
             if key in seen_snapshots:
                 continue
@@ -185,9 +254,10 @@ def build_replay_state(
 ) -> dict[str, Any]:
     normalized = normalize_fixture(fixture)
     strokes = normalized["strokes"].get("strokes", [])
-    started = [stroke for stroke in strokes if stroke["times"]["start"] <= time_seconds]
+    events = fixture_events(normalized)
+    started = active_strokes_at(strokes, events, time_seconds, time_key="start")
     intervals = stroke_intervals(started)
-    completed = [stroke for stroke in strokes if stroke["times"]["end"] <= time_seconds]
+    completed = active_strokes_at(strokes, events, time_seconds, time_key="end")
     pending_groups = group_completed_strokes(completed, gap_threshold, recognize=False)
     contact_times = [
         last_pen_contact_before_idle(group["lastT"], intervals, idle_seconds)
@@ -224,7 +294,9 @@ def build_replay_state(
             for group, contact_t in zip(groups, contact_times)
         ],
         "blocks": blocks,
-        "calls": ocr_call_history(strokes, time_seconds, idle_seconds, gap_threshold),
+        "calls": ocr_call_history(
+            strokes, time_seconds, idle_seconds, gap_threshold, events
+        ),
         "gapGuides": gap_guides(completed, gap_threshold),
         "document": document,
     }
