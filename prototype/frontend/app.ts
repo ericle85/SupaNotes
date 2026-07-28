@@ -74,6 +74,7 @@ interface Autocomplete {
 interface Block {
   strokes: string[];
   kind: Kind;
+  bbox: Bbox;
   latex?: string;
   text?: string;
   autocomplete?: Autocomplete | null;
@@ -127,7 +128,7 @@ const timeValue = byId<HTMLDivElement>("timeValue");
 const strokeValue = byId<HTMLDivElement>("strokeValue");
 const groupValue = byId<HTMLDivElement>("groupValue");
 const blockValue = byId<HTMLDivElement>("blockValue");
-const modelView = byId<HTMLPreElement>("modelView");
+const spatialPage = byId<HTMLDivElement>("spatialPage");
 const callList = byId<HTMLDivElement>("callList");
 const autocompleteList = byId<HTMLDivElement>("autocompleteList");
 const ocrTooltip = byId<HTMLDivElement>("ocrTooltip");
@@ -313,6 +314,36 @@ const drawSelectedOcrCallBoxes = (): void => {
   ctx.restore();
 };
 
+const renderSpatialPage = (): void => {
+  const cw = fixture?.canvasInfo?.width || 612;
+  const ch = fixture?.canvasInfo?.height || 792;
+  spatialPage.style.aspectRatio = `${cw} / ${ch}`;
+  spatialPage.innerHTML = "";
+
+  const recognized = replayState.blocks.filter(
+    (block) => block.kind === "math" || block.kind === "text"
+  );
+  if (!recognized.length) return;
+
+  for (const block of recognized) {
+    const [x0, y0, , y1] = block.bbox;
+    const content = block.latex || block.text || "";
+    if (!content) continue;
+
+    const span = document.createElement("span");
+    span.textContent = content;
+    span.style.position = "absolute";
+    span.style.left = `${(x0 / cw) * 100}%`;
+    span.style.top = `${(((y0 + y1) / 2) / ch) * 100}%`;
+    span.style.transform = "translateY(-50%)";
+    span.style.fontSize = "12px";
+    span.style.fontFamily = "monospace";
+    span.style.whiteSpace = "pre";
+    span.style.color = kindColor(block.kind as Kind);
+    spatialPage.appendChild(span);
+  }
+};
+
 const draw = (): void => {
   if (!fixture) return;
   const width = fixture.canvasInfo.width || 612;
@@ -346,7 +377,7 @@ const draw = (): void => {
   strokeValue.textContent = `${replayState.completedStrokeCount} / ${replayState.totalStrokeCount}`;
   groupValue.textContent = String(replayState.groups.length);
   blockValue.textContent = String(replayState.blocks.length);
-  modelView.textContent = JSON.stringify(replayState.document, null, 2);
+  renderSpatialPage();
   renderCalls();
   renderAutocomplete();
 };
@@ -430,7 +461,7 @@ const requestReplayState = (force?: boolean): void => {
   replayStateFetchInFlight = true;
   fetchReplayState(currentTime)
     .catch((error: Error) => {
-      modelView.textContent = `Failed to build replay state: ${error.message}`;
+      spatialPage.textContent = `Failed to build replay state: ${error.message}`;
     })
     .finally(() => {
       replayStateFetchInFlight = false;
@@ -504,7 +535,7 @@ async function init(): Promise<void> {
 fixtureSelect.addEventListener("change", () => loadFixture(fixtureSelect.value));
 idleInput.addEventListener("input", () => {
   fetchReplayState(currentTime).catch((error: Error) => {
-    modelView.textContent = `Failed to build replay state: ${error.message}`;
+    spatialPage.textContent = `Failed to build replay state: ${error.message}`;
   });
 });
 playPause.addEventListener("click", () => {
@@ -530,7 +561,7 @@ restart.addEventListener("click", () => {
   selectedOcrCallIndex = null;
   draw();
   fetchReplayState(0, true).catch((error: Error) => {
-    modelView.textContent = `Failed to reset replay state: ${error.message}`;
+    spatialPage.textContent = `Failed to reset replay state: ${error.message}`;
   });
 });
 
@@ -644,7 +675,7 @@ canvas.addEventListener(
 window.addEventListener("resize", draw);
 
 init().catch((error: Error) => {
-  modelView.textContent = `Failed to load fixtures: ${error.message}`;
+  spatialPage.textContent = `Failed to load fixtures: ${error.message}`;
 });
 
 export {};

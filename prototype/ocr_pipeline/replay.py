@@ -10,6 +10,7 @@ from .grouping import (
     group_completed_strokes,
     normalize_fixture,
     recognize_group,
+    render_spatial_text,
 )
 
 RecognitionResult = dict[str, Any]
@@ -209,28 +210,21 @@ def ocr_call_history(
     idle_seconds: float,
     events: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Return synthetic OCR jobs that would have fired by replay time.
-
-    Unlike the old final-call list, this never looks ahead to future strokes.
-    It samples only idle pauses that have already occurred and records a new
-    call when the stroke set for a grouped OCR target has changed.
-    """
-
-    calls = []
-    seen_snapshots: set[tuple[str, ...]] = set()
+    calls: list[dict[str, Any]] = []
+    stamped_ids: set[str] = set()
     events = events or []
+
     for fire_at in idle_fire_times(strokes, idle_seconds):
         if fire_at > time_seconds:
             break
-        completed_at_fire = active_strokes_at(strokes, events, fire_at, time_key="end")
-        for group in group_completed_strokes(
-            completed_at_fire, recognize=False
-        ):
-            key = group_key(group)
-            if key in seen_snapshots:
-                continue
-            seen_snapshots.add(key)
+        completed = active_strokes_at(strokes, events, fire_at, time_key="end")
+        unstamped = [s for s in completed if s["id"] not in stamped_ids]
+        if not unstamped:
+            continue
+        for group in group_completed_strokes(unstamped, recognize=False):
             recognized = recognized_group(group)
+            for stroke in group["strokes"]:
+                stamped_ids.add(stroke["id"])
             calls.append(
                 {
                     "index": len(calls),
@@ -238,10 +232,35 @@ def ocr_call_history(
                     "kind": recognized["kind"],
                     "content": recognized["content"],
                     "bbox": rounded_bbox(recognized["bbox"]),
-                    "strokes": list(key),
+                    "strokes": [s["id"] for s in ordered_strokes(group)],
                 }
             )
     return calls
+
+
+def build_stamps(
+    strokes: list[dict[str, Any]],
+    events: list[dict[str, Any]],
+    time_seconds: float,
+    idle_seconds: float,
+) -> tuple[list[tuple[dict[str, Any], float]], set[str]]:
+    stamps: list[tuple[dict[str, Any], float]] = []
+    stamped_ids: set[str] = set()
+
+    for fire_at in idle_fire_times(strokes, idle_seconds):
+        if fire_at > time_seconds:
+            break
+        completed = active_strokes_at(strokes, events, fire_at, time_key="end")
+        unstamped = [s for s in completed if s["id"] not in stamped_ids]
+        if not unstamped:
+            continue
+        for group in group_completed_strokes(unstamped, recognize=False):
+            recognized = recognized_group(group)
+            stamps.append((recognized, fire_at))
+            for stroke in group["strokes"]:
+                stamped_ids.add(stroke["id"])
+
+    return stamps, stamped_ids
 
 
 def build_replay_state(
@@ -252,42 +271,59 @@ def build_replay_state(
     normalized = normalize_fixture(fixture)
     strokes = normalized["strokes"].get("strokes", [])
     events = fixture_events(normalized)
+    canvas_info = normalized.get("canvasInfo", {"width": 612, "height": 792})
+
+    stamps, stamped_ids = build_stamps(
+        strokes, events, time_seconds, idle_seconds
+    )
+
     started = active_strokes_at(strokes, events, time_seconds, time_key="start")
     intervals = stroke_intervals(started)
     completed = active_strokes_at(strokes, events, time_seconds, time_key="end")
-    pending_groups = group_completed_strokes(completed, recognize=False)
-    contact_times = [
+
+    unstamped = [s for s in completed if s["id"] not in stamped_ids]
+    pending_groups = group_completed_strokes(unstamped, recognize=False)
+
+    contact_times_pending = [
         last_pen_contact_before_idle(group["lastT"], intervals, idle_seconds)
         for group in pending_groups
     ]
 
-    groups = []
-    block_groups = []
-    for group, contact_t in zip(pending_groups, contact_times):
-        if time_seconds >= contact_t + idle_seconds:
-            recognized = recognized_group(group)
-            groups.append(recognized)
-            block_groups.append((recognized, contact_t + idle_seconds))
-        else:
-            groups.append(group)
+    all_groups = []
+    all_contact_times = []
+
+    for recognized, fire_at in stamps:
+        all_groups.append(recognized)
+        all_contact_times.append(fire_at - idle_seconds)
+
+    for group, contact_t in zip(pending_groups, contact_times_pending):
+        all_groups.append(group)
+        all_contact_times.append(contact_t)
 
     blocks = [
-        block_from_group(group, index, fire_at)
-        for index, (group, fire_at) in enumerate(block_groups)
+        block_from_group(recognized, index, fire_at)
+        for index, (recognized, fire_at) in enumerate(stamps)
     ]
+
+    spatial_text = render_spatial_text(
+        [recognized for recognized, _ in stamps],
+        canvas_width=float(canvas_info.get("width", 612)),
+        canvas_height=float(canvas_info.get("height", 792)),
+    )
 
     document = {
         "pageId": normalized["name"],
         "time": round(time_seconds, 2),
         "idleTriggerSeconds": idle_seconds,
         "blocks": blocks,
+        "spatialText": spatial_text,
     }
     return {
         "completedStrokeCount": len(completed),
         "totalStrokeCount": len(strokes),
         "groups": [
             group_for_client(group, contact_t)
-            for group, contact_t in zip(groups, contact_times)
+            for group, contact_t in zip(all_groups, all_contact_times)
         ],
         "blocks": blocks,
         "calls": ocr_call_history(

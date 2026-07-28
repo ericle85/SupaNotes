@@ -20,9 +20,9 @@ def read_json(path: Path) -> Any:
 
 def list_fixtures(fixtures_dir: Path) -> list[dict[str, object]]:
     items: list[dict[str, object]] = []
-    for case_dir in sorted(fixtures_dir.glob("case_*")):
+    for case_dir in sorted(d for d in fixtures_dir.iterdir() if d.is_dir()):
         strokes_path = case_dir / "strokes.json"
-        if not case_dir.is_dir() or not strokes_path.exists():
+        if not strokes_path.exists():
             continue
         strokes = read_json(strokes_path)
         stroke_items = strokes.get("strokes", []) if isinstance(strokes, dict) else []
