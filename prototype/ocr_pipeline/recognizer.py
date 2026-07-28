@@ -8,7 +8,6 @@ from functools import lru_cache
 from typing import Any
 
 import numpy as np
-from sympy import latex
 import torch
 
 from ocr_pipeline.ctc.model import CTCTransformer
@@ -29,7 +28,6 @@ NUM_LAYERS = 6
 DIM_FF = 1024
 MAX_SEQ = 2048
 INPUT_DIM = 6
-CONFIDENCE_THRESHOLD = 0.5
 TOP_K_ALTERNATIVES = 3
 MATH_CONFIDENCE_GATE = 0.85
 LETTER_RUN_GATE = 4
@@ -81,16 +79,6 @@ def strokes_in_writing_order(strokes: list[dict[str, Any]]) -> list[list[tuple[f
         if len(points) >= 2:
             result.append(points)
     return result
-
-
-def collapse_repeats(vocab: Vocabulary, predictions: list[int]) -> str:
-    tokens = []
-    previous = -1
-    for token in predictions:
-        if token != previous and token != BLANK_TOKEN:
-            tokens.append(vocab.idx2tok.get(token, "?"))
-        previous = token
-    return "".join(tokens)
 
 
 def step_alternatives(vocab: Vocabulary, step_probs: Any, chosen: int) -> list[dict[str, Any]]:

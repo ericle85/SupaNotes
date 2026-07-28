@@ -13,10 +13,3 @@ def build_context_for_last_line(parsed_lines: list[ParsedLine]) -> DocumentConte
         current_line=parsed_lines[-1],
         preceding_lines=parsed_lines[:-1],
     )
-
-
-def build_context_at_index(parsed_lines: list[ParsedLine], line_index: int) -> DocumentContext:
-    return DocumentContext(
-        current_line=parsed_lines[line_index],
-        preceding_lines=parsed_lines[:line_index],
-    )

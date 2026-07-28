@@ -6,9 +6,9 @@ import glob
 import json
 import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional
 
 
 # Special tokens

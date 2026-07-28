@@ -128,10 +128,6 @@ def ordered_strokes(group: dict[str, Any]) -> list[dict[str, Any]]:
     )
 
 
-def group_key(group: dict[str, Any]) -> tuple[str, ...]:
-    return tuple(stroke["id"] for stroke in ordered_strokes(group))
-
-
 @lru_cache(maxsize=1024)
 def cached_recognize_group(stroke_signature: str) -> RecognitionResult:
     strokes = json.loads(stroke_signature)
@@ -211,37 +207,19 @@ def idle_fire_times(strokes: list[dict[str, Any]], idle_seconds: float) -> list[
     return fire_times
 
 
-def ocr_call_history(
-    strokes: list[dict[str, Any]],
-    time_seconds: float,
-    idle_seconds: float,
-    events: list[dict[str, Any]] | None = None,
-) -> list[dict[str, Any]]:
+def ocr_call_history(log: list[dict[str, Any]]) -> list[dict[str, Any]]:
     calls: list[dict[str, Any]] = []
-    stamped_ids: set[str] = set()
-    events = events or []
-
-    for fire_at in idle_fire_times(strokes, idle_seconds):
-        if fire_at > time_seconds:
-            break
-        completed = active_strokes_at(strokes, events, fire_at, time_key="end")
-        unstamped = [s for s in completed if s["id"] not in stamped_ids]
-        if not unstamped:
-            continue
-        for group in group_completed_strokes(unstamped, recognize=False):
-            recognized = recognized_group(group)
-            for stroke in group["strokes"]:
-                stamped_ids.add(stroke["id"])
-            calls.append(
-                {
-                    "index": len(calls),
-                    "at": round(fire_at, 3),
-                    "kind": recognized["kind"],
-                    "content": recognized["content"],
-                    "bbox": rounded_bbox(recognized["bbox"]),
-                    "strokes": [s["id"] for s in ordered_strokes(group)],
-                }
-            )
+    for index, entry in enumerate(log):
+        calls.append(
+            {
+                "index": index,
+                "at": round(entry["firedAt"], 3),
+                "kind": entry["kind"],
+                "content": entry["content"],
+                "bbox": rounded_bbox(entry["bbox"]),
+                "strokes": [stroke["id"] for stroke in ordered_strokes(entry)],
+            }
+        )
     return calls
 
 
@@ -379,8 +357,6 @@ def build_replay_state(
             for group, contact_t in zip(all_groups, all_contact_times)
         ],
         "blocks": blocks,
-        "calls": ocr_call_history(
-            strokes, time_seconds, idle_seconds, events
-        ),
+        "calls": ocr_call_history(log),
         "document": document,
     }

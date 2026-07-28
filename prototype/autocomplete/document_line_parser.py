@@ -60,8 +60,3 @@ def parse_single_line(line_text: str) -> ParsedLine:
 def parse_document_text(document_text: str) -> list[ParsedLine]:
     non_empty_lines = [line for line in document_text.splitlines() if line.strip()]
     return [parse_single_line(line) for line in non_empty_lines]
-
-
-def read_document_lines_from_file(file_path: str) -> list[ParsedLine]:
-    with open(file_path, "r") as document_file:
-        return parse_document_text(document_file.read())

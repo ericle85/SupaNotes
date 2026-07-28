@@ -5,14 +5,12 @@ from sympy.core.alphabets import greeks
 
 from autocomplete.document_context_model import DocumentContext
 from autocomplete.document_line_parser import ParsedEquation, ParsedExpression, UnparsableLine
-from autocomplete.math_operations import ClassifiedIntent, MathOperation
+from autocomplete.math_operations import MathOperation
 from autocomplete.math_engine import (
     equation_solving,
     expression_transforms,
     calculus,
     complex_numbers,
-    linear_algebra,
-    transforms,
 )
 
 
@@ -34,10 +32,7 @@ class SuggestedNextLine:
         return self.diagnostic_reason == ""
 
 
-def generate_next_line(context: DocumentContext, intent: ClassifiedIntent) -> SuggestedNextLine:
-    # intent is currently unused: the stub classifier is too coarse, so the CAS
-    # resolves the real operation from the line's math structure. Re-introduce
-    # when a real intent model can override _resolve_operation.
+def generate_next_line(context: DocumentContext) -> SuggestedNextLine:
     line = context.current_line
     if isinstance(line, UnparsableLine):
         return SuggestedNextLine("", MathOperation.SIMPLIFY_EXPRESSION, line.parse_error_description)
@@ -285,12 +280,6 @@ _expression_single_arg = {
     MathOperation.COMPUTE_MAGNITUDE: complex_numbers.compute_magnitude,
     MathOperation.COMPUTE_PHASE: complex_numbers.compute_phase_angle,
     MathOperation.EULER_FORM: complex_numbers.express_in_euler_form,
-    MathOperation.COMPUTE_DETERMINANT: linear_algebra.compute_determinant,
-    MathOperation.COMPUTE_INVERSE: linear_algebra.compute_inverse_matrix,
-    MathOperation.COMPUTE_EIGENVALUES: linear_algebra.compute_eigenvalues,
-    MathOperation.LAPLACE_TRANSFORM: transforms.compute_laplace_transform,
-    MathOperation.INVERSE_LAPLACE: transforms.compute_inverse_laplace_transform,
-    MathOperation.FOURIER_TRANSFORM: transforms.compute_fourier_transform,
 }
 
 
@@ -333,9 +322,6 @@ def _execute_expression(line: ParsedExpression, operation: MathOperation) -> Sug
     single_arg_func = _expression_single_arg.get(operation)
     if single_arg_func is not None:
         return SuggestedNextLine(single_arg_func(line), operation)
-    if operation == MathOperation.RREF_STEP:
-        step = linear_algebra.generate_next_rref_step(line)
-        return SuggestedNextLine(step.resulting_matrix_text, operation)
     calculus_func = _calculus_ops.get(operation)
     if calculus_func is not None:
         return SuggestedNextLine(calculus_func(line, _get_variable_name(line.expression)), operation)

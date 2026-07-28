@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import joblib
 
-from ocr_pipeline.recognizer import ROUTER_PATH, router_features, stroke_layout_features
+from ocr_pipeline.recognizer import ROUTER_PATH, router_features
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CACHE = os.path.join(HERE, "router_decodes.json")

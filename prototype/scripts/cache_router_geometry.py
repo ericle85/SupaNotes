@@ -5,7 +5,7 @@ import json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ocr_pipeline.recognizer import stroke_layout_features
-from tests.cache_router_decodes import english_samples, math_samples, CACHE
+from scripts.cache_router_decodes import english_samples, math_samples, CACHE
 
 
 def main():

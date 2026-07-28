@@ -1,6 +1,5 @@
 import os
 from dataclasses import dataclass
-from typing import Optional
 import pytest
 from autocomplete.autocomplete_pipeline import run_autocomplete_on_document_text
 

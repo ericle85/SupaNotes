@@ -33,16 +33,6 @@ class MathOperation(Enum):
     COMPUTE_PHASE = auto()
     EULER_FORM = auto()
     
-    # Linear algebra
-    RREF_STEP = auto()
-    COMPUTE_DETERMINANT = auto()
-    COMPUTE_INVERSE = auto()
-    COMPUTE_EIGENVALUES = auto()
-    
-    # Transforms
-    LAPLACE_TRANSFORM = auto()
-    INVERSE_LAPLACE = auto()
-    FOURIER_TRANSFORM = auto()
 
 
 @dataclass(frozen=True)

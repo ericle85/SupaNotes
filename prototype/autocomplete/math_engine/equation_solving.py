@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 from sympy import (
-    Add, Expr, Integer, Symbol, S, solveset,
+    Add, Expr, Symbol, S, solveset,
     sin, cos, tan, exp, log, sqrt,
     asin, acos, atan, E,
 )
