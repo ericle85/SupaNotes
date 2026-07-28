@@ -37,7 +37,7 @@ struct ContentView: View {
     private func saveOCRFixture() {
         do {
             let directoryURL = try canvasController.saveOCRFixture()
-            let savedFiles = "Saved strokes.json, rendered.png, truth_template.json, and notes.md to:"
+            let savedFiles = "Saved strokes.json, rendered.png, and notes.md to:"
             exportAlert = ExportAlert(
                 title: "OCR Fixture Saved",
                 message: "\(savedFiles)\n\n\(directoryURL.path)"

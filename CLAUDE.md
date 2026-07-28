@@ -1,14 +1,14 @@
-Making a handwriting notetaking app for ipad. App isn't in production yet, so don't worry about breaking changes or backwards compatibility. 
+App isn't in production yet, so don't worry about breaking changes or backwards compatibility. 
 
-Rules:
-    How we write code
+General Coding Rules:
     - Prioritize simple code
-    - Write in single thread
+    - No inline code (things like loops, if statements, etc should be expanded out)
+    - No Ternary Operator
+    - Single thread
     - Functional programming
     - Zero comments to be written
-    - File names and class names must be explicit and word-for-word describe what they do, readable by non-coders at a glance (e.g. StrokeInputSource, not InputView)
+    - File names and class names must be explicit and word-for-word describe what they do, readable by non-coders at a glance
     
-    Swift lint & swift format commands to be run after all changes are made.
-
-After every change, you are to:
-- Build on ipad air 11 inch (M3)
+Swift: 
+    - Swift lint & swift format commands to be run after all changes are made.
+    After every change done, you are to Build on ipad air 11 inch (M3)

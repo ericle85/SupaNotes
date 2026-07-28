@@ -6,9 +6,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-TRUTH_FILENAMES = ("truth.json", "template.json", "truth_template.json")
-
-
 def is_relative_to(path: Path, parent: Path) -> bool:
     try:
         path.relative_to(parent)
@@ -19,14 +16,6 @@ def is_relative_to(path: Path, parent: Path) -> bool:
 
 def read_json(path: Path) -> Any:
     return json.loads(path.read_text())
-
-
-def truth_path(case_dir: Path) -> Path | None:
-    for filename in TRUTH_FILENAMES:
-        candidate = case_dir / filename
-        if candidate.exists():
-            return candidate
-    return None
 
 
 def list_fixtures(fixtures_dir: Path) -> list[dict[str, object]]:
@@ -41,7 +30,6 @@ def list_fixtures(fixtures_dir: Path) -> list[dict[str, object]]:
             {
                 "name": case_dir.name,
                 "strokeCount": len(stroke_items),
-                "hasTruth": truth_path(case_dir) is not None,
             }
         )
     return items
@@ -58,11 +46,7 @@ def load_fixture(fixtures_dir: Path, name: str) -> dict[str, object]:
     if not strokes_path.exists():
         raise ValueError("fixture not found")
 
-    template_path = truth_path(case_dir)
-    truth = read_json(template_path) if template_path else {"blocks": [], "expectedMarkdown": ""}
     return {
         "name": safe_name,
         "strokes": read_json(strokes_path),
-        "truth": truth,
-        "truthFile": template_path.name if template_path else None,
     }

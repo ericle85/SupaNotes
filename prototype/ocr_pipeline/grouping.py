@@ -31,29 +31,15 @@ def bbox_union(left: BBox | None, right: BBox | None) -> BBox | None:
 
 
 def normalize_fixture(fixture: dict[str, Any]) -> dict[str, Any]:
-    truth = fixture.get("truth") or {"blocks": [], "expectedMarkdown": ""}
-    truth_by_stroke: dict[str, dict[str, Any]] = {}
-    for block in truth.get("blocks", []):
-        for stroke_id in block.get("strokes", []):
-            truth_by_stroke[stroke_id] = block
-
     strokes_container = fixture.get("strokes", {})
     strokes = []
     for stroke in strokes_container.get("strokes", []):
-        stroke_id = stroke.get("id", "")
-        strokes.append(
-            {
-                **stroke,
-                "times": stroke_times(stroke),
-                "truthBlock": truth_by_stroke.get(stroke_id),
-            }
-        )
+        strokes.append({**stroke, "times": stroke_times(stroke)})
 
     canvas = strokes_container.get("canvas") or {"width": 612, "height": 792}
     return {
         **fixture,
         "strokes": {**strokes_container, "strokes": strokes},
-        "truth": truth,
         "canvasInfo": canvas,
     }
 

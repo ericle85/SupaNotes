@@ -284,7 +284,6 @@ def build_replay_state(
         "time": round(time_seconds, 2),
         "idleTriggerSeconds": idle_seconds,
         "blocks": blocks,
-        "expectedMarkdown": normalized["truth"].get("expectedMarkdown", ""),
     }
     return {
         "completedStrokeCount": len(completed),

@@ -7,7 +7,7 @@ Build the TypeScript frontend once, then run from the repo root:
 
 Then open the printed localhost URL. The UI replays recorded fixture strokes,
 simulates idle-time OCR triggers, draws line grouping overlays, and shows the
-live spatial document model built from the available fixture truth/template file.
+live spatial document model built from the fixture.
 """
 
 from __future__ import annotations

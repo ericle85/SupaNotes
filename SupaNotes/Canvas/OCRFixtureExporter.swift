@@ -41,10 +41,6 @@ enum OCRFixtureExporter {
         let imageURL = fixtureDirectory.appendingPathComponent("rendered.png")
         try pngData.write(to: imageURL, options: .atomic)
 
-        let truthTemplate = makeTruthTemplate(from: fixture)
-        let truthURL = fixtureDirectory.appendingPathComponent("truth_template.json")
-        try encoder.encode(truthTemplate).write(to: truthURL, options: .atomic)
-
         let notesURL = fixtureDirectory.appendingPathComponent("notes.md")
         try makeNotes(for: fixtureDirectory.lastPathComponent)
             .write(to: notesURL, atomically: true, encoding: .utf8)
@@ -132,35 +128,11 @@ enum OCRFixtureExporter {
         }
     }
 
-    private static func makeTruthTemplate(from fixture: OCRFixtureFile) -> OCRFixtureTruthTemplate {
-        OCRFixtureTruthTemplate(
-            blocks: [
-                OCRFixtureTruthBlock(
-                    kind: "unknown",
-                    text: "",
-                    latex: "",
-                    bbox: fixture.aggregateBoundingBox,
-                    strokes: fixture.strokes.map(\.id)
-                )
-            ],
-            expectedMarkdown: ""
-        )
-    }
-
     private static func makeNotes(for fixtureName: String) -> String {
         """
         # \(fixtureName)
 
-        Fill in `truth_template.json`, then rename it to `truth.json` before adding the fixture to the repo.
-
-        Suggested workflow:
-        1. Open `rendered.png`.
-        2. Split the ink into text/math blocks.
-        3. Put normal handwriting OCR in `text`.
-        4. Put math OCR targets in `latex`.
-        5. Fill `expectedMarkdown` with the text-friendly page export.
-
-        Keep `strokes.json` unchanged; it is the raw fixture input for the OCR pipeline.
+        `strokes.json` is the raw fixture input for the OCR pipeline.
         """
     }
 }
@@ -173,19 +145,6 @@ private struct OCRFixtureFile: Codable {
     let app: OCRFixtureApp
     let canvas: OCRFixtureCanvas
     let strokes: [OCRFixtureStroke]
-
-    var aggregateBoundingBox: [Double]? {
-        let boxes = strokes.compactMap(\.bbox)
-        guard let first = boxes.first else { return nil }
-        return boxes.dropFirst().reduce(first) { current, next in
-            [
-                min(current[0], next[0]),
-                min(current[1], next[1]),
-                max(current[2], next[2]),
-                max(current[3], next[3])
-            ]
-        }
-    }
 }
 
 private struct OCRFixtureDevice: Codable {
@@ -232,19 +191,6 @@ private struct OCRFixturePoint: Codable {
         case azimuth
         case altitude
     }
-}
-
-private struct OCRFixtureTruthTemplate: Codable {
-    let blocks: [OCRFixtureTruthBlock]
-    let expectedMarkdown: String
-}
-
-private struct OCRFixtureTruthBlock: Codable {
-    let kind: String
-    let text: String
-    let latex: String
-    let bbox: [Double]?
-    let strokes: [String]
 }
 
 private extension Stroke {
