@@ -14,6 +14,9 @@ import torch
 from ocr_pipeline.ctc.model import CTCTransformer
 from ocr_pipeline.ctc.dataset import Vocabulary, BLANK_TOKEN
 from ocr_pipeline.ctc.preprocessing import normalize_strokes, extract_point_features, MAX_SEQ_LEN
+from ocr_pipeline.latex_validation import latex_parses
+from ocr_pipeline.handwriting_text_recognizer import recognize_handwritten_text
+from ocr_pipeline.google_ink_handwriting_recognizer import recognize_handwritten_text_with_google_ink
 
 MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
 CKPT_PATH = os.path.join(MODELS_DIR, "ctc_final.pt")
@@ -30,6 +33,10 @@ CONFIDENCE_THRESHOLD = 0.5
 TOP_K_ALTERNATIVES = 3
 MATH_CONFIDENCE_GATE = 0.85
 LETTER_RUN_GATE = 4
+RERANK_POSITION_COUNT = 3
+INK_ASPECT_RATIO_MIN = 0.15
+INK_ASPECT_RATIO_MAX = 25.0
+INK_MINIMUM_SPAN_PX = 6.0
 
 LATEX_COMMAND = re.compile(r"\\[a-zA-Z]+")
 MATH_SYMBOL = re.compile(r"[0-9+=^_/*<>()&-]")
@@ -97,6 +104,10 @@ def step_alternatives(vocab: Vocabulary, step_probs: Any, chosen: int) -> list[d
     return list(candidates)[:TOP_K_ALTERNATIVES]
 
 
+def content_from_tokens(tokens: list[dict[str, Any]]) -> str:
+    return DOUBLED_BACKSLASH.sub("\\\\", "".join(token["token"] for token in tokens))
+
+
 def collapse_with_confidence(vocab: Vocabulary, steps: Any) -> dict[str, Any]:
     probs = steps.exp()
     ids = steps.argmax(dim=-1).tolist()
@@ -113,9 +124,33 @@ def collapse_with_confidence(vocab: Vocabulary, steps: Any) -> dict[str, Any]:
                 }
             )
         previous = token
-    content = DOUBLED_BACKSLASH.sub("\\\\", "".join(token["token"] for token in tokens))
+    content = content_from_tokens(tokens)
     overall = round(sum(token["confidence"] for token in tokens) / len(tokens), 4) if tokens else 0.0
     return {"content": content, "confidence": overall, "tokens": tokens}
+
+
+def weakest_token_positions(tokens: list[dict[str, Any]], count: int) -> list[int]:
+    positions = sorted(range(len(tokens)), key=lambda index: tokens[index]["confidence"])
+    return positions[:count]
+
+
+def tokens_with_alternative(
+    tokens: list[dict[str, Any]], position: int, alternative: dict[str, Any]
+) -> list[dict[str, Any]]:
+    swapped = list(tokens)
+    swapped[position] = {**tokens[position], "token": alternative["token"]}
+    return swapped
+
+
+def reranked_tokens(tokens: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if latex_parses(content_from_tokens(tokens)):
+        return tokens
+    for position in weakest_token_positions(tokens, RERANK_POSITION_COUNT):
+        for alternative in tokens[position].get("alternatives", []):
+            candidate = tokens_with_alternative(tokens, position, alternative)
+            if latex_parses(content_from_tokens(candidate)):
+                return candidate
+    return tokens
 
 
 def decode(model: CTCTransformer, vocab: Vocabulary, raw_strokes: list[list[tuple[float, float, float]]]) -> dict[str, Any]:
@@ -211,6 +246,26 @@ def stroke_layout_features(strokes) -> list[float]:
     ]
 
 
+def group_span(strokes) -> tuple[float, float]:
+    boxes = stroke_boxes(strokes)
+    if boxes is None:
+        return 0.0, 0.0
+    lows, highs = boxes
+    width = float(highs[:, 0].max() - lows[:, 0].min())
+    height = float(highs[:, 1].max() - lows[:, 1].min())
+    return width, height
+
+
+def looks_like_drawing(strokes) -> bool:
+    width, height = group_span(strokes)
+    if max(width, height) < INK_MINIMUM_SPAN_PX:
+        return True
+    aspect_ratio = width / max(height, 1e-9)
+    if aspect_ratio < INK_ASPECT_RATIO_MIN:
+        return True
+    return aspect_ratio > INK_ASPECT_RATIO_MAX
+
+
 def route_kind(content: str, confidence: float) -> str:
     if confidence < MATH_CONFIDENCE_GATE or longest_letter_run(content) >= LETTER_RUN_GATE:
         return "text"
@@ -240,19 +295,36 @@ def route_group(content: str, token_confidences: list[float], strokes) -> str:
     return "math" if probability >= router["threshold"] else "text"
 
 
+def recognize_english_text(strokes) -> dict[str, Any]:
+    google_result = recognize_handwritten_text_with_google_ink(strokes)
+    if google_result["content"]:
+        return google_result
+    return recognize_handwritten_text(strokes)
+
+
 def recognize_group(group: dict[str, Any]) -> dict[str, Any]:
     strokes = strokes_in_writing_order(group["strokes"])
     if not strokes:
         return {"kind": "not labeled", "content": "", "confidence": 0.0, "tokens": []}
+    if looks_like_drawing(strokes):
+        return {"kind": "ink", "content": "", "confidence": 0.0, "tokens": []}
     model, vocab = load_recognizer()
     print("Decoding for group with {} strokes...".format(len(strokes)))
     result = decode(model, vocab, strokes)
     print(result["confidence"], result["content"])
     kind = route_group(result["content"], [token["confidence"] for token in result["tokens"]], strokes)
-    is_math = (kind == "math")
+    if kind != "math":
+        recognized_text = recognize_english_text(strokes)
+        return {
+            "kind": kind,
+            "content": recognized_text["content"],
+            "confidence": recognized_text["confidence"],
+            "tokens": [],
+        }
+    tokens = reranked_tokens(result["tokens"])
     return {
         "kind": kind,
-        "content": result["content"] if is_math else "",
-        "confidence": result["confidence"] if is_math else 0.0,
-        "tokens": result["tokens"] if is_math else [],
+        "content": content_from_tokens(tokens),
+        "confidence": result["confidence"],
+        "tokens": tokens,
     }

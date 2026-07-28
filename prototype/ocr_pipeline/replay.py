@@ -1,4 +1,4 @@
-"""Replay-time spatial document construction for OCR fixtures."""
+"""Replay-time construction of the append-only recognition log for OCR fixtures."""
 
 from __future__ import annotations
 
@@ -7,10 +7,17 @@ from functools import lru_cache
 from typing import Any
 
 from .grouping import (
+    build_group,
     group_completed_strokes,
     normalize_fixture,
     recognize_group,
-    render_spatial_text,
+)
+from .recognition_log import (
+    entries_to_merge_with,
+    entry_stroke_ids,
+    live_entries,
+    logged_stroke_ids,
+    merge_is_allowed,
 )
 
 RecognitionResult = dict[str, Any]
@@ -175,7 +182,7 @@ def block_from_group(
         "strokes": stroke_ids,
         "text": group["content"] if kind == "text" else "",
         "latex": latex,
-        "source": "math_ctc" if kind == "math" else "apple_vision_pending",
+        "source": "math_ctc" if kind == "math" else "apple_vision",
         "recognizedAt": round(fire_at, 2),
         "autocomplete": autocomplete_for_latex(latex),
     }
@@ -238,29 +245,81 @@ def ocr_call_history(
     return calls
 
 
-def build_stamps(
+def strokes_by_id(strokes: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {stroke["id"]: stroke for stroke in strokes}
+
+
+def log_entry(
+    recognized: dict[str, Any],
+    index: int,
+    fire_at: float,
+    supersedes: list[str],
+) -> dict[str, Any]:
+    return {
+        **recognized,
+        "id": f"entry_{index + 1:03d}",
+        "firedAt": fire_at,
+        "supersedes": supersedes,
+    }
+
+
+def union_of_strokes(
+    recognized: dict[str, Any],
+    neighbours: list[dict[str, Any]],
+    lookup: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    union_ids = list(entry_stroke_ids(recognized))
+    for neighbour in neighbours:
+        for stroke_id in entry_stroke_ids(neighbour):
+            if stroke_id not in union_ids:
+                union_ids.append(stroke_id)
+    return [lookup[stroke_id] for stroke_id in union_ids if stroke_id in lookup]
+
+
+def entry_after_merge(
+    recognized: dict[str, Any],
+    neighbours: list[dict[str, Any]],
+    lookup: dict[str, dict[str, Any]],
+    index: int,
+    fire_at: float,
+) -> dict[str, Any]:
+    if recognized["kind"] == "ink":
+        return log_entry(recognized, index, fire_at, [])
+    if not neighbours:
+        return log_entry(recognized, index, fire_at, [])
+    union = recognized_group(build_group(union_of_strokes(recognized, neighbours, lookup)))
+    part_contents = [recognized["content"]]
+    for neighbour in neighbours:
+        part_contents.append(neighbour["content"])
+    if not merge_is_allowed(union["kind"], union["content"], part_contents):
+        return log_entry(recognized, index, fire_at, [])
+    return log_entry(union, index, fire_at, [neighbour["id"] for neighbour in neighbours])
+
+
+def build_recognition_log(
     strokes: list[dict[str, Any]],
     events: list[dict[str, Any]],
     time_seconds: float,
     idle_seconds: float,
-) -> tuple[list[tuple[dict[str, Any], float]], set[str]]:
-    stamps: list[tuple[dict[str, Any], float]] = []
-    stamped_ids: set[str] = set()
+) -> list[dict[str, Any]]:
+    log: list[dict[str, Any]] = []
+    lookup = strokes_by_id(strokes)
 
     for fire_at in idle_fire_times(strokes, idle_seconds):
         if fire_at > time_seconds:
             break
         completed = active_strokes_at(strokes, events, fire_at, time_key="end")
-        unstamped = [s for s in completed if s["id"] not in stamped_ids]
-        if not unstamped:
+        active_ids = {stroke["id"] for stroke in completed}
+        already_logged = logged_stroke_ids(log)
+        unlogged = [s for s in completed if s["id"] not in already_logged]
+        if not unlogged:
             continue
-        for group in group_completed_strokes(unstamped, recognize=False):
+        for group in group_completed_strokes(unlogged, recognize=False):
             recognized = recognized_group(group)
-            stamps.append((recognized, fire_at))
-            for stroke in group["strokes"]:
-                stamped_ids.add(stroke["id"])
+            neighbours = entries_to_merge_with(log, recognized["bbox"], active_ids)
+            log.append(entry_after_merge(recognized, neighbours, lookup, len(log), fire_at))
 
-    return stamps, stamped_ids
+    return log
 
 
 def build_replay_state(
@@ -271,11 +330,11 @@ def build_replay_state(
     normalized = normalize_fixture(fixture)
     strokes = normalized["strokes"].get("strokes", [])
     events = fixture_events(normalized)
-    canvas_info = normalized.get("canvasInfo", {"width": 612, "height": 792})
 
-    stamps, stamped_ids = build_stamps(
-        strokes, events, time_seconds, idle_seconds
-    )
+    log = build_recognition_log(strokes, events, time_seconds, idle_seconds)
+    entries = live_entries(log)
+    stamps = [(entry, entry["firedAt"]) for entry in entries]
+    stamped_ids = logged_stroke_ids(log)
 
     started = active_strokes_at(strokes, events, time_seconds, time_key="start")
     intervals = stroke_intervals(started)
@@ -300,23 +359,17 @@ def build_replay_state(
         all_groups.append(group)
         all_contact_times.append(contact_t)
 
+    recognized_stamps = [(entry, fire_at) for entry, fire_at in stamps if entry["kind"] != "ink"]
     blocks = [
         block_from_group(recognized, index, fire_at)
-        for index, (recognized, fire_at) in enumerate(stamps)
+        for index, (recognized, fire_at) in enumerate(recognized_stamps)
     ]
-
-    spatial_text = render_spatial_text(
-        [recognized for recognized, _ in stamps],
-        canvas_width=float(canvas_info.get("width", 612)),
-        canvas_height=float(canvas_info.get("height", 792)),
-    )
 
     document = {
         "pageId": normalized["name"],
         "time": round(time_seconds, 2),
         "idleTriggerSeconds": idle_seconds,
         "blocks": blocks,
-        "spatialText": spatial_text,
     }
     return {
         "completedStrokeCount": len(completed),

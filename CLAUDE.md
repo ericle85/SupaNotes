@@ -1,5 +1,5 @@
 App isn't in production yet, so don't worry about breaking changes or backwards compatibility. 
-
+Use base env to run
 General Coding Rules:
     - Prioritize simple code
     - No inline code (things like loops, if statements, etc should be expanded out)
