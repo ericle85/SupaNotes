@@ -7,7 +7,6 @@ from functools import lru_cache
 from typing import Any
 
 from .grouping import (
-    gap_guides,
     group_completed_strokes,
     normalize_fixture,
     recognize_group,
@@ -208,7 +207,6 @@ def ocr_call_history(
     strokes: list[dict[str, Any]],
     time_seconds: float,
     idle_seconds: float,
-    gap_threshold: float | None = None,
     events: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Return synthetic OCR jobs that would have fired by replay time.
@@ -226,7 +224,7 @@ def ocr_call_history(
             break
         completed_at_fire = active_strokes_at(strokes, events, fire_at, time_key="end")
         for group in group_completed_strokes(
-            completed_at_fire, gap_threshold, recognize=False
+            completed_at_fire, recognize=False
         ):
             key = group_key(group)
             if key in seen_snapshots:
@@ -250,7 +248,6 @@ def build_replay_state(
     fixture: dict[str, Any],
     time_seconds: float,
     idle_seconds: float,
-    gap_threshold: float | None = None,
 ) -> dict[str, Any]:
     normalized = normalize_fixture(fixture)
     strokes = normalized["strokes"].get("strokes", [])
@@ -258,7 +255,7 @@ def build_replay_state(
     started = active_strokes_at(strokes, events, time_seconds, time_key="start")
     intervals = stroke_intervals(started)
     completed = active_strokes_at(strokes, events, time_seconds, time_key="end")
-    pending_groups = group_completed_strokes(completed, gap_threshold, recognize=False)
+    pending_groups = group_completed_strokes(completed, recognize=False)
     contact_times = [
         last_pen_contact_before_idle(group["lastT"], intervals, idle_seconds)
         for group in pending_groups
@@ -294,8 +291,7 @@ def build_replay_state(
         ],
         "blocks": blocks,
         "calls": ocr_call_history(
-            strokes, time_seconds, idle_seconds, gap_threshold, events
+            strokes, time_seconds, idle_seconds, events
         ),
-        "gapGuides": gap_guides(completed, gap_threshold),
         "document": document,
     }

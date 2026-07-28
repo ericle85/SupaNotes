@@ -72,13 +72,11 @@ class ReplayHandler(BaseHTTPRequestHandler):
             query = parse_qs(parsed.query)
             time_seconds = parse_float(query.get("time", ["0"])[0], default=0.0)
             idle_seconds = parse_float(query.get("idle", ["0.8"])[0], default=0.8)
-            gap_value = query.get("gap", [""])[0]
-            gap_threshold = parse_float(gap_value, default=0.0) if gap_value else None
             try:
                 if query.get("reset", [""])[0] in {"1", "true", "yes"}:
                     clear_recognition_cache()
                 fixture = load_fixture(self.fixtures_dir, name)
-                self.send_json(build_replay_state(fixture, time_seconds, idle_seconds, gap_threshold))
+                self.send_json(build_replay_state(fixture, time_seconds, idle_seconds))
             except ValueError as error:
                 self.send_json({"error": str(error)}, 404)
             return

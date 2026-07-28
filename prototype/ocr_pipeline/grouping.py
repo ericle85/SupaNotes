@@ -71,17 +71,14 @@ def build_group(strokes: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def default_gap_threshold(line: dict[str, Any]) -> float:
-    return max(40.0, line["height"] * 1.2)
+SPLIT_GAP_PX = 42.0
 
 
-def split_line_into_chunks(
-    line: dict[str, Any], gap_threshold: float | None = None
-) -> list[dict[str, Any]]:
+def split_line_into_chunks(line: dict[str, Any]) -> list[dict[str, Any]]:
     strokes = [stroke for stroke in line["strokes"] if stroke.get("bbox")]
     if len(strokes) < 2:
         return [line]
-    threshold = gap_threshold if gap_threshold is not None else default_gap_threshold(line)
+    threshold = SPLIT_GAP_PX
     ordered = sorted(strokes, key=lambda stroke: stroke["bbox"][0])
     chunks = [[ordered[0]]]
     running_right = ordered[0]["bbox"][2]
@@ -129,43 +126,14 @@ def vertical_lines(completed: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return lines
 
 
-def gap_guides(
-    completed: list[dict[str, Any]], gap_threshold: float | None = None
-) -> list[dict[str, Any]]:
-    guides = []
-    for line in vertical_lines(completed):
-        strokes = sorted(
-            [stroke for stroke in line["strokes"] if stroke.get("bbox")],
-            key=lambda stroke: stroke["bbox"][0],
-        )
-        threshold = gap_threshold if gap_threshold is not None else default_gap_threshold(line)
-        running_right = None
-        for stroke in strokes:
-            bbox = stroke["bbox"]
-            if running_right is not None and bbox[0] - running_right > 0:
-                gap = bbox[0] - running_right
-                guides.append(
-                    {
-                        "x": round(bbox[0] - gap / 2, 1),
-                        "y0": round(line["bbox"][1], 1),
-                        "y1": round(line["bbox"][3], 1),
-                        "gap": round(gap, 1),
-                        "isSplit": gap > threshold,
-                    }
-                )
-            running_right = bbox[2] if running_right is None else max(running_right, bbox[2])
-    return guides
-
-
 def group_completed_strokes(
     completed: list[dict[str, Any]],
-    gap_threshold: float | None = None,
     *,
     recognize: bool = True,
 ) -> list[dict[str, Any]]:
     chunks: list[dict[str, Any]] = []
     for line in vertical_lines(completed):
-        chunks.extend(split_line_into_chunks(line, gap_threshold))
+        chunks.extend(split_line_into_chunks(line))
     labels = (recognize_group(chunk) if recognize else dict(UNRECOGNIZED_GROUP) for chunk in chunks)
     enriched = [{**chunk, **label} for chunk, label in zip(chunks, labels)]
     return sorted(enriched, key=lambda chunk: (chunk["bbox"][1], chunk["bbox"][0]))

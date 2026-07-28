@@ -89,21 +89,12 @@ interface OcrCall {
   strokes?: string[];
 }
 
-interface GapGuide {
-  x: number;
-  y0: number;
-  y1: number;
-  gap: number;
-  isSplit: boolean;
-}
-
 interface ReplayState {
   completedStrokeCount: number;
   totalStrokeCount: number;
   groups: Group[];
   blocks: Block[];
   calls: OcrCall[];
-  gapGuides?: GapGuide[];
   document: unknown;
 }
 
@@ -129,8 +120,6 @@ const toggleBoxes = byId<HTMLButtonElement>("toggleBoxes");
 let showBoxes = false;
 const speedSelect = byId<HTMLSelectElement>("speedSelect");
 const idleInput = byId<HTMLInputElement>("idleInput");
-const gapInput = byId<HTMLInputElement>("gapInput");
-const gapValue = byId<HTMLSpanElement>("gapValue");
 const timeline = byId<HTMLProgressElement>("timeline");
 const canvas = byId<HTMLCanvasElement>("canvas");
 const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
@@ -198,9 +187,8 @@ async function fetchReplayState(time: number, reset = false): Promise<void> {
   if (!fixture) return;
   const serial = ++stateRequestSerial;
   const idleSeconds = Number(idleInput.value) || 0.8;
-  const gap = Number(gapInput.value) || 46;
   const name = fixtures.find((item) => item.name === fixtureSelect.value)?.name ?? fixtureSelect.value;
-  const url = `/api/replay_state/${encodeURIComponent(name)}?time=${encodeURIComponent(time.toFixed(3))}&idle=${encodeURIComponent(idleSeconds)}&gap=${encodeURIComponent(gap)}${reset ? "&reset=1" : ""}`;
+  const url = `/api/replay_state/${encodeURIComponent(name)}?time=${encodeURIComponent(time.toFixed(3))}&idle=${encodeURIComponent(idleSeconds)}${reset ? "&reset=1" : ""}`;
   const response = await fetch(url);
   if (!response.ok) throw new Error(await response.text());
   const nextState = (await response.json()) as ReplayState;
@@ -303,48 +291,6 @@ const drawUnderline = (group: Group, called: boolean): void => {
   }
 };
 
-const drawGapGauge = (threshold: number): void => {
-  const y = 14;
-  const x0 = 12;
-  const x1 = x0 + threshold;
-  ctx.save();
-  ctx.strokeStyle = colors.math;
-  ctx.fillStyle = colors.math;
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([]);
-  ctx.beginPath(); ctx.moveTo(x0, y - 7); ctx.lineTo(x0, y + 7); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x1, y - 7); ctx.lineTo(x1, y + 7); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
-  ctx.font = "11px ui-sans-serif, system-ui";
-  ctx.fillText(`split gap ${threshold}px`, x1 + 6, y + 4);
-  ctx.restore();
-};
-
-const drawSplitGuides = (): void => {
-  const threshold = Number(gapInput.value) || 46;
-  const guides = replayState.gapGuides || [];
-  ctx.save();
-  ctx.font = "10px ui-sans-serif, system-ui";
-  for (const guide of guides) {
-    const top = guide.y0 - 6;
-    const bottom = guide.y1 + 6;
-    ctx.strokeStyle = guide.isSplit ? colors.math : colors.muted;
-    ctx.lineWidth = guide.isSplit ? 2 : 1;
-    ctx.setLineDash(guide.isSplit ? [] : [3, 4]);
-    ctx.beginPath();
-    ctx.moveTo(guide.x, top);
-    ctx.lineTo(guide.x, bottom);
-    ctx.stroke();
-    if (guide.isSplit || guide.gap >= 8) {
-      ctx.setLineDash([]);
-      ctx.fillStyle = guide.isSplit ? colors.math : colors.muted;
-      ctx.fillText(`${guide.gap.toFixed(0)}px`, guide.x + 2, top + 10);
-    }
-  }
-  ctx.setLineDash([]);
-  ctx.restore();
-  drawGapGauge(threshold);
-};
 
 const bboxesForCall = (call: OcrCall): Bbox[] => {
   if (call.bboxes?.length) return call.bboxes;
@@ -394,7 +340,6 @@ const draw = (): void => {
       ctx.restore();
     }
   }
-  drawSplitGuides();
   drawSelectedOcrCallBoxes();
 
   timeValue.textContent = `${currentTime.toFixed(2)}s / ${duration.toFixed(2)}s`;
@@ -558,13 +503,6 @@ async function init(): Promise<void> {
 
 fixtureSelect.addEventListener("change", () => loadFixture(fixtureSelect.value));
 idleInput.addEventListener("input", () => {
-  fetchReplayState(currentTime).catch((error: Error) => {
-    modelView.textContent = `Failed to build replay state: ${error.message}`;
-  });
-});
-gapInput.addEventListener("input", () => {
-  gapValue.textContent = gapInput.value;
-  draw();
   fetchReplayState(currentTime).catch((error: Error) => {
     modelView.textContent = `Failed to build replay state: ${error.message}`;
   });
