@@ -241,17 +241,36 @@ def log_entry(
     }
 
 
+def stroke_shifted_in_time(stroke: dict[str, Any], shift: float) -> dict[str, Any]:
+    points = [{**point, "t": point["t"] + shift} for point in stroke.get("points", [])]
+    times = {
+        **stroke["times"],
+        "start": stroke["times"]["start"] + shift,
+        "end": stroke["times"]["end"] + shift,
+    }
+    return {**stroke, "points": points, "times": times}
+
+
 def union_of_strokes(
     recognized: dict[str, Any],
     neighbours: list[dict[str, Any]],
     lookup: dict[str, dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    union_ids = list(entry_stroke_ids(recognized))
-    for neighbour in neighbours:
-        for stroke_id in entry_stroke_ids(neighbour):
-            if stroke_id not in union_ids:
-                union_ids.append(stroke_id)
-    return [lookup[stroke_id] for stroke_id in union_ids if stroke_id in lookup]
+    blocks = sorted([recognized] + neighbours, key=lambda block: block["bbox"][0])
+    ordered: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for block in blocks:
+        known = [lookup[stroke_id] for stroke_id in entry_stroke_ids(block) if stroke_id in lookup]
+        for stroke in sorted(known, key=lambda stroke: stroke["times"]["start"]):
+            if stroke["id"] in seen:
+                continue
+            seen.add(stroke["id"])
+            ordered.append(stroke)
+    available_starts = sorted(stroke["times"]["start"] for stroke in ordered)
+    restamped = []
+    for start, stroke in zip(available_starts, ordered):
+        restamped.append(stroke_shifted_in_time(stroke, start - stroke["times"]["start"]))
+    return restamped
 
 
 def entry_after_merge(
