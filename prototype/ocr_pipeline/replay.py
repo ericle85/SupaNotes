@@ -122,12 +122,6 @@ def last_pen_contact_before_idle(
     return contact
 
 
-def ordered_strokes(group: dict[str, Any]) -> list[dict[str, Any]]:
-    return sorted(
-        group["strokes"], key=lambda stroke: (stroke["times"]["start"], stroke["id"])
-    )
-
-
 @lru_cache(maxsize=1024)
 def cached_recognize_group(stroke_signature: str) -> RecognitionResult:
     strokes = json.loads(stroke_signature)
@@ -135,13 +129,6 @@ def cached_recognize_group(stroke_signature: str) -> RecognitionResult:
 
 
 def recognition_signature(group: dict[str, Any]) -> str:
-    """Build a stable, hashable key that also carries the stroke payload.
-
-    The replay debugger polls while playback is running. Caching by the exact
-    stroke snapshot lets each synthetic OCR job run the CTC model once instead
-    of re-running decode on every poll after the job has already fired.
-    """
-
     return json.dumps(
         [
             {
@@ -149,7 +136,7 @@ def recognition_signature(group: dict[str, Any]) -> str:
                 "points": stroke.get("points", []),
                 "times": stroke.get("times", {}),
             }
-            for stroke in ordered_strokes(group)
+            for stroke in group["strokes"]
         ],
         sort_keys=True,
         separators=(",", ":"),
@@ -169,7 +156,7 @@ def block_from_group(
     group: dict[str, Any], index: int, fire_at: float
 ) -> dict[str, Any]:
     kind = group["kind"]
-    stroke_ids = [stroke["id"] for stroke in ordered_strokes(group)]
+    stroke_ids = entry_stroke_ids(group)
     latex = group["content"] if kind == "math" else ""
     return {
         "id": f"block_{index + 1:03d}",
@@ -193,7 +180,7 @@ def group_for_client(group: dict[str, Any], last_contact_t: float) -> dict[str, 
         "bbox": rounded_bbox(group["bbox"]),
         "lastT": round(group["lastT"], 3),
         "lastPenContactT": round(last_contact_t, 3),
-        "strokes": [stroke["id"] for stroke in ordered_strokes(group)],
+        "strokes": entry_stroke_ids(group),
     }
 
 
@@ -217,7 +204,7 @@ def ocr_call_history(log: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "kind": entry["kind"],
                 "content": entry["content"],
                 "bbox": rounded_bbox(entry["bbox"]),
-                "strokes": [stroke["id"] for stroke in ordered_strokes(entry)],
+                "strokes": entry_stroke_ids(entry),
             }
         )
     return calls
@@ -227,6 +214,21 @@ def strokes_by_id(strokes: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return {stroke["id"]: stroke for stroke in strokes}
 
 
+def stroke_ids_from_strokes(strokes: list[dict[str, Any]]) -> list[str]:
+    stroke_ids = []
+    for stroke in strokes:
+        stroke_ids.append(stroke["id"])
+    return stroke_ids
+
+
+def entry_without_strokes(entry: dict[str, Any]) -> dict[str, Any]:
+    result = {}
+    for key, value in entry.items():
+        if key != "strokes":
+            result[key] = value
+    return result
+
+
 def log_entry(
     recognized: dict[str, Any],
     index: int,
@@ -234,43 +236,40 @@ def log_entry(
     supersedes: list[str],
 ) -> dict[str, Any]:
     return {
-        **recognized,
+        **entry_without_strokes(recognized),
+        "strokeIds": stroke_ids_from_strokes(recognized["strokes"]),
         "id": f"entry_{index + 1:03d}",
         "firedAt": fire_at,
         "supersedes": supersedes,
     }
 
 
-def stroke_shifted_in_time(stroke: dict[str, Any], shift: float) -> dict[str, Any]:
-    points = [{**point, "t": point["t"] + shift} for point in stroke.get("points", [])]
-    times = {
-        **stroke["times"],
-        "start": stroke["times"]["start"] + shift,
-        "end": stroke["times"]["end"] + shift,
-    }
-    return {**stroke, "points": points, "times": times}
+def unique_ordered_stroke_ids(entries: list[dict[str, Any]]) -> list[str]:
+    stroke_ids = []
+    for entry in entries:
+        for stroke_id in entry_stroke_ids(entry):
+            if stroke_id not in stroke_ids:
+                stroke_ids.append(stroke_id)
+    return stroke_ids
 
 
-def union_of_strokes(
-    recognized: dict[str, Any],
-    neighbours: list[dict[str, Any]],
+def strokes_for_ids(
+    stroke_ids: list[str],
     lookup: dict[str, dict[str, Any]],
 ) -> list[dict[str, Any]]:
+    strokes = []
+    for stroke_id in stroke_ids:
+        if stroke_id in lookup:
+            strokes.append(lookup[stroke_id])
+    return strokes
+
+
+def union_stroke_ids(
+    recognized: dict[str, Any],
+    neighbours: list[dict[str, Any]],
+) -> list[str]:
     blocks = sorted([recognized] + neighbours, key=lambda block: block["bbox"][0])
-    ordered: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for block in blocks:
-        known = [lookup[stroke_id] for stroke_id in entry_stroke_ids(block) if stroke_id in lookup]
-        for stroke in sorted(known, key=lambda stroke: stroke["times"]["start"]):
-            if stroke["id"] in seen:
-                continue
-            seen.add(stroke["id"])
-            ordered.append(stroke)
-    available_starts = sorted(stroke["times"]["start"] for stroke in ordered)
-    restamped = []
-    for start, stroke in zip(available_starts, ordered):
-        restamped.append(stroke_shifted_in_time(stroke, start - stroke["times"]["start"]))
-    return restamped
+    return unique_ordered_stroke_ids(blocks)
 
 
 def entry_after_merge(
@@ -284,7 +283,8 @@ def entry_after_merge(
         return log_entry(recognized, index, fire_at, [])
     if not neighbours:
         return log_entry(recognized, index, fire_at, [])
-    union = recognized_group(build_group(union_of_strokes(recognized, neighbours, lookup)))
+    stroke_ids = union_stroke_ids(recognized, neighbours)
+    union = recognized_group(build_group(strokes_for_ids(stroke_ids, lookup)))
     part_contents = [recognized["content"]]
     for neighbour in neighbours:
         part_contents.append(neighbour["content"])

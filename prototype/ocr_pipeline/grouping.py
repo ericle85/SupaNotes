@@ -74,10 +74,15 @@ def build_group(strokes: list[dict[str, Any]]) -> dict[str, Any]:
 SPLIT_GAP_PX = 40.0 # TODO: make this be a dynamic number
 
 
+def group_with_strokes_in_time_order(group: dict[str, Any]) -> dict[str, Any]:
+    ordered = sorted(group["strokes"], key=lambda stroke: stroke["times"]["start"])
+    return {**group, "strokes": ordered}
+
+
 def split_line_into_chunks(line: dict[str, Any]) -> list[dict[str, Any]]:
     strokes = [stroke for stroke in line["strokes"] if stroke.get("bbox")]
     if len(strokes) < 2:
-        return [line]
+        return [group_with_strokes_in_time_order(line)]
     threshold = SPLIT_GAP_PX
     ordered = sorted(strokes, key=lambda stroke: stroke["bbox"][0])
     chunks = [[ordered[0]]]
@@ -89,8 +94,8 @@ def split_line_into_chunks(line: dict[str, Any]) -> list[dict[str, Any]]:
             chunks[-1].append(stroke)
         running_right = max(running_right, stroke["bbox"][2])
     if len(chunks) == 1:
-        return [line]
-    return [build_group(chunk) for chunk in chunks]
+        return [group_with_strokes_in_time_order(line)]
+    return [group_with_strokes_in_time_order(build_group(chunk)) for chunk in chunks]
 
 
 def vertical_lines(completed: list[dict[str, Any]]) -> list[dict[str, Any]]:

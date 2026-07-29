@@ -91,13 +91,13 @@ def _self_check() -> None:
 
     from ocr_pipeline.fixtures import load_fixture
     from ocr_pipeline.grouping import group_completed_strokes, normalize_fixture
-    from ocr_pipeline.recognizer import strokes_in_writing_order
+    from ocr_pipeline.recognizer import point_sequences_from_strokes
 
     fixtures_dir = Path(__file__).resolve().parent.parent / "fixtures"
     fixture = normalize_fixture(load_fixture(fixtures_dir, "writing"))
     groups = group_completed_strokes(fixture["strokes"]["strokes"], recognize=False)
     recognized = [
-        recognize_handwritten_text_with_google_ink(strokes_in_writing_order(group["strokes"]))
+        recognize_handwritten_text_with_google_ink(point_sequences_from_strokes(group["strokes"]))
         for group in groups
     ]
 

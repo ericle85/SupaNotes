@@ -117,14 +117,14 @@ def _self_check() -> None:
 
     from ocr_pipeline.fixtures import load_fixture
     from ocr_pipeline.grouping import normalize_fixture, group_completed_strokes
-    from ocr_pipeline.recognizer import strokes_in_writing_order
+    from ocr_pipeline.recognizer import point_sequences_from_strokes
 
     assert vision_is_available()
 
     fixtures_dir = Path(__file__).resolve().parent.parent / "fixtures"
     fixture = normalize_fixture(load_fixture(fixtures_dir, "writing"))
     groups = group_completed_strokes(fixture["strokes"]["strokes"], recognize=False)
-    recognized = [recognize_handwritten_text(strokes_in_writing_order(g["strokes"])) for g in groups]
+    recognized = [recognize_handwritten_text(point_sequences_from_strokes(g["strokes"])) for g in groups]
     non_empty = [result for result in recognized if result["content"]]
 
     print("recognized:", [result["content"] for result in recognized])

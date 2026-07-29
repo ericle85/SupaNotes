@@ -47,7 +47,12 @@ def live_entries(log: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def entry_stroke_ids(entry: dict[str, Any]) -> list[str]:
-    return [stroke["id"] for stroke in entry["strokes"]]
+    if "strokeIds" in entry:
+        return entry["strokeIds"]
+    stroke_ids = []
+    for stroke in entry["strokes"]:
+        stroke_ids.append(stroke["id"])
+    return stroke_ids
 
 
 def logged_stroke_ids(log: list[dict[str, Any]]) -> set[str]:

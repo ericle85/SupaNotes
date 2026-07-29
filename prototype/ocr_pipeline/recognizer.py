@@ -71,10 +71,9 @@ def load_recognizer() -> tuple[CTCTransformer, Vocabulary]:
     return model, vocab
 
 
-def strokes_in_writing_order(strokes: list[dict[str, Any]]) -> list[list[tuple[float, float, float]]]:
-    ordered = sorted(strokes, key=lambda stroke: stroke.get("times", {}).get("start", 0.0))
+def point_sequences_from_strokes(strokes: list[dict[str, Any]]) -> list[list[tuple[float, float, float]]]:
     result = []
-    for stroke in ordered:
+    for stroke in strokes:
         points = [(point["x"], point["y"], point["t"]) for point in stroke.get("points", [])]
         if len(points) >= 2:
             result.append(points)
@@ -291,7 +290,7 @@ def recognize_english_text(strokes) -> dict[str, Any]:
 
 
 def recognize_group(group: dict[str, Any]) -> dict[str, Any]:
-    strokes = strokes_in_writing_order(group["strokes"])
+    strokes = point_sequences_from_strokes(group["strokes"])
     if not strokes:
         return {"kind": "not labeled", "content": "", "confidence": 0.0, "tokens": []}
     if looks_like_drawing(strokes):
