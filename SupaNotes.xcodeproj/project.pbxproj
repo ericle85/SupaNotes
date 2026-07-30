@@ -6,15 +6,19 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		EED2459800FE4C6D7702BA5F /* Pods_SupaNotes.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9B21F8A9DFE628E1839E599D /* Pods_SupaNotes.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
-		BFAF52182F41429F0038730F /* PBXContainerItemProxy */ = {
+		ABCDEF000000000000000007 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = BFE730D62F3CCEC200F5DD1D /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = BFE730DD2F3CCEC200F5DD1D;
 			remoteInfo = SupaNotes;
 		};
-		ABCDEF000000000000000007 /* PBXContainerItemProxy */ = {
+		BFAF52182F41429F0038730F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = BFE730D62F3CCEC200F5DD1D /* Project object */;
 			proxyType = 1;
@@ -24,25 +28,34 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		9B21F8A9DFE628E1839E599D /* Pods_SupaNotes.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_SupaNotes.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		9DB6832F2A8F4AB6FC67E458 /* Pods-SupaNotes.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SupaNotes.debug.xcconfig"; path = "Target Support Files/Pods-SupaNotes/Pods-SupaNotes.debug.xcconfig"; sourceTree = "<group>"; };
+		ABCDEF000000000000000002 /* UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BFAF52142F41429F0038730F /* Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BFE730DE2F3CCEC200F5DD1D /* SupaNotes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SupaNotes.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		ABCDEF000000000000000002 /* UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		EC803F4ADED094886A469FE2 /* Pods-SupaNotes.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SupaNotes.release.xcconfig"; path = "Target Support Files/Pods-SupaNotes/Pods-SupaNotes.release.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		ABCDEF000000000000000003 /* UITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
 		BFAF52152F41429F0038730F /* Tests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = Tests;
 			sourceTree = "<group>";
 		};
 		BFE730E02F3CCEC200F5DD1D /* SupaNotes */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = SupaNotes;
-			sourceTree = "<group>";
-		};
-		ABCDEF000000000000000003 /* UITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = UITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -66,12 +79,31 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EED2459800FE4C6D7702BA5F /* Pods_SupaNotes.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		1B9A8A31CE1BD19C5487422D /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				9B21F8A9DFE628E1839E599D /* Pods_SupaNotes.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		B6663CBC8EDC7F3808F210F4 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				9DB6832F2A8F4AB6FC67E458 /* Pods-SupaNotes.debug.xcconfig */,
+				EC803F4ADED094886A469FE2 /* Pods-SupaNotes.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
+			sourceTree = "<group>";
+		};
 		BFE730D52F3CCEC200F5DD1D = {
 			isa = PBXGroup;
 			children = (
@@ -79,6 +111,8 @@
 				BFAF52152F41429F0038730F /* Tests */,
 				ABCDEF000000000000000003 /* UITests */,
 				BFE730DF2F3CCEC200F5DD1D /* Products */,
+				B6663CBC8EDC7F3808F210F4 /* Pods */,
+				1B9A8A31CE1BD19C5487422D /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -112,8 +146,6 @@
 				ABCDEF000000000000000003 /* UITests */,
 			);
 			name = UITests;
-			packageProductDependencies = (
-			);
 			productName = UITests;
 			productReference = ABCDEF000000000000000002 /* UITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -135,8 +167,6 @@
 				BFAF52152F41429F0038730F /* Tests */,
 			);
 			name = Tests;
-			packageProductDependencies = (
-			);
 			productName = Tests;
 			productReference = BFAF52142F41429F0038730F /* Tests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -145,9 +175,12 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = BFE730E92F3CCEC300F5DD1D /* Build configuration list for PBXNativeTarget "SupaNotes" */;
 			buildPhases = (
+				9937E1692324D447A3A70BC2 /* [CP] Check Pods Manifest.lock */,
 				BFE730DA2F3CCEC200F5DD1D /* Sources */,
 				BFE730DB2F3CCEC200F5DD1D /* Frameworks */,
 				BFE730DC2F3CCEC200F5DD1D /* Resources */,
+				1987762BAB79D984453AEFC8 /* [CP] Embed Pods Frameworks */,
+				E8391F4C5F91EE5312D9371B /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -157,8 +190,6 @@
 				BFE730E02F3CCEC200F5DD1D /* SupaNotes */,
 			);
 			name = SupaNotes;
-			packageProductDependencies = (
-			);
 			productName = SupaNotes;
 			productReference = BFE730DE2F3CCEC200F5DD1D /* SupaNotes.app */;
 			productType = "com.apple.product-type.application";
@@ -230,6 +261,65 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		1987762BAB79D984453AEFC8 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-SupaNotes/Pods-SupaNotes-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-SupaNotes/Pods-SupaNotes-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SupaNotes/Pods-SupaNotes-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		9937E1692324D447A3A70BC2 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-SupaNotes-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		E8391F4C5F91EE5312D9371B /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-SupaNotes/Pods-SupaNotes-resources-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-SupaNotes/Pods-SupaNotes-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SupaNotes/Pods-SupaNotes-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		ABCDEF000000000000000004 /* Sources */ = {
@@ -388,7 +478,7 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -451,7 +541,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -472,6 +562,7 @@
 		};
 		BFE730EA2F3CCEC300F5DD1D /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9DB6832F2A8F4AB6FC67E458 /* Pods-SupaNotes.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -510,6 +601,7 @@
 		};
 		BFE730EB2F3CCEC300F5DD1D /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = EC803F4ADED094886A469FE2 /* Pods-SupaNotes.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

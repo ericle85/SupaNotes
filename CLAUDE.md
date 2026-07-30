@@ -11,4 +11,4 @@ General Coding Rules:
     
 Swift: 
     - Swift lint & swift format commands to be run after all changes are made.
-    After every change done, you are to Build on ipad air 11 inch (M3)
+    After every change done, you are to Build on ipad air 13 inch (M3)

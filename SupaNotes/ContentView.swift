@@ -2,27 +2,41 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var canvasController = DrawingCanvasController()
+    @StateObject private var ocrEngine = OCREngine()
     @State private var exportAlert: ExportAlert?
 
     var body: some View {
-        ZStack {
-            Color(.systemGray5)
-                .ignoresSafeArea()
+        HStack(spacing: 0) {
+            ZStack {
+                Color(.systemGray5)
+                    .ignoresSafeArea()
 
-            CanvasView(controller: canvasController)
-                .frame(width: LetterPageSize.width, height: LetterPageSize.height)
-                .shadow(radius: 4)
+                CanvasView(controller: canvasController)
+                    .frame(width: LetterPageSize.width, height: LetterPageSize.height)
+                    .shadow(radius: 4)
 
-            VStack(alignment: .trailing, spacing: 12) {
-                Button("Save OCR Fixture") { saveOCRFixture() }
-                    .buttonStyle(.borderedProminent)
+                VStack(alignment: .trailing, spacing: 12) {
+                    Button("Save OCR Fixture") { saveOCRFixture() }
+                        .buttonStyle(.borderedProminent)
 
-                Button("Clear") { canvasController.clear() }
+                    Button("Clear") {
+                        canvasController.clear()
+                        ocrEngine.blocks = []
+                    }
                     .buttonStyle(.bordered)
                     .accessibilityIdentifier(QAID.clearStrokes)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             }
-            .padding()
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+
+            OCRResultsPanel(blocks: ocrEngine.blocks, isReady: ocrEngine.isModelReady)
+                .frame(width: 300)
+        }
+        .onAppear {
+            canvasController.onStrokesChanged = { strokes in
+                ocrEngine.strokesChanged(strokes)
+            }
         }
         .alert(item: $exportAlert) { alert in
             Alert(

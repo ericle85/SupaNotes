@@ -4,6 +4,7 @@ import UIKit
 
 final class DrawingCanvasController: ObservableObject {
     fileprivate weak var canvas: DrawingCanvas?
+    var onStrokesChanged: (([Stroke]) -> Void)?
 
     func clear() {
         canvas?.clearStrokes()
@@ -13,6 +14,11 @@ final class DrawingCanvasController: ObservableObject {
         guard let canvas else { throw OCRFixtureExportError.invalidCanvasSize }
         return try canvas.saveOCRFixture()
     }
+
+    fileprivate func notifyStrokesChanged() {
+        guard let canvas else { return }
+        onStrokesChanged?(canvas.currentStrokes)
+    }
 }
 
 struct CanvasView: UIViewRepresentable {
@@ -20,6 +26,7 @@ struct CanvasView: UIViewRepresentable {
 
     func makeUIView(context _: Context) -> DrawingCanvas {
         let canvas = DrawingCanvas()
+        canvas.controller = controller
         controller.canvas = canvas
         return canvas
     }
@@ -29,6 +36,9 @@ struct CanvasView: UIViewRepresentable {
 
 final class DrawingCanvas: StrokeInputSource {
     private let engine = StrokeEngine()
+    weak var controller: DrawingCanvasController?
+
+    var currentStrokes: [Stroke] { engine.strokes }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -46,6 +56,7 @@ final class DrawingCanvas: StrokeInputSource {
         onStrokeFinished = { [weak self] point in
             self?.engine.end(at: point)
             self?.setNeedsDisplay()
+            self?.controller?.notifyStrokesChanged()
         }
         onStrokeDiscarded = { [weak self] in
             self?.engine.cancel()
