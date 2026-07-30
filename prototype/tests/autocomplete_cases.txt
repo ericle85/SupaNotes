@@ -9,18 +9,18 @@
 # following variable token, matching dataset.py tokenization (for example, \omega t).
 
 # linear equations, numeric coefficients
-2x+3=11 => SOLVE_EQUATION_ONE_STEP => 2 x = 8
-3x+2=x+8 => SOLVE_EQUATION_ONE_STEP => 2 x + 2 = 8
+2x+3=11 => SOLVE_EQUATION_ONE_STEP => x = 4
+3x+2=x+8 => SOLVE_EQUATION_ONE_STEP => x = 3
 2x=8 => SOLVE_EQUATION_ONE_STEP => x = 4
 \frac{x}{2}=5 => SOLVE_EQUATION_ONE_STEP => x = 10
 \frac{x}{3}=4 => SOLVE_EQUATION_ONE_STEP => x = 12
 -3x=9 => SOLVE_EQUATION_ONE_STEP => x = -3
-2x-5=1 => SOLVE_EQUATION_ONE_STEP => 2 x = 6
-2(x+1)=6 => SOLVE_EQUATION_ONE_STEP => x + 1 = 3
+2x-5=1 => SOLVE_EQUATION_ONE_STEP => x = 3
+2(x+1)=6 => SOLVE_EQUATION_ONE_STEP => x = 2
 
 # linear equations, symbolic coefficients
 ax=b => SOLVE_EQUATION_ONE_STEP => x = \frac{b}{a}
-ax+b=c => SOLVE_EQUATION_ONE_STEP => a x = - b + c
+ax+b=c => SOLVE_EQUATION_ONE_STEP => x = \frac{- b + c}{a}
 
 # expression simplification
 2x+3x+4 => SIMPLIFY_EXPRESSION => 5 x + 4
@@ -39,13 +39,21 @@ xfail:x^{2}-2x+1 => FACTOR_EXPRESSION => (x - 1)**2
 (x+1)(x-2)=0 => SOLVE_FACTOR_FORM => x = -1, 2
 (x+3)(x-4)=0 => SOLVE_FACTOR_FORM => x = -3, 4
 (x-1)(x+5)=0 => SOLVE_FACTOR_FORM => x = -5, 1
+(x-2)(x+3)(x-5)=0 => SOLVE_FACTOR_FORM => x = -3, 2, 5
 
 # trigonometric equations
-sin(x)=0 => SOLVE_TRIG => x = 0
-cos(x)=1 => SOLVE_TRIG => x = 0
-sin(x)=0.5 => SOLVE_TRIG => x = 0.523598775598299
+sin(x)=0 => SOLVE_TRIG => x = 0, \pi
+cos(x)=1 => SOLVE_TRIG => x = 0, 2 \pi
+sin(x)=0.5 => SOLVE_TRIG => x = 0.523598775598299, 2.61799387799149
+cos(x)=0 => SOLVE_TRIG => x = \frac{\pi}{2}, \frac{3 \pi}{2}
+sin(x)=1 => SOLVE_TRIG => x = \frac{\pi}{2}
+tan(x)=1 => SOLVE_TRIG => x = \frac{\pi}{4}
+cos(x)=0.5 => SOLVE_TRIG => x = 1.0471975511966, 5.23598775598299
+tan(x)=0.5773502691896257 => SOLVE_TRIG => x = 0.523598775598299
 
 # exponential / logarithmic
+2^{x}=8 => SOLVE_EQUATION_ONE_STEP => x = 3
+3^{x}=27 => SOLVE_EQUATION_ONE_STEP => x = 3
 xfail:e^{x}=2 => SOLVE_EXP_LOG => x = log(2)
 ln(x)=3 => SOLVE_EXP_LOG => x = e^{3}
 \sqrt{x}=3 => SOLVE_RADICAL => x = 9
@@ -55,43 +63,40 @@ ln(x)=3 => SOLVE_EXP_LOG => x = e^{3}
 x^{2}=4 => SOLVE_QUADRATIC => x = -2, 2
 x^{2}=9 => SOLVE_QUADRATIC => x = -3, 3
 x^{2}=0 => SOLVE_QUADRATIC => x = 0
-x^{4}=16 => SOLVE_EQUATION_ONE_STEP => x = -2, 2
-2x^{2}=8 => SOLVE_QUADRATIC => x^{2} = 4
+x^{4}=16 => SOLVE_EQUATION_ONE_STEP => x = -2, 2, - 2 i, 2 i
+2x^{2}=8 => SOLVE_QUADRATIC => x = -2, 2
 
-# quadratic equations (full form) - solver does one step at a time
-x^{2}-4x+3=0 => SOLVE_QUADRATIC => x^{2} - 4 x = -3
-xfail:x^{2}+6x+9=0 => SOLVE_QUADRATIC => x**2 + 6*x = -9
-x^{2}-9x+20=0 => SOLVE_QUADRATIC => x^{2} - 9 x = -20
-2x^{2}-5x-3=0 => SOLVE_QUADRATIC => 2 x^{2} - 5 x = 3
-x^{2}-25=0 => SOLVE_QUADRATIC => x^{2} = 25
-x^{2}-16=0 => SOLVE_QUADRATIC => x^{2} = 16
+# quadratic equations (full form) - sympy solves directly
+x^{2}-4x+3=0 => SOLVE_QUADRATIC => x = 1, 3
+xfail:x^{2}+6x+9=0 => SOLVE_QUADRATIC => x = -3
+x^{2}-9x+20=0 => SOLVE_QUADRATIC => x = 4, 5
+2x^{2}-5x-3=0 => SOLVE_QUADRATIC => x = - \frac{1}{2}, 3
+x^{2}-25=0 => SOLVE_QUADRATIC => x = -5, 5
+x^{2}-16=0 => SOLVE_QUADRATIC => x = -4, 4
 
 # higher-order polynomial roots
-x^{3}=27 => SOLVE_EQUATION_ONE_STEP => x = 3
-x^{3}=-8 => SOLVE_EQUATION_ONE_STEP => x = -2
-x^{5}=32 => SOLVE_EQUATION_ONE_STEP => x = 2
-xfail:2^{x}=8 => SOLVE_EQUATION_ONE_STEP => x = 3
-xfail:3^{x}=27 => SOLVE_EQUATION_ONE_STEP => x = 3
+x^{3}=27 => SOLVE_EQUATION_ONE_STEP => x = 3, - \frac{3}{2} + \frac{3 \sqrt{3} i}{2}, - \frac{3}{2} - \frac{3 \sqrt{3} i}{2}
+x^{3}=-8 => SOLVE_EQUATION_ONE_STEP => x = -2, 1 + \sqrt{3} i, 1 - \sqrt{3} i
+x^{5}=32 => SOLVE_EQUATION_ONE_STEP => x = 2, - \frac{1}{2} + \frac{\sqrt{5}}{2} + 2 i \sqrt{\frac{\sqrt{5}}{8} + \frac{5}{8}}, - \frac{1}{2} + \frac{\sqrt{5}}{2} - 2 i \sqrt{\frac{\sqrt{5}}{8} + \frac{5}{8}}, - \frac{\sqrt{5}}{2} - \frac{1}{2} + 2 i \sqrt{\frac{5}{8} - \frac{\sqrt{5}}{8}}, - \frac{\sqrt{5}}{2} - \frac{1}{2} - 2 i \sqrt{\frac{5}{8} - \frac{\sqrt{5}}{8}}
 
-# Greek / single-letter equations: every symbol is solvable, so these route to
-# SOLVE targeting the highest-preference symbol (one step at a time).
+# Greek / single-letter equations: sympy solves for the preferred target variable directly.
 \alpha+\beta=1 => SOLVE_EQUATION_ONE_STEP => \alpha = 1 - \beta
-F=ma => SOLVE_EQUATION_ONE_STEP => F - a m = 0
+F=ma => SOLVE_EQUATION_ONE_STEP => m = \frac{F}{a}
 xfail:\tau=rFsin(\theta) => SIMPLIFY_EXPRESSION => tau = F*r*sin(theta)
-\rho=\frac{m}{V} => SOLVE_EQUATION_ONE_STEP => \rho - \frac{m}{V} = 0
-E=mc^{2} => SOLVE_EQUATION_ONE_STEP => E - c^{2} m = 0
+\rho=\frac{m}{V} => SOLVE_EQUATION_ONE_STEP => m = V \rho
+E=mc^{2} => SOLVE_EQUATION_ONE_STEP => m = \frac{E}{c^{2}}
 p=\frac{h}{\lambda} => SOLVE_EQUATION_ONE_STEP => NO_SUGGESTION
 \omega=2\pi f => SOLVE_EQUATION_ONE_STEP => NO_SUGGESTION
-\theta=\alpha+\beta => SOLVE_EQUATION_ONE_STEP => - \alpha + \theta = \beta
-\sigma=\frac{\alpha}{\beta} => SOLVE_EQUATION_ONE_STEP => - \frac{\alpha}{\beta} + \sigma = 0
-F=\alpha m => SOLVE_EQUATION_ONE_STEP => F - \alpha m = 0
-a=\frac{F}{m} => SOLVE_EQUATION_ONE_STEP => - \frac{F}{m} + a = 0
-v^{2}=u^{2}+2as => SOLVE_QUADRATIC => - u^{2} + v^{2} = 2 a s
+\theta=\alpha+\beta => SOLVE_EQUATION_ONE_STEP => \alpha = - \beta + \theta
+\sigma=\frac{\alpha}{\beta} => SOLVE_EQUATION_ONE_STEP => \alpha = \beta \sigma
+F=\alpha m => SOLVE_EQUATION_ONE_STEP => m = \frac{F}{\alpha}
+a=\frac{F}{m} => SOLVE_EQUATION_ONE_STEP => m = \frac{F}{a}
+v^{2}=u^{2}+2as => SOLVE_QUADRATIC => u = - \sqrt{- 2 a s + v^{2}}, \sqrt{- 2 a s + v^{2}}
 \delta_{t}=\frac{v-u}{a} => SIMPLIFY_EXPRESSION => delta_{t} = \frac{- u + v}{a}
-\theta=\omega t => SOLVE_EQUATION_ONE_STEP => - \omega t + \theta = 0
+\theta=\omega t => SOLVE_EQUATION_ONE_STEP => t = \frac{\theta}{\omega}
 
 # Greek letter equation (solving for x)
-\alpha x+\beta=\gamma => SOLVE_EQUATION_ONE_STEP => \alpha x = - \beta + \gamma
+\alpha x+\beta=\gamma => SOLVE_EQUATION_ONE_STEP => x = \frac{- \beta + \gamma}{\alpha}
 
 # radical equations
 xfail:\sqrt{2x}=4 => SOLVE_EQUATION_ONE_STEP => x = 8
@@ -101,11 +106,5 @@ a=b=c => NO_SUGGESTION => NO_SUGGESTION
 0=0 => SOLVE_EQUATION_ONE_STEP => NO_SUGGESTION
 
 # xfail: cases we haven't implemented yet
-xfail:cos(x)=0 => SOLVE_TRIG => x = 1.57079632679490
-xfail:sin(x)=1 => SOLVE_TRIG => x = 1.57079632679490
-xfail:tan(x)=1 => SOLVE_TRIG => x = 0.785398163397448
-xfail:(x-2)(x+3)(x-5)=0 => SOLVE_FACTOR_FORM => x = -3, 2, 5
 \log_{10}(x)=2 => SOLVE_EXP_LOG => x = 100
-xfail:cos(x)=0.5 => SOLVE_TRIG => x = 1.0471975511965976
-xfail:tan(x)=0.5773502691896257 => SOLVE_TRIG => x = 0.5235987755982989
 x!=\Gamma(x+1)=\int_{0}^{\infty}\frac{t^{x}}{e^{t}}dt => NO_SUGGESTION => NO_SUGGESTION

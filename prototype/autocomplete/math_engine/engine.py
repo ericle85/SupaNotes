@@ -295,10 +295,6 @@ _calculus_ops = {
 }
 
 
-def _format_input_equation(line: ParsedEquation) -> str:
-    return equation_solving._format_equation(line.left_side, line.right_side)
-
-
 def _execute_equation(line: ParsedEquation, operation: MathOperation) -> SuggestedNextLine:
     transform = _equation_transforms.get(operation)
     if transform is not None:
@@ -307,10 +303,10 @@ def _execute_equation(line: ParsedEquation, operation: MathOperation) -> Suggest
         return SuggestedNextLine("", operation, "equation has no variable to solve for")
     if equation_solving.is_equation_solved(line):
         return SuggestedNextLine("", operation, "equation is already solved")
-    step = equation_solving.generate_next_solving_step(line)
-    if step.resulting_equation_text == _format_input_equation(line):
-        return SuggestedNextLine("", operation, "cannot solve further")
-    return SuggestedNextLine(step.resulting_equation_text, operation)
+    result = equation_solving.solve_equation(line)
+    if not result:
+        return SuggestedNextLine("", operation, "cannot solve")
+    return SuggestedNextLine(result, operation)
 
 
 def _execute_expression(line: ParsedExpression, operation: MathOperation) -> SuggestedNextLine:
