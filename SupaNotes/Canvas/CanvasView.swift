@@ -5,6 +5,7 @@ import UIKit
 final class DrawingCanvasController: ObservableObject {
     fileprivate weak var canvas: DrawingCanvas?
     var onStrokesChanged: (([Stroke]) -> Void)?
+    @Published var selectedBlockBBox: CGRect?
 
     func clear() {
         canvas?.clearStrokes()
@@ -31,14 +32,21 @@ struct CanvasView: UIViewRepresentable {
         return canvas
     }
 
-    func updateUIView(_: DrawingCanvas, context _: Context) {}
+    func updateUIView(_ uiView: DrawingCanvas, context _: Context) {
+        uiView.highlightBBox = controller.selectedBlockBBox
+    }
 }
 
 final class DrawingCanvas: StrokeInputSource {
     private let engine = StrokeEngine()
     weak var controller: DrawingCanvasController?
+    var highlightBBox: CGRect? {
+        didSet { setNeedsDisplay() }
+    }
 
-    var currentStrokes: [Stroke] { engine.strokes }
+    var currentStrokes: [Stroke] {
+        engine.strokes
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -87,5 +95,16 @@ final class DrawingCanvas: StrokeInputSource {
     override func draw(_: CGRect) {
         guard let context = UIGraphicsGetCurrentContext() else { return }
         StrokeRenderer.draw(engine.strokes, active: engine.activeStroke, in: context)
+        drawHighlightBBox(in: context)
+    }
+
+    private func drawHighlightBBox(in context: CGContext) {
+        guard let bbox = highlightBBox else { return }
+        context.saveGState()
+        context.setStrokeColor(UIColor.systemRed.cgColor)
+        context.setLineWidth(2)
+        context.setLineDash(phase: 0, lengths: [4, 3])
+        context.stroke(bbox)
+        context.restoreGState()
     }
 }

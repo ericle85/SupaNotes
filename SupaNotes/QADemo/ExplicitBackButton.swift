@@ -18,5 +18,7 @@ struct ExplicitBackButton: ViewModifier {
 }
 
 extension View {
-    func explicitBack() -> some View { modifier(ExplicitBackButton()) }
+    func explicitBack() -> some View {
+        modifier(ExplicitBackButton())
+    }
 }

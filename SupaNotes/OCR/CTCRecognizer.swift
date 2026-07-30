@@ -12,7 +12,7 @@ struct CTCPoint {
     let t: Float
 }
 
-struct CTCTokenDetail {
+struct CTCTokenDetail: Equatable {
     let token: String
     let confidence: Float
 }
@@ -68,7 +68,7 @@ private func ctcResampleStroke(_ stroke: [CTCPoint], step: Float = CTC_RESAMPLE_
     guard stroke.count >= 2 else { return stroke }
 
     var cumLen = [Float](repeating: 0, count: stroke.count)
-    for i in 1..<stroke.count {
+    for i in 1 ..< stroke.count {
         let dx = stroke[i].x - stroke[i - 1].x
         let dy = stroke[i].y - stroke[i - 1].y
         cumLen[i] = cumLen[i - 1] + sqrt(dx * dx + dy * dy)
@@ -87,7 +87,7 @@ private func ctcResampleStroke(_ stroke: [CTCPoint], step: Float = CTC_RESAMPLE_
     let ys = stroke.map { $0.y }
     let ts = stroke.map { $0.t }
 
-    for i in 0..<nPoints {
+    for i in 0 ..< nPoints {
         let targetLen = totalLen * Float(i) / Float(nPoints - 1)
         let interpX = ctcLinearInterp(cumLen, xs, at: targetLen)
         let interpY = ctcLinearInterp(cumLen, ys, at: targetLen)
@@ -117,7 +117,7 @@ func ctcExtractPointFeatures(_ strokes: [[CTCPoint]]) -> [Float] {
 
     for (i, stroke) in strokes.enumerated() {
         let resampled = ctcResampleStroke(stroke)
-        for j in 0..<resampled.count {
+        for j in 0 ..< resampled.count {
             let x = resampled[j].x
             let y = resampled[j].y
             let dx: Float = j > 0 ? resampled[j].x - resampled[j - 1].x : 0
@@ -162,12 +162,12 @@ private func ctcGreedyDecode(
     var decodedTokens = [(Int, Float)]()
     var prev = -1
 
-    for t in 0..<seqLen {
+    for t in 0 ..< seqLen {
         let offset = t * vocabSize
         var maxIdx = 0
         var maxVal: Float = logProbs[offset]
 
-        for v in 1..<vocabSize {
+        for v in 1 ..< vocabSize {
             let val = logProbs[offset + v]
             if val > maxVal {
                 maxVal = val
@@ -210,18 +210,19 @@ final class CTCRecognizer {
         let config = MLModelConfiguration()
         config.computeUnits = .cpuAndGPU
         guard let modelURL = Bundle.main.url(forResource: "CTCTransformer", withExtension: "mlmodelc")
-                ?? Bundle.main.url(forResource: "CTCTransformer", withExtension: "mlpackage")
+            ?? Bundle.main.url(forResource: "CTCTransformer", withExtension: "mlpackage")
         else {
             throw NSError(domain: "CTCRecognizer", code: 1, userInfo: [NSLocalizedDescriptionKey: "Model not found"])
         }
-        self.model = try MLModel(contentsOf: modelURL, configuration: config)
-        self.vocab = ctcLoadVocab()
+        model = try MLModel(contentsOf: modelURL, configuration: config)
+        vocab = ctcLoadVocab()
 
         if let outputDesc = model.modelDescription.outputDescriptionsByName["log_probs"],
-           let constraint = outputDesc.multiArrayConstraint {
-            self.vocabSize = constraint.shape.last?.intValue ?? 259
+           let constraint = outputDesc.multiArrayConstraint
+        {
+            vocabSize = constraint.shape.last?.intValue ?? 259
         } else {
-            self.vocabSize = 259
+            vocabSize = 259
         }
     }
 
@@ -235,7 +236,7 @@ final class CTCRecognizer {
         }
 
         let featureArray = try MLMultiArray(shape: [1, seqLen as NSNumber, CTC_FEATURE_DIM as NSNumber], dataType: .float32)
-        for i in 0..<(seqLen * CTC_FEATURE_DIM) {
+        for i in 0 ..< (seqLen * CTC_FEATURE_DIM) {
             featureArray[i] = NSNumber(value: features[i])
         }
 
@@ -259,7 +260,7 @@ final class CTCRecognizer {
         let totalElements = outLen * vocabSize
         var logProbs = [Float](repeating: 0, count: totalElements)
         let ptr = logProbsArray.dataPointer.bindMemory(to: Float16.self, capacity: logProbsArray.count)
-        for i in 0..<totalElements {
+        for i in 0 ..< totalElements {
             logProbs[i] = Float(ptr[i])
         }
 

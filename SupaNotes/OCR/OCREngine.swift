@@ -10,13 +10,15 @@ enum RecognizedKind: String {
     case ink
 }
 
-struct RecognizedBlock: Identifiable {
+struct RecognizedBlock: Identifiable, Equatable {
     let id: String
     let kind: RecognizedKind
     let content: String
     let confidence: Float
     let bbox: CGRect
     let strokeIndices: [Int]
+    let recognizedAt: TimeInterval
+    let tokens: [CTCTokenDetail]
 }
 
 // MARK: - Stroke Grouping
@@ -97,7 +99,7 @@ private func verticalLines(strokeIndices: [Int], strokes: [Stroke]) -> [StrokeGr
         for (lineIdx, line) in lines.enumerated() {
             let threshold = max(LINE_MERGE_MIN_THRESHOLD, max(line.height, height) * LINE_MERGE_HEIGHT_FACTOR)
             let distance = abs(centerY - line.centerY)
-            if distance < threshold && distance < bestDistance {
+            if distance < threshold, distance < bestDistance {
                 bestLineIndex = lineIdx
                 bestDistance = distance
             }
@@ -159,7 +161,7 @@ private func splitLineIntoChunks(_ line: StrokeGroup, strokes: [Stroke]) -> [Str
 }
 
 func groupStrokes(_ strokes: [Stroke]) -> [StrokeGroup] {
-    let allIndices = Array(0..<strokes.count)
+    let allIndices = Array(0 ..< strokes.count)
     var chunks: [StrokeGroup] = []
     for line in verticalLines(strokeIndices: allIndices, strokes: strokes) {
         chunks.append(contentsOf: splitLineIntoChunks(line, strokes: strokes))
@@ -242,6 +244,7 @@ final class OCREngine: ObservableObject {
     private let digitalInkRecognizer = DigitalInkTextRecognizer()
     private var idleTimer: Timer?
     private var lastStrokeCount = 0
+    private let sessionStart = Date()
 
     init() {
         loadModels()
@@ -283,6 +286,7 @@ final class OCREngine: ObservableObject {
         let groups = groupStrokes(strokes)
         var newBlocks: [RecognizedBlock] = []
         let dispatchGroup = DispatchGroup()
+        let recognizedAt = Date().timeIntervalSince(sessionStart)
 
         for (index, group) in groups.enumerated() {
             if looksLikeDrawing(group.bbox) { continue }
@@ -305,13 +309,16 @@ final class OCREngine: ObservableObject {
                         content: ctcResult.text,
                         confidence: ctcResult.confidence,
                         bbox: group.bbox,
-                        strokeIndices: group.strokeIndices
+                        strokeIndices: group.strokeIndices,
+                        recognizedAt: recognizedAt,
+                        tokens: ctcResult.tokens
                     )
                     newBlocks.append(block)
                 } else {
                     dispatchGroup.enter()
                     let capturedIndex = index
                     let capturedGroup = group
+                    let capturedTokens = ctcResult.tokens
 
                     digitalInkRecognizer.recognize(strokes: ctcStrokes) { text in
                         let content = text ?? ctcResult.text
@@ -321,7 +328,9 @@ final class OCREngine: ObservableObject {
                             content: content,
                             confidence: text != nil ? 1.0 : ctcResult.confidence,
                             bbox: capturedGroup.bbox,
-                            strokeIndices: capturedGroup.strokeIndices
+                            strokeIndices: capturedGroup.strokeIndices,
+                            recognizedAt: recognizedAt,
+                            tokens: capturedTokens
                         )
                         newBlocks.append(block)
                         dispatchGroup.leave()

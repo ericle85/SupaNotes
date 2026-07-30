@@ -1,6 +1,6 @@
 import Foundation
-import MLKitDigitalInkRecognition
 import MLKitCommon
+import MLKitDigitalInkRecognition
 
 typealias InkStrokePoint = MLKitDigitalInkRecognition.StrokePoint
 typealias InkStroke = MLKitDigitalInkRecognition.Stroke
@@ -13,7 +13,7 @@ final class DigitalInkTextRecognizer {
         guard let identifier = DigitalInkRecognitionModelIdentifier(forLanguageTag: "en-US") else {
             fatalError("en-US digital ink model identifier not found")
         }
-        self.modelIdentifier = identifier
+        modelIdentifier = identifier
     }
 
     func ensureModelDownloaded(completion: @escaping (Bool) -> Void) {

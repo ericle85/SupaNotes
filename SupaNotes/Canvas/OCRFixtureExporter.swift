@@ -208,7 +208,7 @@ private extension CGRect {
             Double(minX),
             Double(minY),
             Double(maxX),
-            Double(maxY)
+            Double(maxY),
         ]
     }
 }

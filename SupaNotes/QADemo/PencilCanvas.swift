@@ -7,13 +7,15 @@ final class PencilCanvasController: ObservableObject {
     @Published var lastTouchInfo = "—"
     fileprivate weak var view: PencilCanvasView?
 
-    func clear() { view?.clearCanvas() }
+    func clear() {
+        view?.clearCanvas()
+    }
 
     func inject(command: String) {
         let points = PencilCanvasController.parse(command)
         let normalized = points.isEmpty ? PencilCanvasController.defaultStroke : points
         #if DEBUG
-        view?.injectPencilStroke(normalized: normalized)
+            view?.injectPencilStroke(normalized: normalized)
         #endif
     }
 
@@ -105,42 +107,59 @@ final class PencilCanvasView: StrokeInputSource {
     }
 
     #if DEBUG
-    func injectPencilStroke(normalized points: [CGPoint]) {
-        guard points.count >= 2, bounds.width > 0, bounds.height > 0 else { return }
-        let mapped = points.map { CGPoint(x: $0.x * bounds.width, y: $0.y * bounds.height) }
-        let touch = SyntheticPencilTouch(location: mapped[0], phase: .began)
-        touchesBegan([touch], with: nil)
-        for point in mapped.dropFirst() {
-            touch.update(location: point, phase: .moved)
-            touchesMoved([touch], with: nil)
+        func injectPencilStroke(normalized points: [CGPoint]) {
+            guard points.count >= 2, bounds.width > 0, bounds.height > 0 else { return }
+            let mapped = points.map { CGPoint(x: $0.x * bounds.width, y: $0.y * bounds.height) }
+            let touch = SyntheticPencilTouch(location: mapped[0], phase: .began)
+            touchesBegan([touch], with: nil)
+            for point in mapped.dropFirst() {
+                touch.update(location: point, phase: .moved)
+                touchesMoved([touch], with: nil)
+            }
+            touch.update(location: mapped[mapped.count - 1], phase: .ended)
+            touchesEnded([touch], with: nil)
         }
-        touch.update(location: mapped[mapped.count - 1], phase: .ended)
-        touchesEnded([touch], with: nil)
-    }
     #endif
 }
 
 #if DEBUG
-final class SyntheticPencilTouch: UITouch {
-    private var _location: CGPoint
-    private var _phase: UITouch.Phase
+    final class SyntheticPencilTouch: UITouch {
+        private var _location: CGPoint
+        private var _phase: UITouch.Phase
 
-    init(location: CGPoint, phase: UITouch.Phase) {
-        self._location = location
-        self._phase = phase
-        super.init()
+        init(location: CGPoint, phase: UITouch.Phase) {
+            _location = location
+            _phase = phase
+            super.init()
+        }
+
+        func update(location: CGPoint, phase: UITouch.Phase) {
+            _location = location
+            _phase = phase
+        }
+
+        override var type: UITouch.TouchType {
+            .pencil
+        }
+
+        override var phase: UITouch.Phase {
+            _phase
+        }
+
+        override var force: CGFloat {
+            1
+        }
+
+        override var maximumPossibleForce: CGFloat {
+            1
+        }
+
+        override func location(in _: UIView?) -> CGPoint {
+            _location
+        }
+
+        override func previousLocation(in _: UIView?) -> CGPoint {
+            _location
+        }
     }
-
-    func update(location: CGPoint, phase: UITouch.Phase) {
-        _location = location
-        _phase = phase
-    }
-
-    override var type: UITouch.TouchType { .pencil }
-    override var phase: UITouch.Phase { _phase }
-    override var force: CGFloat { 1 }
-    override var maximumPossibleForce: CGFloat { 1 }
-    override func location(in view: UIView?) -> CGPoint { _location }
-    override func previousLocation(in view: UIView?) -> CGPoint { _location }
-}
 #endif

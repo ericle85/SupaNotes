@@ -11,7 +11,7 @@ struct NumbersDemoView: View {
                 .accessibilityIdentifier(QAID.displayedNumber)
 
             HStack(spacing: 24) {
-                ForEach(1...3, id: \.self) { number in
+                ForEach(1 ... 3, id: \.self) { number in
                     Button("\(number)") { displayed = "\(number)" }
                         .font(.system(size: 40, weight: .semibold))
                         .frame(width: 100, height: 100)
