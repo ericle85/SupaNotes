@@ -5,7 +5,6 @@ from sympy.core.alphabets import greeks
 
 from autocomplete.document_context_model import DocumentContext
 from autocomplete.document_line_parser import ParsedEquation, ParsedExpression, UnparsableLine
-from autocomplete.math_operations import MathOperation
 from autocomplete.math_engine import (
     equation_solving,
     expression_transforms,
@@ -23,7 +22,7 @@ class GhostText:
 @dataclass(frozen=True)
 class SuggestedNextLine:
     suggested_text: str
-    operation: MathOperation
+    operation: str
     diagnostic_reason: str = ""
     ghost_text: GhostText | None = None
 
@@ -35,7 +34,7 @@ class SuggestedNextLine:
 def generate_next_line(context: DocumentContext) -> SuggestedNextLine:
     line = context.current_line
     if isinstance(line, UnparsableLine):
-        return SuggestedNextLine("", MathOperation.SIMPLIFY_EXPRESSION, line.parse_error_description)
+        return SuggestedNextLine("", "simplify_expression", line.parse_error_description)
     evaluated = _try_evaluate_numeric(line, context.preceding_lines)
     if evaluated is not None:
         return evaluated
@@ -80,27 +79,27 @@ def _try_evaluate_numeric(line, preceding_lines):
     if numeric.is_number and numeric.is_real is False:
         return None
     if resolved.free_symbols or not numeric.is_number:
-        return SuggestedNextLine("", MathOperation.EVALUATE_NUMERIC, "expression has unknown or non-numeric terms")
+        return SuggestedNextLine("", "evaluate_numeric", "expression has unknown or non-numeric terms")
     result_text = _calculator_result_text(numeric)
     return SuggestedNextLine(
         result_text,
-        MathOperation.EVALUATE_NUMERIC,
+        "evaluate_numeric",
         ghost_text=GhostText(result_text, placement),
     )
 
 
-def _resolve_equation(line: ParsedEquation) -> MathOperation:
+def _resolve_equation(line: ParsedEquation) -> str:
     for matches, operation in _equation_rules:
         if matches(line):
             return operation
-    return MathOperation.SOLVE_EQUATION_ONE_STEP
+    return "solve_equation_one_step"
 
 
-def _resolve_expression(line: ParsedExpression) -> MathOperation:
+def _resolve_expression(line: ParsedExpression) -> str:
     for matches, operation in _expression_rules:
         if matches(line):
             return operation
-    return MathOperation.SIMPLIFY_EXPRESSION
+    return "simplify_expression"
 
 
 def _either_side(predicate: Callable) -> Callable[[ParsedEquation], bool]:
@@ -132,9 +131,6 @@ def _is_manipulable_variable(name: str) -> bool:
     return name.lower().removeprefix("var") in _GREEK_NAMES
 
 
-# Every Greek symbol is solvable: a multi-symbol equation routes to SOLVE targeting
-# the highest-preference symbol. Chosen so the app can later let the user tap a
-# suggestion and pick "solve for tau", "solve for omega", ... re-targeting the solve.
 def _has_single_unknown(line: ParsedEquation) -> bool:
     names = {symbol.name for symbol in line.left_side.free_symbols | line.right_side.free_symbols}
     if len(names) <= 1:
@@ -225,17 +221,17 @@ def _expression_contains_power_term(line: ParsedExpression) -> bool:
     return any(term.is_Pow or (term.is_Mul and any(factor.is_Pow for factor in term.args)) for term in terms)
 
 
-EquationRule = tuple[Callable[[ParsedEquation], bool], MathOperation]
-ExpressionRule = tuple[Callable[[ParsedExpression], bool], MathOperation]
+EquationRule = tuple[Callable[[ParsedEquation], bool], str]
+ExpressionRule = tuple[Callable[[ParsedExpression], bool], str]
 
 _equation_rules: tuple[EquationRule, ...] = (
-    (_is_factor_form_equation, MathOperation.SOLVE_FACTOR_FORM),
-    (lambda line: not _has_single_unknown(line), MathOperation.SIMPLIFY_EXPRESSION),
-    (_either_side(_contains_trig), MathOperation.SOLVE_TRIG),
-    (_either_side(_contains_exp), MathOperation.SOLVE_EXP_LOG),
-    (_either_side(_contains_log), MathOperation.SOLVE_EXP_LOG),
-    (_either_side(_contains_sqrt), MathOperation.SOLVE_RADICAL),
-    (_is_quadratic_equation, MathOperation.SOLVE_QUADRATIC),
+    (_is_factor_form_equation, "solve_factor_form"),
+    (lambda line: not _has_single_unknown(line), "simplify_expression"),
+    (_either_side(_contains_trig), "solve_trig"),
+    (_either_side(_contains_exp), "solve_exp_log"),
+    (_either_side(_contains_log), "solve_exp_log"),
+    (_either_side(_contains_sqrt), "solve_radical"),
+    (_is_quadratic_equation, "solve_quadratic"),
 )
 
 
@@ -248,38 +244,38 @@ def _is_numeric_awaiting_equals(line: ParsedExpression) -> bool:
 
 
 _expression_rules: tuple[ExpressionRule, ...] = (
-    (_is_complex_number, MathOperation.CONVERT_POLAR),
-    (_is_numeric_awaiting_equals, MathOperation.AWAITING_TRAILING_EQUALS),
-    (lambda line: _is_zero_denominator_fraction(line.expression), MathOperation.UNDEFINED_RESULT),
-    (lambda line: _is_simplest(line.expression) is False, MathOperation.SIMPLIFY_EXPRESSION),
-    (lambda line: _is_simplest(line.expression) is True, MathOperation.CONVERT_TO_DECIMAL),
-    (lambda line: _needs_expansion(line.expression), MathOperation.EXPAND_EXPRESSION),
-    (_expression_contains_power_term, MathOperation.FACTOR_EXPRESSION),
-    (lambda line: _needs_cancellation(line.expression), MathOperation.CANCEL_EXPRESSION),
+    (_is_complex_number, "convert_polar"),
+    (_is_numeric_awaiting_equals, "awaiting_trailing_equals"),
+    (lambda line: _is_zero_denominator_fraction(line.expression), "undefined_result"),
+    (lambda line: _is_simplest(line.expression) is False, "simplify_expression"),
+    (lambda line: _is_simplest(line.expression) is True, "convert_to_decimal"),
+    (lambda line: _needs_expansion(line.expression), "expand_expression"),
+    (_expression_contains_power_term, "factor_expression"),
+    (lambda line: _needs_cancellation(line.expression), "cancel_expression"),
 )
 
 
 _equation_transforms = {
-    MathOperation.SIMPLIFY_EXPRESSION: expression_transforms.simplify_equation,
-    MathOperation.FACTOR_EXPRESSION: expression_transforms.factor_equation,
-    MathOperation.EXPAND_EXPRESSION: expression_transforms.expand_equation,
-    MathOperation.CANCEL_EXPRESSION: expression_transforms.cancel_equation,
+    "simplify_expression": expression_transforms.simplify_equation,
+    "factor_expression": expression_transforms.factor_equation,
+    "expand_expression": expression_transforms.expand_equation,
+    "cancel_expression": expression_transforms.cancel_equation,
 }
 
 _expression_transforms = {
-    MathOperation.SIMPLIFY_EXPRESSION: expression_transforms.simplify_expression,
-    MathOperation.FACTOR_EXPRESSION: expression_transforms.factor_expression,
-    MathOperation.EXPAND_EXPRESSION: expression_transforms.expand_expression,
-    MathOperation.CANCEL_EXPRESSION: expression_transforms.cancel_expression,
-    MathOperation.CONVERT_TO_DECIMAL: expression_transforms.convert_expression_to_decimal,
-    MathOperation.UNDEFINED_RESULT: expression_transforms.suggest_undefined_result,
+    "simplify_expression": expression_transforms.simplify_expression,
+    "factor_expression": expression_transforms.factor_expression,
+    "expand_expression": expression_transforms.expand_expression,
+    "cancel_expression": expression_transforms.cancel_expression,
+    "convert_to_decimal": expression_transforms.convert_expression_to_decimal,
+    "undefined_result": expression_transforms.suggest_undefined_result,
 }
 
 _expression_single_arg = {
-    MathOperation.CONVERT_POLAR: complex_numbers.convert_rectangular_to_polar,
-    MathOperation.COMPUTE_MAGNITUDE: complex_numbers.compute_magnitude,
-    MathOperation.COMPUTE_PHASE: complex_numbers.compute_phase_angle,
-    MathOperation.EULER_FORM: complex_numbers.express_in_euler_form,
+    "convert_polar": complex_numbers.convert_rectangular_to_polar,
+    "compute_magnitude": complex_numbers.compute_magnitude,
+    "compute_phase": complex_numbers.compute_phase_angle,
+    "euler_form": complex_numbers.express_in_euler_form,
 }
 
 
@@ -288,14 +284,14 @@ def _compute_limit(line: ParsedExpression, variable_name: str) -> str:
 
 
 _calculus_ops = {
-    MathOperation.DIFFERENTIATE: calculus.differentiate_expression,
-    MathOperation.INTEGRATE: calculus.integrate_expression,
-    MathOperation.COMPUTE_LIMIT: _compute_limit,
-    MathOperation.EXPAND_TAYLOR: calculus.expand_as_taylor_series,
+    "differentiate": calculus.differentiate_expression,
+    "integrate": calculus.integrate_expression,
+    "compute_limit": _compute_limit,
+    "expand_taylor": calculus.expand_as_taylor_series,
 }
 
 
-def _execute_equation(line: ParsedEquation, operation: MathOperation) -> SuggestedNextLine:
+def _execute_equation(line: ParsedEquation, operation: str) -> SuggestedNextLine:
     transform = _equation_transforms.get(operation)
     if transform is not None:
         return SuggestedNextLine(transform(line), operation)
@@ -309,8 +305,8 @@ def _execute_equation(line: ParsedEquation, operation: MathOperation) -> Suggest
     return SuggestedNextLine(result, operation)
 
 
-def _execute_expression(line: ParsedExpression, operation: MathOperation) -> SuggestedNextLine:
-    if operation == MathOperation.AWAITING_TRAILING_EQUALS:
+def _execute_expression(line: ParsedExpression, operation: str) -> SuggestedNextLine:
+    if operation == "awaiting_trailing_equals":
         return SuggestedNextLine("", operation, "write \"=\" to request a result")
     transform = _expression_transforms.get(operation)
     if transform is not None:

@@ -90,6 +90,20 @@ class ReplayHandler(BaseHTTPRequestHandler):
         self.serve_frontend(path.lstrip("/"))
 
     def do_POST(self) -> None:  # noqa: N802
+        parsed = urlparse(self.path)
+        path = parsed.path
+        if path == "/api/recognize":
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(content_length)) if content_length else {}
+            strokes = body.get("strokes", [])
+            if not strokes:
+                self.send_json({"error": "no strokes"}, 400)
+                return
+            from ocr_pipeline.recognizer import recognize_group
+            group = {"strokes": strokes}
+            result = recognize_group(group)
+            self.send_json(result)
+            return
         self.send_json({"error": "not found"}, 404)
 
     def serve_frontend(self, relative: str) -> None:

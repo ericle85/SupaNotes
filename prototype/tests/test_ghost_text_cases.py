@@ -4,7 +4,7 @@ from autocomplete.autocomplete_pipeline import run_autocomplete_on_document_text
 def test_trailing_equals_places_ghost_text_right():
     result = run_autocomplete_on_document_text("2+3=")
     ghost = result.suggestion.ghost_text
-    assert result.classified_intent.operation.name == "EVALUATE_NUMERIC"
+    assert result.operation == "evaluate_numeric"
     assert ghost is not None
     assert ghost.text == "5"
     assert ghost.placement == "right"
@@ -13,7 +13,7 @@ def test_trailing_equals_places_ghost_text_right():
 def test_leading_equals_places_ghost_text_left():
     result = run_autocomplete_on_document_text("=2+3")
     ghost = result.suggestion.ghost_text
-    assert result.classified_intent.operation.name == "EVALUATE_NUMERIC"
+    assert result.operation == "evaluate_numeric"
     assert ghost is not None
     assert ghost.text == "5"
     assert ghost.placement == "left"

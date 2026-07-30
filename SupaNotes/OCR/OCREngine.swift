@@ -189,7 +189,7 @@ private func looksLikeDrawing(_ bbox: CGRect) -> Bool {
     return aspect > INK_ASPECT_RATIO_MAX
 }
 
-private let latexCommandPattern = try! NSRegularExpression(pattern: "\\\\[a-zA-Z]+")
+let latexCommandPattern = try! NSRegularExpression(pattern: "\\\\[a-zA-Z]+")
 private let mathSymbolPattern = try! NSRegularExpression(pattern: "[0-9+=^_/*<>()&-]")
 private let mathBracketPattern = try! NSRegularExpression(pattern: "[\\[\\]:,|{}]")
 private let letterRunPattern = try! NSRegularExpression(pattern: "[a-zA-Z]+")
@@ -198,7 +198,7 @@ private let mathFunctionPattern = try! NSRegularExpression(
 )
 private let latexEnvPattern = try! NSRegularExpression(pattern: "\\\\(?:begin|end)\\{[a-zA-Z*]+\\}")
 
-private func longestLetterRun(_ content: String) -> Int {
+func longestLetterRun(_ content: String) -> Int {
     let range = NSRange(content.startIndex..., in: content)
     let stripped1 = latexEnvPattern.stringByReplacingMatches(in: content, range: range, withTemplate: " ")
     let range2 = NSRange(stripped1.startIndex..., in: stripped1)
@@ -300,7 +300,7 @@ final class OCREngine: ObservableObject {
 
             do {
                 let ctcResult = try ctcRecognizer.recognize(strokes: ctcStrokes)
-                let kind = routeKind(content: ctcResult.text, confidence: ctcResult.confidence)
+                let kind = routeGroup(content: ctcResult.text, tokenConfidences: ctcResult.tokens.map { $0.confidence }, strokes: ctcStrokes)
 
                 if kind == .math {
                     let block = RecognizedBlock(

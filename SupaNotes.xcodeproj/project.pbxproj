@@ -100,7 +100,6 @@
 				9DB6832F2A8F4AB6FC67E458 /* Pods-SupaNotes.debug.xcconfig */,
 				EC803F4ADED094886A469FE2 /* Pods-SupaNotes.release.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};

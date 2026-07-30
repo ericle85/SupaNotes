@@ -57,8 +57,8 @@ def test_autocomplete_case(case: AutocompleteCase):
         assert result.suggestion.has_suggestion is False
         assert result.suggestion.diagnostic_reason != ""
         if case.expected_operation_name != NO_SUGGESTION_SENTINEL:
-            assert result.classified_intent.operation.name == case.expected_operation_name
+            assert result.operation == case.expected_operation_name.lower()
         return
     assert result.suggestion.has_suggestion is True
-    assert result.classified_intent.operation.name == case.expected_operation_name
+    assert result.operation == case.expected_operation_name.lower()
     assert result.suggestion.suggested_text == case.expected_next_line
