@@ -1,10 +1,20 @@
 """Conv + Transformer + CTC model for online handwriting recognition."""
 
+import os
 import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
+from .dataset import Vocabulary, BLANK_TOKEN
+from .preprocessing import normalize_strokes, extract_point_features
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+CKPT_PATH = os.path.join(SCRIPT_DIR, "ctc_final.pt")
+VOCAB_PATH = os.path.join(SCRIPT_DIR, "vocab.json")
+MAX_SEQ_LEN = 2048         # max input points
+INNER_MAX_SEQ_LEN = 1026    # max transformer positions (matches checkpoint PE buffer)
 
 class SinusoidalPositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=2048, dropout=0.1):
@@ -74,8 +84,8 @@ class CTCTransformer(nn.Module):
     - Linear CTC head + log_softmax
     """
 
-    def __init__(self, vocab_size, input_dim=6, d_model=512, nhead=8,
-                 num_layers=11, dim_ff=2048, dropout=0.15, max_seq_len=512):
+    def __init__(self, vocab_size, input_dim=6, d_model=256, nhead=8,
+                 num_layers=6, dim_ff=1024, dropout=0, max_seq_len=2048):
         super().__init__()
         self.conv = ConvSubsampler(input_dim, d_model, dropout=dropout)
         self.pos_enc = SinusoidalPositionalEncoding(d_model, max_len=max_seq_len, dropout=dropout)
@@ -120,3 +130,69 @@ class CTCTransformer(nn.Module):
         logits = self.ctc_head(x)
         log_probs = F.log_softmax(logits, dim=-1).permute(1, 0, 2)  # (T', B, V)
         return log_probs, out_lengths
+
+
+def ctc_greedy_decode(log_probs, lengths, vocab):
+    preds = log_probs.argmax(dim=-1).T  # (B, T)
+    results = []
+    for i, length in enumerate(lengths):
+        seq = preds[i, :length].tolist()
+        decoded = []
+        prev = -1
+        for tok in seq:
+            if tok != prev and tok != BLANK_TOKEN:
+                decoded.append(tok)
+            prev = tok
+        results.append(vocab.decode(decoded))
+    return results
+
+
+class CTCModel:
+    """Ready-to-use CTC handwriting recognition model.
+
+    Loads the checkpoint and vocabulary on construction — no extra setup needed.
+
+    Usage:
+        model = CTCModel()
+        text = model.transcribe(strokes)
+    """
+
+    def __init__(self):
+        ckpt = torch.load(CKPT_PATH, map_location="cpu", weights_only=False)
+
+        self.vocab = Vocabulary()
+        self.vocab.load(VOCAB_PATH)
+
+        self.ctc = CTCTransformer(
+            vocab_size=ckpt["vocab_size"],
+            max_seq_len=INNER_MAX_SEQ_LEN,
+        )
+        self.ctc.load_state_dict(ckpt["model"])
+        self.ctc.eval()
+
+    @torch.no_grad()
+    def transcribe(self, strokes):
+        """Transcribe handwritten strokes to LaTeX text.
+
+        Args:
+            strokes: list of np.ndarrays, each shape (N_i, 3) with columns [x, y, t]
+
+        Returns:
+            str: decoded transcription
+        """
+        if not strokes:
+            return ""
+
+        strokes = normalize_strokes(strokes)
+        features = extract_point_features(strokes)
+
+        if len(features) == 0 or len(features) > MAX_SEQ_LEN:
+            return ""
+
+        x = torch.from_numpy(features).float().unsqueeze(0)  # (1, N, 6)
+        lengths = torch.tensor([features.shape[0]], dtype=torch.long)
+
+        ctc_log_probs, out_lens = self.ctc(x, lengths)
+        results = ctc_greedy_decode(ctc_log_probs.cpu(), out_lens.cpu(), self.vocab)
+
+        return results[0]
