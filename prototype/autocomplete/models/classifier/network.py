@@ -6,10 +6,8 @@ from typing import Iterable
 NUM_CLASSES = 4
 
 class StrokeClassifier(nn.Module):
-    """Small convolutional sequence classifier that runs comfortably on CPU.
-
-    This configuration has 223,139 trainable parameters, intentionally leaving
-    substantial headroom under the 1M-parameter budget.
+    """
+    Classifier model for online handwriting strokes. Input is a sequence of shape (N, 5) with features (x, y, dx, dy, pen_state). Output is a vector of class logits.
     """
 
     def __init__(

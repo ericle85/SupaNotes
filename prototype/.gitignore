@@ -1,6 +1,0 @@
-__pycache__/
-*.pyc
-.venv/
-frontend/node_modules/
-frontend/app.js
-frontend/app.js.map
