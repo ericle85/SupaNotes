@@ -183,8 +183,7 @@ class CTCModel:
         if not strokes:
             return ""
 
-        strokes = normalize_strokes(strokes)
-        features = extract_point_features(strokes)
+        features = extract_point_features(normalize_strokes(strokes))
 
         if len(features) == 0 or len(features) > MAX_SEQ_LEN:
             return ""
