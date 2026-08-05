@@ -119,6 +119,7 @@ skills/
 .pi-subagents/
 
 *.pt
+!prototype/autocomplete/models/classifier/xyt_zeroed_t.pt
 prototype/fixtures/
 pulled_fixtures/
 prototype/tests/router_decodes.json
