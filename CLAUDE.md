@@ -5,7 +5,8 @@ For a fresh conversation, before any code is written lets work through questions
 
 Coding Rules:
     - Never write a README.md
-    - Prioritize simple code
+    - Only simple code
+    - Even for simple code, still think deeply about what your write impact the system as a whole
     - No inline code (things like loops, if statements, etc should be expanded out)
     - No Ternary Operator
     - Single thread

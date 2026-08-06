@@ -1,16 +1,16 @@
 import SwiftUI
 
-struct ZoomableCanvasRepresentable: UIViewRepresentable {
-    func makeUIView(context: Context) -> ZoomableCanvasView {
-        return ZoomableCanvasView()
+struct CanvasViewRepresentable: UIViewRepresentable {
+    func makeUIView(context: Context) -> CanvasView {
+        return CanvasView()
     }
 
-    func updateUIView(_ uiView: ZoomableCanvasView, context: Context) {}
+    func updateUIView(_ uiView: CanvasView, context: Context) {}
 }
 
 struct ContentView: View {
     var body: some View {
-        ZoomableCanvasRepresentable()
+        CanvasViewRepresentable()
             .ignoresSafeArea()
     }
 }
