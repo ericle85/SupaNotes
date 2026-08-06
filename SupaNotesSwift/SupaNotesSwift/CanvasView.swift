@@ -25,6 +25,11 @@ final class CanvasView: UIView, UIScrollViewDelegate {
         scrollView.showsHorizontalScrollIndicator = false
         addSubview(scrollView)
 
+        // if let pdfURL = Bundle.main.url(forResource: "ECE", withExtension: "pdf"),
+        //    let document = CGPDFDocument(pdfURL as CFURL),
+        //    let page = document.page(at: 1) {
+        //     setBackground(.pdf(page))
+        // }
         setBackground(.grid(.dark))
 
         let zoom = DebugZoomAnimationController(scrollView: scrollView)
