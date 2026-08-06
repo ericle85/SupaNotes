@@ -17,7 +17,7 @@ final class PageView: UIView {
         fatalError()
     }
 
-    func setBackground(_ background: PageBackground) {
+    private func setBackground(_ background: PageBackground) {
         backgroundView?.removeFromSuperview()
 
         let pageSize = Self.pageSizeFor(background)

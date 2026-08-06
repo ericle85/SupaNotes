@@ -15,6 +15,7 @@ final class TiledBackgroundView: UIView {
         self.pageRect = pdfPage.getBoxRect(.mediaBox)
         super.init(frame: .zero)
 
+        layer.backgroundColor = UIColor.white.cgColor // if this matches the color of the page it works very well
         contentScaleFactor = 1.0
         let tiledLayer = layer as! CATiledLayer
         tiledLayer.levelsOfDetail = 4

@@ -9,8 +9,6 @@ final class CanvasView: UIView, UIScrollViewDelegate {
     private var pageYOffsets: [CGFloat] = []
     private var pageSizes: [CGSize] = []
     private var visiblePageViews: [Int: PageView] = [:]
-    private var recycledPageViews: [PageView] = []
-
     private let pageGap: CGFloat = 20
 
     #if DEBUG
@@ -49,8 +47,6 @@ final class CanvasView: UIView, UIScrollViewDelegate {
             pageView.removeFromSuperview()
         }
         visiblePageViews.removeAll()
-        recycledPageViews.removeAll()
-
         pages = newPages
         precomputeLayout()
         setNeedsLayout()
@@ -110,9 +106,7 @@ final class CanvasView: UIView, UIScrollViewDelegate {
 
         for index in visiblePageViews.keys {
             if !newVisibleIndices.contains(index) {
-                let pageView = visiblePageViews.removeValue(forKey: index)!
-                pageView.removeFromSuperview()
-                recycledPageViews.append(pageView)
+                visiblePageViews.removeValue(forKey: index)!.removeFromSuperview()
             }
         }
 
@@ -130,20 +124,12 @@ final class CanvasView: UIView, UIScrollViewDelegate {
             if let existing = visiblePageViews[index] {
                 existing.frame = targetFrame
             } else {
-                let pageView = dequeuePageView(for: pages[index])
+                let pageView = PageView(page: pages[index])
                 pageView.frame = targetFrame
                 contentContainer.addSubview(pageView)
                 visiblePageViews[index] = pageView
             }
         }
-    }
-
-    private func dequeuePageView(for page: Page) -> PageView {
-        if let reused = recycledPageViews.popLast() {
-            reused.setBackground(page.background)
-            return reused
-        }
-        return PageView(page: page)
     }
 
     override func layoutSubviews() {
