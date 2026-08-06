@@ -1,11 +1,11 @@
 import SwiftUI
 
 struct CanvasViewRepresentable: UIViewRepresentable {
-    func makeUIView(context: Context) -> CanvasView {
+    func makeUIView(context _: Context) -> CanvasView {
         return CanvasView()
     }
 
-    func updateUIView(_ uiView: CanvasView, context: Context) {}
+    func updateUIView(_: CanvasView, context _: Context) {}
 }
 
 struct ContentView: View {
