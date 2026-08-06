@@ -12,7 +12,7 @@ final class CanvasView: UIView, UIScrollViewDelegate {
 
   override init(frame: CGRect) {
     super.init(frame: frame)
-    backgroundColor = .black
+    backgroundColor = .gray
 
     scrollView.delegate = self
     scrollView.minimumZoomScale = 0.25
@@ -36,7 +36,7 @@ final class CanvasView: UIView, UIScrollViewDelegate {
   required init?(coder: NSCoder) { fatalError() }
 
   private func makePDFBackground() -> TiledBackgroundView? {
-    guard let pdfURL = Bundle.main.url(forResource: "GraphPaperBackground", withExtension: "pdf"),
+    guard let pdfURL = Bundle.main.url(forResource: "Graph", withExtension: "pdf"),
       let document = CGPDFDocument(pdfURL as CFURL),
       let page = document.page(at: 1)
     else { return nil }
