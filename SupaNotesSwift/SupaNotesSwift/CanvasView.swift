@@ -1,85 +1,96 @@
 import UIKit
+import PDFKit
 
-final class PDFPageView: UIView {
-    let pdfPage: CGPDFPage
-    let pageSize: CGSize
-
-    init(pdfPage: CGPDFPage) {
-        self.pdfPage = pdfPage
-        self.pageSize = pdfPage.getBoxRect(.mediaBox).size
-        super.init(frame: CGRect(origin: .zero, size: pageSize))
-        backgroundColor = .white
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    override func draw(_ rect: CGRect) {
-        guard let context = UIGraphicsGetCurrentContext() else { return }
-
-        context.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
-        context.fill(rect)
-
-        context.saveGState()
-        context.translateBy(x: 0, y: pageSize.height)
-        context.scaleBy(x: 1, y: -1)
-        context.drawPDFPage(pdfPage)
-        context.restoreGState()
-    }
-}
-
-final class CanvasView: UIView, UIScrollViewDelegate {
-    private let scrollView = UIScrollView()
-    private var pageView: PDFPageView?
+final class CanvasView: UIView {
+    private let pdfView = PDFView()
+    private var displayLink: CADisplayLink?
+    private var zoomPhase: Double = 0
+    private var zoomSpeed: Double = 0.5
+    private let speedSlider = UISlider()
+    private let toggleButton = UIButton(type: .system)
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = .black
-        setupScrollView()
+        pdfView.displayMode = .singlePage
+        pdfView.autoScales = true
+        pdfView.pageShadowsEnabled = false
+        pdfView.maxScaleFactor = 8.0
+        addSubview(pdfView)
+
+        setupDebugControls()
         loadPDF()
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    private func setupScrollView() {
-        scrollView.delegate = self
-        scrollView.maximumZoomScale = 8.0
-        scrollView.showsVerticalScrollIndicator = false
-        scrollView.showsHorizontalScrollIndicator = false
-        scrollView.bouncesZoom = true
-        addSubview(scrollView)
+    private func setupDebugControls() {
+        toggleButton.setTitle("Zoom Loop", for: .normal)
+        toggleButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
+        toggleButton.setTitleColor(.white, for: .normal)
+        toggleButton.layer.cornerRadius = 8
+        toggleButton.contentEdgeInsets = UIEdgeInsets(top: 8, left: 16, bottom: 8, right: 16)
+        toggleButton.addTarget(self, action: #selector(toggleZoomLoop), for: .touchUpInside)
+        addSubview(toggleButton)
+
+        speedSlider.minimumValue = 0.1
+        speedSlider.maximumValue = 3.0
+        speedSlider.value = 0.5
+        speedSlider.addTarget(self, action: #selector(speedChanged), for: .valueChanged)
+        speedSlider.isHidden = true
+        addSubview(speedSlider)
     }
 
     private func loadPDF() {
-        guard let pdfURL = Bundle.main.url(forResource: "ECE", withExtension: "pdf"),
-              let document = CGPDFDocument(pdfURL as CFURL),
-              let page = document.page(at: 1) else { return }
-
-        let pv = PDFPageView(pdfPage: page)
-        scrollView.addSubview(pv)
-        scrollView.contentSize = pv.frame.size
-        pageView = pv
+        guard let pdfURL = Bundle.main.url(forResource: "GraphPaperBackground", withExtension: "pdf") else { return }
+        pdfView.document = PDFDocument(url: pdfURL)
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        scrollView.frame = bounds
+        pdfView.frame = bounds
+        toggleButton.frame = CGRect(x: 20, y: bounds.height - 100, width: 120, height: 40)
+        speedSlider.frame = CGRect(x: 150, y: bounds.height - 95, width: 200, height: 30)
+    }
 
-        guard let pv = pageView else { return }
-        let fitScale = min(bounds.width / pv.pageSize.width, bounds.height / pv.pageSize.height)
-        scrollView.minimumZoomScale = fitScale
-        if scrollView.zoomScale < fitScale {
-            scrollView.zoomScale = fitScale
+    @objc private func toggleZoomLoop() {
+        if displayLink != nil {
+            stopZoomLoop()
+        } else {
+            startZoomLoop()
         }
     }
 
-    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-        return pageView
+    private func startZoomLoop() {
+        zoomPhase = 0
+        speedSlider.isHidden = false
+        toggleButton.setTitle("Stop", for: .normal)
+        toggleButton.backgroundColor = UIColor.systemRed.withAlphaComponent(0.8)
+
+        let link = CADisplayLink(target: self, selector: #selector(zoomTick))
+        link.add(to: .main, forMode: .common)
+        displayLink = link
     }
 
-    func scrollViewDidZoom(_ scrollView: UIScrollView) {
-        guard let pv = pageView else { return }
-        let offsetX = max((scrollView.bounds.width - pv.frame.width) / 2, 0)
-        let offsetY = max((scrollView.bounds.height - pv.frame.height) / 2, 0)
-        scrollView.contentInset = UIEdgeInsets(top: offsetY, left: offsetX, bottom: offsetY, right: offsetX)
+    private func stopZoomLoop() {
+        displayLink?.invalidate()
+        displayLink = nil
+        speedSlider.isHidden = true
+        toggleButton.setTitle("Zoom Loop", for: .normal)
+        toggleButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
+    }
+
+    @objc private func speedChanged() {
+        zoomSpeed = Double(speedSlider.value)
+    }
+
+    @objc private func zoomTick() {
+        guard let link = displayLink else { return }
+        zoomPhase += link.duration * zoomSpeed
+
+        let t = (sin(zoomPhase) + 1) / 2
+        let minScale = pdfView.minScaleFactor
+        let maxScale = pdfView.maxScaleFactor
+        let scale = minScale + (maxScale - minScale) * t
+        pdfView.scaleFactor = scale
     }
 }
