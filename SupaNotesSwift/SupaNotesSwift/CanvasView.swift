@@ -1,8 +1,9 @@
 import UIKit
-import PDFKit
+import CoreGraphics
 
-final class CanvasView: UIView {
-    private let pdfView = PDFView()
+final class CanvasView: UIView, UIScrollViewDelegate {
+    private let scrollView = UIScrollView()
+    private var tiledBackground: TiledBackgroundView?
     private var displayLink: CADisplayLink?
     private var zoomPhase: Double = 0
     private var zoomSpeed: Double = 0.5
@@ -11,17 +12,35 @@ final class CanvasView: UIView {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        pdfView.displayMode = .singlePage
-        pdfView.autoScales = true
-        pdfView.pageShadowsEnabled = false
-        pdfView.maxScaleFactor = 8.0
-        addSubview(pdfView)
+        backgroundColor = .black
 
+        scrollView.delegate = self
+        scrollView.minimumZoomScale = 0.25
+        scrollView.maximumZoomScale = 10.0
+        scrollView.bouncesZoom = true
+        scrollView.showsVerticalScrollIndicator = false
+        scrollView.showsHorizontalScrollIndicator = false
+        addSubview(scrollView)
+
+        loadBackground()
         setupDebugControls()
-        loadPDF()
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    private func loadBackground() {
+        guard let pdfURL = Bundle.main.url(forResource: "GraphPaperBackground", withExtension: "pdf") else { return }
+        guard let document = CGPDFDocument(pdfURL as CFURL) else { return }
+        guard let page = document.page(at: 1) else { return }
+
+        let pageRect = page.getBoxRect(.mediaBox)
+        let bgView = TiledBackgroundView(pdfPage: page)
+        bgView.frame = CGRect(origin: .zero, size: pageRect.size)
+
+        scrollView.addSubview(bgView)
+        scrollView.contentSize = pageRect.size
+        tiledBackground = bgView
+    }
 
     private func setupDebugControls() {
         toggleButton.setTitle("Zoom Loop", for: .normal)
@@ -40,16 +59,37 @@ final class CanvasView: UIView {
         addSubview(speedSlider)
     }
 
-    private func loadPDF() {
-        guard let pdfURL = Bundle.main.url(forResource: "GraphPaperBackground", withExtension: "pdf") else { return }
-        pdfView.document = PDFDocument(url: pdfURL)
-    }
-
     override func layoutSubviews() {
         super.layoutSubviews()
-        pdfView.frame = bounds
+        scrollView.frame = bounds
+        centerContent()
         toggleButton.frame = CGRect(x: 20, y: bounds.height - 100, width: 120, height: 40)
         speedSlider.frame = CGRect(x: 150, y: bounds.height - 95, width: 200, height: 30)
+    }
+
+    private func centerContent() {
+        guard let bgView = tiledBackground else { return }
+
+        let scrollBounds = scrollView.bounds
+        let contentSize = bgView.frame.size
+
+        let offsetX = max(0, (scrollBounds.width - contentSize.width) / 2)
+        let offsetY = max(0, (scrollBounds.height - contentSize.height) / 2)
+
+        scrollView.contentInset = UIEdgeInsets(
+            top: offsetY,
+            left: offsetX,
+            bottom: offsetY,
+            right: offsetX
+        )
+    }
+
+    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+        return tiledBackground
+    }
+
+    func scrollViewDidZoom(_ scrollView: UIScrollView) {
+        centerContent()
     }
 
     @objc private func toggleZoomLoop() {
@@ -88,9 +128,9 @@ final class CanvasView: UIView {
         zoomPhase += link.duration * zoomSpeed
 
         let t = (sin(zoomPhase) + 1) / 2
-        let minScale = pdfView.minScaleFactor
-        let maxScale = pdfView.maxScaleFactor
+        let minScale = scrollView.minimumZoomScale
+        let maxScale = scrollView.maximumZoomScale
         let scale = minScale + (maxScale - minScale) * t
-        pdfView.scaleFactor = scale
+        scrollView.zoomScale = scale
     }
 }
