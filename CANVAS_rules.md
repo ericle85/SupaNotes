@@ -8,3 +8,7 @@ In the app:
 - 2 finger zooming in & out via pinching
 - Importing pdfs will result in them being backgrounds for the page (with pdf page size setting the canvas size)
 -  Strokes will be vectorized as well
+
+How the canvas connects to prototype/
+- The models in prototype/autocomplete/models will be used to read what the user is writing.
+- I still need to figure out when to call prototype/autocomplete/pipeline.py to get the suggestion

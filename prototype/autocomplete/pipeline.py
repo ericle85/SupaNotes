@@ -5,7 +5,7 @@ from math_engine.engine import do_autosuggestion
 ctc_model = CTCModel()
 classifier_model = ClassifierModel()
 
-def pipeline(strokes):
+def pipeline(strokes) -> str:
     """"
     strokes[0] stroke indexing
     strokes[0][i] indexing points of strokes 0
@@ -16,7 +16,7 @@ def pipeline(strokes):
 
     strokes_as_string = translate_strokes_to_string(strokes, kind)
     suggestion = get_autosuggestion(strokes_as_string, kind)
-    # render_suggestion(suggestion) # TODO when we have a UI
+    return suggestion
 
 def classify_strokes(strokes) -> str:
     return classifier_model.classify(strokes)["class"]
