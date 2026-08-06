@@ -4,7 +4,14 @@ import UIKit
 final class CanvasView: UIView, UIScrollViewDelegate {
     private let scrollView = UIScrollView()
     private let contentContainer = UIView()
-    private var pageView: PageView?
+
+    private var pages: [Page] = []
+    private var pageYOffsets: [CGFloat] = []
+    private var pageSizes: [CGSize] = []
+    private var visiblePageViews: [Int: PageView] = [:]
+    private var recycledPageViews: [PageView] = []
+
+    private let pageGap: CGFloat = 20
 
     #if DEBUG
         private var debugZoom: DebugZoomAnimationController?
@@ -23,7 +30,6 @@ final class CanvasView: UIView, UIScrollViewDelegate {
         addSubview(scrollView)
 
         scrollView.addSubview(contentContainer)
-        setPage(Page(background: .grid(.dark)))
 
         #if DEBUG
             let zoom = DebugZoomAnimationController(scrollView: scrollView)
@@ -38,19 +44,113 @@ final class CanvasView: UIView, UIScrollViewDelegate {
         fatalError()
     }
 
-    func setPage(_ page: Page) {
-        pageView?.removeFromSuperview()
+    func setPages(_ newPages: [Page]) {
+        for pageView in visiblePageViews.values {
+            pageView.removeFromSuperview()
+        }
+        visiblePageViews.removeAll()
+        recycledPageViews.removeAll()
 
-        let newPageView = PageView(page: page)
-        contentContainer.frame = CGRect(origin: .zero, size: newPageView.frame.size)
-        contentContainer.addSubview(newPageView)
-        scrollView.contentSize = newPageView.frame.size
-        pageView = newPageView
+        pages = newPages
+        precomputeLayout()
+        setNeedsLayout()
+    }
+
+    private func precomputeLayout() {
+        pageSizes = pages.map { PageView.pageSizeFor($0.background) }
+
+        pageYOffsets = []
+        var y: CGFloat = 0
+        for (index, size) in pageSizes.enumerated() {
+            pageYOffsets.append(y)
+            y += size.height
+            if index < pageSizes.count - 1 {
+                y += pageGap
+            }
+        }
+    }
+
+    private func updateContentSize() {
+        let totalHeight = pageYOffsets.isEmpty
+            ? 0
+            : pageYOffsets.last! + pageSizes.last!.height
+        let containerWidth = pageSizes.map(\.width).max() ?? scrollView.bounds.width
+
+        contentContainer.frame = CGRect(
+            x: 0, y: 0,
+            width: containerWidth,
+            height: totalHeight
+        )
+        scrollView.contentSize = CGSize(width: containerWidth, height: totalHeight)
+    }
+
+    private func updateVisiblePages() {
+        guard !pages.isEmpty else { return }
+
+        let zoomScale = scrollView.zoomScale
+        let visibleRect = CGRect(
+            x: scrollView.contentOffset.x / zoomScale,
+            y: scrollView.contentOffset.y / zoomScale,
+            width: scrollView.bounds.width / zoomScale,
+            height: scrollView.bounds.height / zoomScale
+        )
+
+        let bufferHeight = visibleRect.height
+        let expandedMinY = visibleRect.minY - bufferHeight
+        let expandedMaxY = visibleRect.maxY + bufferHeight
+
+        var newVisibleIndices: Set<Int> = []
+        for index in 0..<pages.count {
+            let pageMinY = pageYOffsets[index]
+            let pageMaxY = pageMinY + pageSizes[index].height
+            if pageMaxY >= expandedMinY && pageMinY <= expandedMaxY {
+                newVisibleIndices.insert(index)
+            }
+        }
+
+        for index in visiblePageViews.keys {
+            if !newVisibleIndices.contains(index) {
+                let pageView = visiblePageViews.removeValue(forKey: index)!
+                pageView.removeFromSuperview()
+                recycledPageViews.append(pageView)
+            }
+        }
+
+        let containerWidth = contentContainer.bounds.width
+        for index in newVisibleIndices {
+            let size = pageSizes[index]
+            let x = (containerWidth - size.width) / 2
+            let targetFrame = CGRect(
+                x: x,
+                y: pageYOffsets[index],
+                width: size.width,
+                height: size.height
+            )
+
+            if let existing = visiblePageViews[index] {
+                existing.frame = targetFrame
+            } else {
+                let pageView = dequeuePageView(for: pages[index])
+                pageView.frame = targetFrame
+                contentContainer.addSubview(pageView)
+                visiblePageViews[index] = pageView
+            }
+        }
+    }
+
+    private func dequeuePageView(for page: Page) -> PageView {
+        if let reused = recycledPageViews.popLast() {
+            reused.setBackground(page.background)
+            return reused
+        }
+        return PageView(page: page)
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
         scrollView.frame = bounds
+        updateContentSize()
+        updateVisiblePages()
         centerContent()
 
         #if DEBUG
@@ -82,5 +182,10 @@ final class CanvasView: UIView, UIScrollViewDelegate {
 
     func scrollViewDidZoom(_: UIScrollView) {
         centerContent()
+        updateVisiblePages()
+    }
+
+    func scrollViewDidScroll(_: UIScrollView) {
+        updateVisiblePages()
     }
 }
