@@ -118,7 +118,8 @@ xcdebugger/
 skills/
 .pi-subagents/
 
-prototype/autocomplete/models/ctc/ctc_final.pt
+*.pt
+!prototype/autocomplete/models/classifier/xyt_zeroed_t.pt
 prototype/fixtures/
 pulled_fixtures/
 prototype/tests/router_decodes.json
