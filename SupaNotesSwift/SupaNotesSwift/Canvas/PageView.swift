@@ -1,8 +1,11 @@
 import CoreGraphics
+import PencilKit
 import UIKit
 
 final class PageView: UIView {
   private var backgroundView: UIView?
+  private let drawingCanvas = PKCanvasView()
+  private let toolPicker = PKToolPicker()
 
   static let defaultPageSize = CGSize(width: 612, height: 792)
 
@@ -10,11 +13,25 @@ final class PageView: UIView {
     let pageSize = Self.pageSizeFor(page.background)
     super.init(frame: CGRect(origin: .zero, size: pageSize))
     setBackground(page.background)
+    setupDrawingCanvas(size: pageSize)
   }
 
   @available(*, unavailable)
   required init?(coder _: NSCoder) {
     fatalError()
+  }
+
+  private func setupDrawingCanvas(size: CGSize) {
+    drawingCanvas.frame = CGRect(origin: .zero, size: size)
+    drawingCanvas.isScrollEnabled = false
+    drawingCanvas.backgroundColor = .clear
+    drawingCanvas.isOpaque = false
+    drawingCanvas.drawingPolicy = .pencilOnly
+    addSubview(drawingCanvas)
+
+    toolPicker.setVisible(true, forFirstResponder: drawingCanvas)
+    toolPicker.addObserver(drawingCanvas)
+    drawingCanvas.becomeFirstResponder()
   }
 
   private func setBackground(_ background: PageBackground) {
