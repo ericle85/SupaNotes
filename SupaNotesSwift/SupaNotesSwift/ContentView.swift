@@ -11,7 +11,7 @@ struct CanvasViewRepresentable: UIViewRepresentable {
   func updateUIView(_: CanvasView, context _: Context) {}
 
   private func loadPDFPages() -> [Page] {
-    return [Page(background: .grid(.dark))]
+    return [Page(background: .grid(.light))]
   }
 }
 

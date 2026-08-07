@@ -14,6 +14,13 @@ struct GridTheme {
     lineWidth: 0.5,
     spacing: 25
   )
+  
+  static let light = GridTheme(
+    backgroundColor: UIColor.white,
+    lineColor: UIColor(red: 0x6F / 255.0, green: 0x6F / 255.0, blue: 0x6F / 255.0, alpha: 0.25),
+    lineWidth: 0.5,
+    spacing: 25
+  )
 }
 
 final class GridBackgroundView: UIView {
