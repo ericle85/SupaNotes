@@ -11,10 +11,6 @@ final class CanvasView: UIView, UIScrollViewDelegate {
   private var visiblePageViews: [Int: PageView] = [:]
   private let pageGap: CGFloat = 20
 
-  #if DEBUG
-    private var debugZoom: DebugZoomAnimationController?
-  #endif
-
   override init(frame: CGRect) {
     super.init(frame: frame)
     backgroundColor = .gray
@@ -28,13 +24,6 @@ final class CanvasView: UIView, UIScrollViewDelegate {
     addSubview(scrollView)
 
     scrollView.addSubview(contentContainer)
-
-    #if DEBUG
-      let zoom = DebugZoomAnimationController(scrollView: scrollView)
-      addSubview(zoom.toggleButton)
-      addSubview(zoom.speedSlider)
-      debugZoom = zoom
-    #endif
   }
 
   @available(*, unavailable)
@@ -140,13 +129,6 @@ final class CanvasView: UIView, UIScrollViewDelegate {
     updateContentSize()
     updateVisiblePages()
     centerContent()
-
-    #if DEBUG
-      if let zoom = debugZoom {
-        zoom.toggleButton.frame = CGRect(x: 20, y: bounds.height - 100, width: 120, height: 40)
-        zoom.speedSlider.frame = CGRect(x: 150, y: bounds.height - 95, width: 200, height: 30)
-      }
-    #endif
   }
 
   private func centerContent() {
