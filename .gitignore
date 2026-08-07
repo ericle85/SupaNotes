@@ -119,6 +119,7 @@ skills/
 .pi-subagents/
 
 *.pt
+!prototype/autocomplete/models/ctc/ctc_final.pt
 !prototype/autocomplete/models/classifier/xyt_zeroed_t.pt
 prototype/fixtures/
 pulled_fixtures/
