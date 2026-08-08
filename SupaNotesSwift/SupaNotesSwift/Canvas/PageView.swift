@@ -41,6 +41,14 @@ final class PageView: UIView {
     fatalError()
   }
 
+  func currentStrokes() -> [Stroke] {
+    strokeLock.lock()
+    let snapshot = strokes
+    strokeLock.unlock()
+    print("Snapshot logged")
+    return snapshot
+  }
+
   private func addStroke(_ stroke: Stroke) {
     strokeLock.lock()
     strokes.append(stroke)

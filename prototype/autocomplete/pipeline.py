@@ -8,7 +8,8 @@ classifier_model = ClassifierModel()
 def pipeline(strokes) -> str:
     kind = classify_strokes(strokes)
     print(f"kind: {kind}")
-    if kind == "scribble" or kind == "none": return
+    if kind == "scribble" or kind == "none":
+        return
 
     strokes_as_string = translate_strokes_to_string(strokes, kind)
     print(f"strokes as strings: {strokes_as_string}")

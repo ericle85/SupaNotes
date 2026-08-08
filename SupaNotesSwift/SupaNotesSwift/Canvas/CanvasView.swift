@@ -78,8 +78,7 @@ final class CanvasView: UIView, UIScrollViewDelegate {
   private func updateVisiblePages() {
     guard !pages.isEmpty else { return }
 
-    let zoomScale = min(
-      max(scrollView.zoomScale, scrollView.minimumZoomScale), scrollView.maximumZoomScale)
+    let zoomScale = scrollView.zoomScale
     let visibleRect = CGRect(
       x: scrollView.contentOffset.x / zoomScale,
       y: scrollView.contentOffset.y / zoomScale,
@@ -102,7 +101,9 @@ final class CanvasView: UIView, UIScrollViewDelegate {
 
     for index in visiblePageViews.keys {
       if !newVisibleIndices.contains(index) {
-        visiblePageViews.removeValue(forKey: index)!.removeFromSuperview()
+        let pageView = visiblePageViews.removeValue(forKey: index)!
+        pages[index].strokes = pageView.currentStrokes()
+        pageView.removeFromSuperview()
       }
     }
 
