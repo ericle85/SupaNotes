@@ -6,11 +6,6 @@ ctc_model = CTCModel()
 classifier_model = ClassifierModel()
 
 def pipeline(strokes) -> str:
-    """"
-    strokes[0] stroke indexing
-    strokes[0][i] indexing points of strokes 0
-    strokes[0][i][j] indexing point data of strokes 0, stroke i, point j
-    """
     kind = classify_strokes(strokes)
     print(f"kind: {kind}")
     if kind == "scribble" or kind == "none": return

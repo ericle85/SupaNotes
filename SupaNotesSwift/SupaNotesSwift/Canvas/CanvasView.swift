@@ -21,6 +21,11 @@ final class CanvasView: UIView, UIScrollViewDelegate {
     scrollView.bouncesZoom = true
     scrollView.showsVerticalScrollIndicator = false
     scrollView.showsHorizontalScrollIndicator = false
+
+    let fingerOnly = [UITouch.TouchType.direct.rawValue as NSNumber]
+    scrollView.panGestureRecognizer.allowedTouchTypes = fingerOnly
+    scrollView.pinchGestureRecognizer?.allowedTouchTypes = fingerOnly
+
     addSubview(scrollView)
 
     scrollView.addSubview(contentContainer)

@@ -1,4 +1,4 @@
-import PencilKit
+import CoreGraphics
 import UIKit
 
 struct HersheyGlyph {
@@ -6,45 +6,48 @@ struct HersheyGlyph {
   let strokes: [[CGPoint]]
 }
 
-func makeTextDrawing(
+func makeTextStrokes(
   text: String,
   origin: CGPoint,
   scale: CGFloat
-) -> PKDrawing {
+) -> [Stroke] {
   let letterSpacing: CGFloat = 2 * scale
   var cursorX = origin.x
-  var allStrokes: [PKStroke] = []
+  var allStrokes: [Stroke] = []
 
   for char in text {
-    guard let glyph = hersheyGlyphs[char] else { continue }
+    guard let glyph = hersheyGlyphs[char] else {
+      continue
+    }
 
     for polyline in glyph.strokes {
-      guard polyline.count >= 2 else { continue }
+      guard polyline.count >= 2 else {
+        continue
+      }
 
-      let points: [PKStrokePoint] = polyline.enumerated().map { index, pt in
-        PKStrokePoint(
+      let points: [StrokePoint] = polyline.enumerated().map { index, pt in
+        StrokePoint(
           location: CGPoint(
             x: cursorX + pt.x * scale,
             y: origin.y + pt.y * scale
           ),
-          timeOffset: TimeInterval(index) * 0.02,
-          size: CGSize(width: 4.5, height: 4.5),
-          opacity: 1.0,
           force: 1.0,
-          azimuth: 0,
-          altitude: .pi / 2
+          timestamp: TimeInterval(index) * 0.02
         )
       }
 
-      let path = PKStrokePath(controlPoints: points, creationDate: Date())
-      let stroke = PKStroke(ink: PKInk(.pen, color: .label), path: path)
+      let stroke = Stroke(
+        points: points,
+        color: .black,
+        width: 2.0
+      )
       allStrokes.append(stroke)
     }
 
     cursorX += (glyph.width * scale + letterSpacing)
   }
 
-  return PKDrawing(strokes: allStrokes)
+  return allStrokes
 }
 
 private let hersheyGlyphs: [Character: HersheyGlyph] = [
