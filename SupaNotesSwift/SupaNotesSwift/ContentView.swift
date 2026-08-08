@@ -11,7 +11,12 @@ struct CanvasViewRepresentable: UIViewRepresentable {
   func updateUIView(_: CanvasView, context _: Context) {}
 
   private func loadPDFPages() -> [Page] {
-    return [Page(background: .grid(.light))]
+    let drawing = makeTextDrawing(
+      text: "Hello World",
+      origin: CGPoint(x: 50, y: 100),
+      scale: 4
+    )
+    return [Page(background: .grid(.light), initialDrawing: drawing)]
   }
 }
 

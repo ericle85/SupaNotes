@@ -1,4 +1,5 @@
 import CoreGraphics
+import PencilKit
 import UIKit
 
 struct StrokePoint {
@@ -20,10 +21,16 @@ enum PageBackground {
 struct Page {
   let background: PageBackground
   var strokes: [Stroke]
+  var initialDrawing: PKDrawing?
 
-  init(background: PageBackground, strokes: [Stroke] = []) {
+  init(
+    background: PageBackground,
+    strokes: [Stroke] = [],
+    initialDrawing: PKDrawing? = nil
+  ) {
     self.background = background
     self.strokes = strokes
+    self.initialDrawing = initialDrawing
   }
 }
 

@@ -14,6 +14,9 @@ final class PageView: UIView {
     super.init(frame: CGRect(origin: .zero, size: pageSize))
     setBackground(page.background)
     setupDrawingCanvas(size: pageSize)
+    if let drawing = page.initialDrawing {
+      drawingCanvas.drawing = drawing
+    }
   }
 
   @available(*, unavailable)
