@@ -7,7 +7,9 @@ struct GridTheme {
   let lineWidth: CGFloat
   let spacing: CGFloat
 
-  init(backgroundColor: UIColor, lineColor: UIColor, lineWidth: CGFloat = 0.5, spacing: CGFloat = 25) {
+  init(
+    backgroundColor: UIColor, lineColor: UIColor, lineWidth: CGFloat = 0.5, spacing: CGFloat = 25
+  ) {
     self.backgroundColor = backgroundColor
     self.lineColor = lineColor
     self.lineWidth = lineWidth
