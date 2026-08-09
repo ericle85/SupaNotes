@@ -5,11 +5,11 @@ from math_engine.engine import do_autosuggestion
 ctc_model = CTCModel()
 classifier_model = ClassifierModel()
 
-def pipeline(strokes) -> str:
+def pipeline(strokes):
     kind = classify_strokes(strokes)
     print(f"kind: {kind}")
     if kind == "scribble" or kind == "none":
-        return
+        return None
 
     strokes_as_string = translate_strokes_to_string(strokes, kind)
     print(f"strokes as strings: {strokes_as_string}")

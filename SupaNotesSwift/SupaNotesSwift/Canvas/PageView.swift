@@ -45,7 +45,6 @@ final class PageView: UIView {
     strokeLock.lock()
     let snapshot = strokes
     strokeLock.unlock()
-    print("Snapshot logged")
     return snapshot
   }
 

@@ -5,15 +5,22 @@ from pipeline import pipeline
 
 class PipelineHandler(BaseHTTPRequestHandler):
     def do_POST(self):
-        length = int(self.headers["Content-Length"])
-        raw = json.loads(self.rfile.read(length))
-        strokes = [np.array(s) for s in raw]
-        result = pipeline(strokes)
-        response = json.dumps({"result": result}).encode()
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(response)
+        try:
+            length = int(self.headers["Content-Length"])
+            raw = json.loads(self.rfile.read(length))
+            strokes = [np.array(s) for s in raw]
+            result = pipeline(strokes)
+            response = json.dumps({"result": result}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(response)
+        except Exception as e:
+            error = json.dumps({"error": str(e)}).encode()
+            self.send_response(400)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(error)
 
     def log_message(self, format, *args):
         print(f"[Server] {args[0]}")

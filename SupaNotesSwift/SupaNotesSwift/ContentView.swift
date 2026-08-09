@@ -3,12 +3,7 @@ import SwiftUI
 struct CanvasViewRepresentable: UIViewRepresentable {
   func makeUIView(context _: Context) -> CanvasView {
     let canvas = CanvasView()
-    let strokes = makeTextStrokes(
-      text: "Hello World",
-      origin: CGPoint(x: 50, y: 100),
-      scale: 4
-    )
-    let pages = [Page(background: .grid(.light), strokes: strokes)]
+    let pages = [Page(background: .grid(.light))]
     canvas.setPages(pages)
     return canvas
   }
