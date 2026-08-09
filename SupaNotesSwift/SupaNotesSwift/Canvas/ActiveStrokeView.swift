@@ -4,7 +4,7 @@ import UIKit
 final class ActiveStrokeView: UIView {
   private var currentPoints: [StrokePoint] = []
   private let strokeColor: UIColor = .black
-  private let strokeWidth: CGFloat = 2.0
+  private let strokeWidth: CGFloat = 4.0
   private var dirtyRect: CGRect = .null
 
   var onStrokeFinished: ((Stroke) -> Void)?
