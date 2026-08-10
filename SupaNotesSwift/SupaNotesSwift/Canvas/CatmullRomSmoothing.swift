@@ -1,25 +1,5 @@
 import CoreGraphics
 
-func getCatmullRomPoint(p0: CGPoint, p1: CGPoint, p2: CGPoint, p3: CGPoint, t: CGFloat)
-  -> CGPoint
-{
-  let t2 = t * t
-  let t3 = t2 * t
-
-  let calculate = { (v0: CGFloat, v1: CGFloat, v2: CGFloat, v3: CGFloat) -> CGFloat in
-    0.5
-      * ((2 * v1)
-        + (-v0 + v2) * t
-        + (2 * v0 - 5 * v1 + 4 * v2 - v3) * t2
-        + (-v0 + 3 * v1 - 3 * v2 + v3) * t3)
-  }
-
-  return CGPoint(
-    x: calculate(p0.x, p1.x, p2.x, p3.x),
-    y: calculate(p0.y, p1.y, p2.y, p3.y)
-  )
-}
-
 func getCatmullRomPath(from points: [CGPoint]) -> CGPath {
   let path = CGMutablePath()
 
@@ -53,4 +33,24 @@ func getCatmullRomPath(from points: [CGPoint]) -> CGPath {
   }
 
   return path
+}
+
+func getCatmullRomPoint(p0: CGPoint, p1: CGPoint, p2: CGPoint, p3: CGPoint, t: CGFloat)
+  -> CGPoint
+{
+  let t2 = t * t
+  let t3 = t2 * t
+
+  let calculate = { (v0: CGFloat, v1: CGFloat, v2: CGFloat, v3: CGFloat) -> CGFloat in
+    0.5
+      * ((2 * v1)
+        + (-v0 + v2) * t
+        + (2 * v0 - 5 * v1 + 4 * v2 - v3) * t2
+        + (-v0 + 3 * v1 - 3 * v2 + v3) * t3)
+  }
+
+  return CGPoint(
+    x: calculate(p0.x, p1.x, p2.x, p3.x),
+    y: calculate(p0.y, p1.y, p2.y, p3.y)
+  )
 }
