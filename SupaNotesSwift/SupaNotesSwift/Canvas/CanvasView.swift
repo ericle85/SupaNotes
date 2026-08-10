@@ -10,6 +10,9 @@ final class CanvasView: UIView, UIScrollViewDelegate {
   private var pageSizes: [CGSize] = []
   private var visiblePageViews: [Int: PageView] = [:]
   private let pageGap: CGFloat = 20
+  #if DEBUG
+    private let fpsOverlay = DebugFPSOverlay()
+  #endif
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -29,6 +32,10 @@ final class CanvasView: UIView, UIScrollViewDelegate {
     addSubview(scrollView)
 
     scrollView.addSubview(contentContainer)
+
+    #if DEBUG
+      fpsOverlay.attach(to: self)
+    #endif
   }
 
   @available(*, unavailable)
@@ -142,6 +149,9 @@ final class CanvasView: UIView, UIScrollViewDelegate {
     updateContentSize()
     updateVisiblePages()
     centerContent()
+    #if DEBUG
+      fpsOverlay.layout(in: bounds, safeArea: safeAreaInsets)
+    #endif
   }
 
   private func centerContent() {
