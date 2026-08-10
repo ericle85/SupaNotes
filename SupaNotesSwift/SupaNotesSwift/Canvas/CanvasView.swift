@@ -125,11 +125,14 @@ final class CanvasView: UIView, UIScrollViewDelegate {
         pageView.frame = targetFrame
         contentContainer.addSubview(pageView)
         visiblePageViews[index] = pageView
-        pageView.updateActiveStrokeVisibleArea(rect: visibleRect, zoomScale: zoomScale)
         pageView.onDrawingStateChanged = { [weak self] isDrawing in
           self?.setZoomEnabled(!isDrawing)
         }
       }
+    }
+
+    for (_, pageView) in visiblePageViews {
+      pageView.updateActiveStrokeVisibleArea(rect: visibleRect, zoomScale: zoomScale)
     }
   }
 
@@ -168,25 +171,9 @@ final class CanvasView: UIView, UIScrollViewDelegate {
   func scrollViewDidZoom(_: UIScrollView) {
     centerContent()
     updateVisiblePages()
-    updateActiveStrokeVisibleAreas()
   }
 
   func scrollViewDidScroll(_: UIScrollView) {
     updateVisiblePages()
-    updateActiveStrokeVisibleAreas()
-  }
-
-  private func updateActiveStrokeVisibleAreas() {
-    let zoomScale = scrollView.zoomScale
-    let visibleRect = CGRect(
-      x: scrollView.contentOffset.x / zoomScale,
-      y: scrollView.contentOffset.y / zoomScale,
-      width: scrollView.bounds.width / zoomScale,
-      height: scrollView.bounds.height / zoomScale
-    )
-
-    for (_, pageView) in visiblePageViews {
-      pageView.updateActiveStrokeVisibleArea(rect: visibleRect, zoomScale: zoomScale)
-    }
   }
 }

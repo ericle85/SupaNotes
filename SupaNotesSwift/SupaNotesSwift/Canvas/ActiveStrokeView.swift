@@ -5,13 +5,13 @@ final class ActiveStrokeView: UIView {
   private var currentPoints: [StrokePoint] = []
   private let strokeColor: UIColor = .black
   private let strokeWidth: CGFloat = 4.0
-  private var visiblePageRect: CGRect = .null
+  private var dirtyRect: CGRect = .null
+  private var strokeCommitted = false
 
   var onStrokeFinished: ((Stroke) -> Void)?
   var onDrawingStateChanged: ((Bool) -> Void)?
 
   func updateVisibleArea(rect: CGRect, zoomScale: CGFloat) {
-    visiblePageRect = bounds.intersection(rect)
     let newScale = zoomScale * traitCollection.displayScale
     if contentScaleFactor != newScale {
       contentScaleFactor = newScale
@@ -44,6 +44,7 @@ final class ActiveStrokeView: UIView {
       force: touch.force,
       timestamp: touch.timestamp
     )
+    strokeCommitted = false
     currentPoints = [point]
     onDrawingStateChanged?(true)
   }
@@ -57,6 +58,7 @@ final class ActiveStrokeView: UIView {
     }
 
     let coalesced = event?.coalescedTouches(for: touch) ?? [touch]
+    let padding = strokeWidth / 2 + 4
 
     for coalescedTouch in coalesced {
       let location = coalescedTouch.location(in: self)
@@ -66,9 +68,28 @@ final class ActiveStrokeView: UIView {
         timestamp: coalescedTouch.timestamp
       )
       currentPoints.append(point)
+
+      let pointRect = CGRect(
+        x: location.x - padding,
+        y: location.y - padding,
+        width: padding * 2,
+        height: padding * 2
+      )
+      dirtyRect = dirtyRect.isNull ? pointRect : dirtyRect.union(pointRect)
     }
 
-    setNeedsDisplay(visiblePageRect)
+    if let prev = currentPoints.dropLast(coalesced.count).last {
+      let prevRect = CGRect(
+        x: prev.location.x - padding,
+        y: prev.location.y - padding,
+        width: padding * 2,
+        height: padding * 2
+      )
+      dirtyRect = dirtyRect.union(prevRect)
+    }
+
+    setNeedsDisplay(dirtyRect)
+    dirtyRect = .null
   }
 
   override func touchesEnded(_ touches: Set<UITouch>, with _: UIEvent?) {
@@ -86,6 +107,7 @@ final class ActiveStrokeView: UIView {
         width: strokeWidth
       )
       onStrokeFinished?(stroke)
+      strokeCommitted = true
     }
     onDrawingStateChanged?(false)
   }
@@ -97,7 +119,7 @@ final class ActiveStrokeView: UIView {
   }
 
   override func draw(_: CGRect) {
-    guard !currentPoints.isEmpty else {
+    guard !strokeCommitted, !currentPoints.isEmpty else {
       return
     }
     guard let context = UIGraphicsGetCurrentContext() else {
