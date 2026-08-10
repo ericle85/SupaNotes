@@ -38,8 +38,16 @@ struct Stroke {
   let points: [StrokePoint]
   let color: UIColor
   let width: CGFloat
+  let boundingRect: CGRect
 
-  var boundingRect: CGRect {
+  init(points: [StrokePoint], color: UIColor, width: CGFloat) {
+    self.points = points
+    self.color = color
+    self.width = width
+    self.boundingRect = Self.computeBoundingRect(points: points, width: width)
+  }
+
+  private static func computeBoundingRect(points: [StrokePoint], width: CGFloat) -> CGRect {
     guard let first = points.first else {
       return .zero
     }

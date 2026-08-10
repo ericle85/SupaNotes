@@ -1,7 +1,7 @@
 import CoreGraphics
 import UIKit
 
-final class CanvasView: UIView, UIScrollViewDelegate {
+final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegate {
   private let scrollView = UIScrollView()
   private let contentContainer = UIView()
 
@@ -10,6 +10,7 @@ final class CanvasView: UIView, UIScrollViewDelegate {
   private var pageSizes: [CGSize] = []
   private var visiblePageViews: [Int: PageView] = [:]
   private let pageGap: CGFloat = 20
+  private var momentumStopGesture: UIGestureRecognizer?
   #if DEBUG
     private let fpsOverlay = DebugFPSOverlay()
   #endif
@@ -29,8 +30,16 @@ final class CanvasView: UIView, UIScrollViewDelegate {
     scrollView.panGestureRecognizer.allowedTouchTypes = fingerOnly
     scrollView.pinchGestureRecognizer?.allowedTouchTypes = fingerOnly
 
-    addSubview(scrollView)
+    let stopMomentum = UILongPressGestureRecognizer(
+      target: self, action: #selector(handleMomentumStop))
+    stopMomentum.minimumPressDuration = 0
+    stopMomentum.cancelsTouchesInView = false
+    stopMomentum.delegate = self
 
+    momentumStopGesture = stopMomentum
+
+    addSubview(scrollView)
+    scrollView.addGestureRecognizer(stopMomentum)
     scrollView.addSubview(contentContainer)
 
     #if DEBUG
@@ -46,7 +55,13 @@ final class CanvasView: UIView, UIScrollViewDelegate {
     fatalError()
   }
 
-  func setPages(_ newPages: [Page]) {
+  #if DEBUG
+    deinit {
+      fpsOverlay.detach()
+    }
+  #endif
+
+  func setPages(_ newPages: [Page]) {  // choosing to have fresh canvas no matter what for now
     for pageView in visiblePageViews.values {
       pageView.removeFromSuperview()
     }
@@ -142,7 +157,7 @@ final class CanvasView: UIView, UIScrollViewDelegate {
     }
 
     for (_, pageView) in visiblePageViews {
-      pageView.updateActiveStrokeVisibleArea(rect: visibleRect, zoomScale: zoomScale)
+      pageView.updateActiveStrokeContentScale(zoomScale: zoomScale)
     }
   }
 
@@ -167,6 +182,19 @@ final class CanvasView: UIView, UIScrollViewDelegate {
       bottom: offsetY,
       right: offsetX
     )
+  }
+
+  @objc private func handleMomentumStop(_ gesture: UILongPressGestureRecognizer) {
+    if gesture.state == .began, scrollView.isDecelerating {
+      scrollView.setContentOffset(scrollView.contentOffset, animated: false)
+    }
+  }
+
+  func gestureRecognizer(
+    _ gestureRecognizer: UIGestureRecognizer,
+    shouldRecognizeSimultaneouslyWith _: UIGestureRecognizer
+  ) -> Bool {
+    return gestureRecognizer === momentumStopGesture
   }
 
   private func setZoomEnabled(_ enabled: Bool) {

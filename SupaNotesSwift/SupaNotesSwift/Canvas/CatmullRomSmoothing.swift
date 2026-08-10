@@ -36,8 +36,7 @@ func getCatmullRomPath(from points: [CGPoint]) -> CGPath {
 }
 
 func getCatmullRomPoint(p0: CGPoint, p1: CGPoint, p2: CGPoint, p3: CGPoint, t: CGFloat)
-  -> CGPoint
-{
+  -> CGPoint {
   let t2 = t * t
   let t3 = t2 * t
 

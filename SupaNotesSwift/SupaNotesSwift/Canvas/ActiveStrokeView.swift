@@ -6,12 +6,11 @@ final class ActiveStrokeView: UIView {
   private let strokeColor: UIColor = .black
   private let strokeWidth: CGFloat = 4.0
   private var dirtyRect: CGRect = .null
-  private var strokeCommitted = false
 
   var onStrokeFinished: ((Stroke) -> Void)?
   var onDrawingStateChanged: ((Bool) -> Void)?
 
-  func updateVisibleArea(rect: CGRect, zoomScale: CGFloat) {
+  func updateContentScale(zoomScale: CGFloat) {
     let newScale = zoomScale * traitCollection.displayScale
     if contentScaleFactor != newScale {
       contentScaleFactor = newScale
@@ -44,7 +43,6 @@ final class ActiveStrokeView: UIView {
       force: touch.force,
       timestamp: touch.timestamp
     )
-    strokeCommitted = false
     currentPoints = [point]
     onDrawingStateChanged?(true)
   }
@@ -107,7 +105,6 @@ final class ActiveStrokeView: UIView {
         width: strokeWidth
       )
       onStrokeFinished?(stroke)
-      strokeCommitted = true
     }
     onDrawingStateChanged?(false)
   }
@@ -119,7 +116,7 @@ final class ActiveStrokeView: UIView {
   }
 
   override func draw(_: CGRect) {
-    guard !strokeCommitted, !currentPoints.isEmpty else {
+    guard !currentPoints.isEmpty else {
       return
     }
     guard let context = UIGraphicsGetCurrentContext() else {
