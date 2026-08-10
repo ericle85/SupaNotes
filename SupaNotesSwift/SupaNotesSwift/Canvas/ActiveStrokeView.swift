@@ -8,6 +8,7 @@ final class ActiveStrokeView: UIView {
   private var visiblePageRect: CGRect = .null
 
   var onStrokeFinished: ((Stroke) -> Void)?
+  var onDrawingStateChanged: ((Bool) -> Void)?
 
   func updateVisibleArea(rect: CGRect, zoomScale: CGFloat) {
     visiblePageRect = bounds.intersection(rect)
@@ -44,6 +45,7 @@ final class ActiveStrokeView: UIView {
       timestamp: touch.timestamp
     )
     currentPoints = [point]
+    onDrawingStateChanged?(true)
   }
 
   override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -85,14 +87,13 @@ final class ActiveStrokeView: UIView {
       )
       onStrokeFinished?(stroke)
     }
-
-    currentPoints = []
-    setNeedsDisplay()
+    onDrawingStateChanged?(false)
   }
 
   override func touchesCancelled(_: Set<UITouch>, with _: UIEvent?) {
     currentPoints = []
     setNeedsDisplay()
+    onDrawingStateChanged?(false)
   }
 
   override func draw(_: CGRect) {

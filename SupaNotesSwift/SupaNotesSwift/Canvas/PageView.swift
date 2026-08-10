@@ -6,6 +6,10 @@ final class PageView: UIView {
   private let strokeLock = NSLock()
   private var strokes: [Stroke]
   private let activeStroke: ActiveStrokeView
+  var onDrawingStateChanged: ((Bool) -> Void)? {
+    get { activeStroke.onDrawingStateChanged }
+    set { activeStroke.onDrawingStateChanged = newValue }
+  }
 
   static let defaultPageSize = CGSize(width: 612, height: 792)
 

@@ -126,6 +126,9 @@ final class CanvasView: UIView, UIScrollViewDelegate {
         contentContainer.addSubview(pageView)
         visiblePageViews[index] = pageView
         pageView.updateActiveStrokeVisibleArea(rect: visibleRect, zoomScale: zoomScale)
+        pageView.onDrawingStateChanged = { [weak self] isDrawing in
+          self?.setZoomEnabled(!isDrawing)
+        }
       }
     }
   }
@@ -151,6 +154,11 @@ final class CanvasView: UIView, UIScrollViewDelegate {
       bottom: offsetY,
       right: offsetX
     )
+  }
+
+  private func setZoomEnabled(_ enabled: Bool) {
+    scrollView.pinchGestureRecognizer?.isEnabled = enabled
+    scrollView.panGestureRecognizer.isEnabled = enabled
   }
 
   func viewForZooming(in _: UIScrollView) -> UIView? {
