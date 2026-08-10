@@ -24,7 +24,7 @@ func renderStroke(
     return
   }
 
-  let path = catmullRomPath(from: points)
+  let path = getCatmullRomPath(from: points)
   context.setStrokeColor(color)
   context.setLineWidth(width)
   context.setLineCap(.round)

@@ -1,6 +1,26 @@
 import CoreGraphics
 
-func catmullRomPath(from points: [CGPoint]) -> CGPath {
+func getCatmullRomPoint(p0: CGPoint, p1: CGPoint, p2: CGPoint, p3: CGPoint, t: CGFloat)
+  -> CGPoint
+{
+  let t2 = t * t
+  let t3 = t2 * t
+
+  let calculate = { (v0: CGFloat, v1: CGFloat, v2: CGFloat, v3: CGFloat) -> CGFloat in
+    0.5
+      * ((2 * v1)
+        + (-v0 + v2) * t
+        + (2 * v0 - 5 * v1 + 4 * v2 - v3) * t2
+        + (-v0 + 3 * v1 - 3 * v2 + v3) * t3)
+  }
+
+  return CGPoint(
+    x: calculate(p0.x, p1.x, p2.x, p3.x),
+    y: calculate(p0.y, p1.y, p2.y, p3.y)
+  )
+}
+
+func getCatmullRomPath(from points: [CGPoint]) -> CGPath {
   let path = CGMutablePath()
 
   guard points.count >= 2 else {
@@ -15,7 +35,7 @@ func catmullRomPath(from points: [CGPoint]) -> CGPath {
 
   path.move(to: points[0])
 
-  let segments = 8
+  let subdivisions = 20
   let lastIndex = points.count - 1
 
   for i in 0..<lastIndex {
@@ -24,26 +44,11 @@ func catmullRomPath(from points: [CGPoint]) -> CGPath {
     let p2 = points[min(i + 1, lastIndex)]
     let p3 = points[min(i + 2, lastIndex)]
 
-    for s in 1...segments {
-      let t = CGFloat(s) / CGFloat(segments)
-      let t2 = t * t
-      let t3 = t2 * t
+    for s in 1...subdivisions {
+      let t = CGFloat(s) / CGFloat(subdivisions)
 
-      let x =
-        0.5
-        * ((2 * p1.x)
-          + (-p0.x + p2.x) * t
-          + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2
-          + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3)
-
-      let y =
-        0.5
-        * ((2 * p1.y)
-          + (-p0.y + p2.y) * t
-          + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2
-          + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3)
-
-      path.addLine(to: CGPoint(x: x, y: y))
+      let point = getCatmullRomPoint(p0: p0, p1: p1, p2: p2, p3: p3, t: t)
+      path.addLine(to: point)
     }
   }
 
