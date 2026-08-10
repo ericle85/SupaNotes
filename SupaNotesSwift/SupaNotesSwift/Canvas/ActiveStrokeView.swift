@@ -5,9 +5,17 @@ final class ActiveStrokeView: UIView {
   private var currentPoints: [StrokePoint] = []
   private let strokeColor: UIColor = .black
   private let strokeWidth: CGFloat = 4.0
-  private var dirtyRect: CGRect = .null
+  private var visiblePageRect: CGRect = .null
 
   var onStrokeFinished: ((Stroke) -> Void)?
+
+  func updateVisibleArea(rect: CGRect, zoomScale: CGFloat) {
+    visiblePageRect = bounds.intersection(rect)
+    let newScale = zoomScale * traitCollection.displayScale
+    if contentScaleFactor != newScale {
+      contentScaleFactor = newScale
+    }
+  }
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -36,7 +44,6 @@ final class ActiveStrokeView: UIView {
       timestamp: touch.timestamp
     )
     currentPoints = [point]
-    dirtyRect = .null
   }
 
   override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -48,7 +55,6 @@ final class ActiveStrokeView: UIView {
     }
 
     let coalesced = event?.coalescedTouches(for: touch) ?? [touch]
-    let padding = strokeWidth / 2 + 4
 
     for coalescedTouch in coalesced {
       let location = coalescedTouch.location(in: self)
@@ -58,28 +64,9 @@ final class ActiveStrokeView: UIView {
         timestamp: coalescedTouch.timestamp
       )
       currentPoints.append(point)
-
-      let pointRect = CGRect(
-        x: location.x - padding,
-        y: location.y - padding,
-        width: padding * 2,
-        height: padding * 2
-      )
-      dirtyRect = dirtyRect.isNull ? pointRect : dirtyRect.union(pointRect)
     }
 
-    if let prev = currentPoints.dropLast(coalesced.count).last {
-      let prevRect = CGRect(
-        x: prev.location.x - padding,
-        y: prev.location.y - padding,
-        width: padding * 2,
-        height: padding * 2
-      )
-      dirtyRect = dirtyRect.union(prevRect)
-    }
-
-    setNeedsDisplay(dirtyRect)
-    dirtyRect = .null
+    setNeedsDisplay(visiblePageRect)
   }
 
   override func touchesEnded(_ touches: Set<UITouch>, with _: UIEvent?) {
@@ -100,13 +87,11 @@ final class ActiveStrokeView: UIView {
     }
 
     currentPoints = []
-    dirtyRect = .null
     setNeedsDisplay()
   }
 
   override func touchesCancelled(_: Set<UITouch>, with _: UIEvent?) {
     currentPoints = []
-    dirtyRect = .null
     setNeedsDisplay()
   }
 

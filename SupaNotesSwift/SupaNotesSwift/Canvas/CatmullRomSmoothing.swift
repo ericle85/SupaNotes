@@ -15,7 +15,7 @@ func getCatmullRomPath(from points: [CGPoint]) -> CGPath {
 
   path.move(to: points[0])
 
-  let subdivisions = 20
+  let subdivisions = 3
   let lastIndex = points.count - 1
 
   for i in 0..<lastIndex {

@@ -41,6 +41,11 @@ final class PageView: UIView {
     fatalError()
   }
 
+  func updateActiveStrokeVisibleArea(rect: CGRect, zoomScale: CGFloat) {
+    let localRect = convert(rect, from: superview)
+    activeStroke.updateVisibleArea(rect: localRect, zoomScale: zoomScale)
+  }
+
   func currentStrokes() -> [Stroke] {
     strokeLock.lock()
     let snapshot = strokes
