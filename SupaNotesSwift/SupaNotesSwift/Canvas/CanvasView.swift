@@ -11,6 +11,7 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
   private var visiblePageViews: [Int: PageView] = [:]
   private let pageGap: CGFloat = 20
   private var momentumStopGesture: UIGestureRecognizer?
+  var resetOnResume: Bool = true
   #if DEBUG
     private let fpsOverlay = DebugFPSOverlay()
   #endif
@@ -41,6 +42,13 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
     addSubview(scrollView)
     scrollView.addGestureRecognizer(stopMomentum)
     scrollView.addSubview(contentContainer)
+
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleForegroundResume),
+      name: UIApplication.willEnterForegroundNotification,
+      object: nil
+    )
 
     #if DEBUG
       DispatchQueue.main.async { [weak self] in
@@ -182,6 +190,22 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
       bottom: offsetY,
       right: offsetX
     )
+  }
+
+  @objc private func handleForegroundResume() {
+    if resetOnResume {
+      setPages(pages.map { Page(background: $0.background) })
+      setZoomEnabled(true)
+      scrollView.zoomScale = 1.0
+      scrollView.contentOffset = .zero
+      return
+    }
+    setZoomEnabled(true)
+    for (_, pageView) in visiblePageViews {
+      pageView.layer.setNeedsDisplay()
+      pageView.setNeedsDisplay()
+    }
+    setNeedsLayout()
   }
 
   @objc private func handleMomentumStop(_ gesture: UILongPressGestureRecognizer) {
