@@ -7,29 +7,37 @@ import UIKit
     private var lastTimestamp: CFTimeInterval = 0
     private var frameCount: Int = 0
 
-    func attach(to parent: UIView) {
+    func attach() {
+      guard
+        let window = UIApplication.shared.connectedScenes
+          .compactMap({ $0 as? UIWindowScene })
+          .flatMap(\.windows)
+          .first(where: { $0.isKeyWindow })
+      else { return }
+
       label.font = UIFont.monospacedDigitSystemFont(ofSize: 14, weight: .bold)
       label.textColor = .white
       label.backgroundColor = UIColor.black.withAlphaComponent(0.6)
       label.textAlignment = .center
       label.layer.cornerRadius = 6
+      label.layer.zPosition = .greatestFiniteMagnitude
       label.clipsToBounds = true
+      label.isUserInteractionEnabled = false
       label.text = " -- FPS "
       label.sizeToFit()
       label.frame.size.width += 12
       label.frame.size.height += 4
-      parent.addSubview(label)
+
+      let safeTop = window.safeAreaInsets.top
+      label.frame.origin = CGPoint(
+        x: window.bounds.maxX - label.frame.width - 12,
+        y: safeTop + 8
+      )
+
+      window.addSubview(label)
 
       displayLink = CADisplayLink(target: self, selector: #selector(tick))
       displayLink?.add(to: .main, forMode: .common)
-    }
-
-    func layout(in bounds: CGRect, safeArea: UIEdgeInsets) {
-      label.frame.origin = CGPoint(
-        x: bounds.maxX - label.frame.width - 12,
-        y: safeArea.top + 8
-      )
-      label.superview?.bringSubviewToFront(label)
     }
 
     @objc private func tick(_ link: CADisplayLink) {

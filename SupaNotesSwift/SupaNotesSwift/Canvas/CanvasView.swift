@@ -34,7 +34,10 @@ final class CanvasView: UIView, UIScrollViewDelegate {
     scrollView.addSubview(contentContainer)
 
     #if DEBUG
-      fpsOverlay.attach(to: self)
+      DispatchQueue.main.async { [weak self] in
+        guard self != nil else { return }
+        self?.fpsOverlay.attach()
+      }
     #endif
   }
 
@@ -149,9 +152,6 @@ final class CanvasView: UIView, UIScrollViewDelegate {
     updateContentSize()
     updateVisiblePages()
     centerContent()
-    #if DEBUG
-      fpsOverlay.layout(in: bounds, safeArea: safeAreaInsets)
-    #endif
   }
 
   private func centerContent() {
