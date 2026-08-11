@@ -88,7 +88,3 @@ struct Page {
     self.strokes = strokes
   }
 }
-
-struct Note {
-  var pages: [Page]
-}
