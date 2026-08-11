@@ -7,6 +7,8 @@ final class ActiveStrokeView: UIView {
   private let strokeWidth: CGFloat = 4.0
   private let minimumPointDistance: CGFloat = 0.2
   private var dirtyRect: CGRect = .null
+  private var commitGeneration: Int = 0
+  private let tileRenderGracePeriod: TimeInterval = 0.1
 
   var onStrokeFinished: ((Stroke) -> Void)?
   var onDrawingStateChanged: ((Bool) -> Void)?
@@ -45,6 +47,7 @@ final class ActiveStrokeView: UIView {
       force: touch.force,
       timestamp: touch.timestamp
     )
+    commitGeneration += 1
     currentPoints = [point]
     onDrawingStateChanged?(true)
     setNeedsDisplay()
@@ -122,8 +125,13 @@ final class ActiveStrokeView: UIView {
         color: strokeColor,
         width: strokeWidth
       )
-      currentPoints = []
       onStrokeFinished?(stroke)
+      let gen = commitGeneration
+      DispatchQueue.main.asyncAfter(deadline: .now() + tileRenderGracePeriod) { [weak self] in
+        guard let self, self.commitGeneration == gen else { return }
+        self.currentPoints = []
+        self.setNeedsDisplay()
+      }
     }
     onDrawingStateChanged?(false)
   }
