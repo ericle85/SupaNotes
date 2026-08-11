@@ -1,6 +1,5 @@
 import CoreGraphics
 import Metal
-import QuartzCore
 import UIKit
 
 final class ActiveStrokeView: UIView {
@@ -8,66 +7,36 @@ final class ActiveStrokeView: UIView {
   private let strokeColor: UIColor = .black
   private let strokeWidth: CGFloat = 4.0
   private let minimumPointDistance: CGFloat = 1.0
-  private let renderer: MetalStrokeRenderer
-  private let metalLayer = CAMetalLayer()
-  private var drawableSizeNeedsUpdate = false
+  private var dirtyRect: CGRect = .null
+  private let gpuSmoothing: CatmullRomGPU
 
   var onStrokeFinished: ((Stroke) -> Void)?
   var onDrawingStateChanged: ((Bool) -> Void)?
 
   func updateContentScale(zoomScale: CGFloat) {
     let newScale = zoomScale * traitCollection.displayScale
-    if metalLayer.contentsScale != newScale {
-      metalLayer.contentsScale = newScale
-      if currentPoints.isEmpty {
-        drawableSizeNeedsUpdate = true
-      } else {
-        updateDrawableSize()
-      }
+    if contentScaleFactor != newScale {
+      contentScaleFactor = newScale
     }
   }
 
   override init(frame: CGRect) {
     guard let device = MTLCreateSystemDefaultDevice(),
-      let metalRenderer = MetalStrokeRenderer(device: device)
+      let smoother = CatmullRomGPU(device: device)
     else { fatalError("Metal not available") }
 
-    self.renderer = metalRenderer
+    self.gpuSmoothing = smoother
 
     super.init(frame: frame)
 
     backgroundColor = .clear
     isOpaque = false
     isMultipleTouchEnabled = false
-
-    metalLayer.device = device
-    metalLayer.pixelFormat = .bgra8Unorm
-    metalLayer.isOpaque = false
-    metalLayer.framebufferOnly = true
-    metalLayer.frame = bounds
-    metalLayer.isHidden = true
-    layer.addSublayer(metalLayer)
-    updateDrawableSize()
   }
 
   @available(*, unavailable)
   required init?(coder _: NSCoder) {
     fatalError()
-  }
-
-  override func layoutSubviews() {
-    super.layoutSubviews()
-    metalLayer.frame = bounds
-    drawableSizeNeedsUpdate = false
-    updateDrawableSize()
-  }
-
-  private func updateDrawableSize() {
-    let scale = metalLayer.contentsScale
-    metalLayer.drawableSize = CGSize(
-      width: bounds.width * scale,
-      height: bounds.height * scale
-    )
   }
 
   override func touchesBegan(_ touches: Set<UITouch>, with _: UIEvent?) {
@@ -85,9 +54,8 @@ final class ActiveStrokeView: UIView {
       timestamp: touch.timestamp
     )
     currentPoints = [point]
-    metalLayer.isHidden = false
     onDrawingStateChanged?(true)
-    renderFrame()
+    setNeedsDisplay()
   }
 
   override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -99,6 +67,8 @@ final class ActiveStrokeView: UIView {
     }
 
     let coalesced = event?.coalescedTouches(for: touch) ?? [touch]
+    let padding = strokeWidth * 2
+    let pointCountBefore = currentPoints.count
 
     for coalescedTouch in coalesced {
       let location = coalescedTouch.location(in: self)
@@ -117,9 +87,33 @@ final class ActiveStrokeView: UIView {
         timestamp: coalescedTouch.timestamp
       )
       currentPoints.append(point)
+
+      let pointRect = CGRect(
+        x: location.x - padding,
+        y: location.y - padding,
+        width: padding * 2,
+        height: padding * 2
+      )
+      dirtyRect = dirtyRect.isNull ? pointRect : dirtyRect.union(pointRect)
     }
 
-    renderFrame()
+    if currentPoints.count == pointCountBefore {
+      return
+    }
+
+    if pointCountBefore >= 1 {
+      let prev = currentPoints[pointCountBefore - 1]
+      let prevRect = CGRect(
+        x: prev.location.x - padding,
+        y: prev.location.y - padding,
+        width: padding * 2,
+        height: padding * 2
+      )
+      dirtyRect = dirtyRect.union(prevRect)
+    }
+
+    setNeedsDisplay(dirtyRect)
+    dirtyRect = .null
   }
 
   override func touchesEnded(_ touches: Set<UITouch>, with _: UIEvent?) {
@@ -144,35 +138,49 @@ final class ActiveStrokeView: UIView {
 
   override func touchesCancelled(_: Set<UITouch>, with _: UIEvent?) {
     currentPoints = []
-    renderFrame()
+    setNeedsDisplay()
     onDrawingStateChanged?(false)
   }
 
-  private func flushDrawableSizeIfNeeded() {
-    if drawableSizeNeedsUpdate {
-      drawableSizeNeedsUpdate = false
-      updateDrawableSize()
-    }
-  }
-
-  private func renderFrame() {
-    flushDrawableSizeIfNeeded()
-    guard let drawable = metalLayer.nextDrawable() else {
+  override func draw(_: CGRect) {
+    #if DEBUG
+      DebugFPSOverlay.recordDraw()
+    #endif
+    guard !currentPoints.isEmpty else {
       return
     }
-
-    if currentPoints.isEmpty {
-      renderer.clear(drawable: drawable)
+    guard let context = UIGraphicsGetCurrentContext() else {
       return
     }
 
     let locations = currentPoints.map { $0.location }
-    renderer.render(
-      points: locations,
-      color: strokeColor,
-      width: strokeWidth,
-      to: drawable,
-      viewportSize: bounds.size
-    )
+
+    if locations.count == 1 {
+      let radius = strokeWidth / 2
+      let dotRect = CGRect(
+        x: locations[0].x - radius,
+        y: locations[0].y - radius,
+        width: strokeWidth,
+        height: strokeWidth
+      )
+      context.setFillColor(strokeColor.cgColor)
+      context.fillEllipse(in: dotRect)
+      return
+    }
+
+    let smoothed = gpuSmoothing.smooth(points: locations)
+
+    let path = CGMutablePath()
+    path.move(to: smoothed[0])
+    for i in 1..<smoothed.count {
+      path.addLine(to: smoothed[i])
+    }
+
+    context.setStrokeColor(strokeColor.cgColor)
+    context.setLineWidth(strokeWidth)
+    context.setLineCap(.round)
+    context.setLineJoin(.round)
+    context.addPath(path)
+    context.strokePath()
   }
 }
