@@ -20,7 +20,10 @@ final class ActiveStrokeView: UIView {
       metalLayer.contentsScale = newScale
       updateDrawableSize()
       if currentPoints.isEmpty {
-        metalLayer.isHidden = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+          guard let self, self.currentPoints.isEmpty else { return }
+          self.metalLayer.isHidden = true
+        }
       }
     }
   }
@@ -43,6 +46,7 @@ final class ActiveStrokeView: UIView {
     metalLayer.isOpaque = false
     metalLayer.framebufferOnly = true
     metalLayer.frame = bounds
+    metalLayer.isHidden = true
     layer.addSublayer(metalLayer)
     updateDrawableSize()
   }
