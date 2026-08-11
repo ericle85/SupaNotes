@@ -40,11 +40,7 @@ final class ActiveStrokeView: UIView {
     }
 
     let location = touch.location(in: self)
-    let point = StrokePoint(
-      location: location,
-      force: touch.force,
-      timestamp: touch.timestamp
-    )
+    let point = StrokePoint(location: location)
     currentPoints = [point]
     onDrawingStateChanged?(true)
     setNeedsDisplay()
@@ -73,11 +69,7 @@ final class ActiveStrokeView: UIView {
         }
       }
 
-      let point = StrokePoint(
-        location: location,
-        force: coalescedTouch.force,
-        timestamp: coalescedTouch.timestamp
-      )
+      let point = StrokePoint(location: location)
       currentPoints.append(point)
 
       let pointRect = CGRect(

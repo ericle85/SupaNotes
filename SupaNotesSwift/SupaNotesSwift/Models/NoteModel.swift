@@ -16,12 +16,6 @@ struct GridTheme {
     self.spacing = spacing
   }
 
-  static let dark = GridTheme(
-    backgroundColor: UIColor(
-      red: 0x14 / 255.0, green: 0x14 / 255.0, blue: 0x14 / 255.0, alpha: 1.0),
-    lineColor: UIColor(red: 0x20 / 255.0, green: 0x20 / 255.0, blue: 0x20 / 255.0, alpha: 1.0)
-  )
-
   static let light = GridTheme(
     backgroundColor: UIColor.white,
     lineColor: UIColor(red: 0x6F / 255.0, green: 0x6F / 255.0, blue: 0x6F / 255.0, alpha: 0.25)
@@ -30,8 +24,6 @@ struct GridTheme {
 
 struct StrokePoint {
   let location: CGPoint
-  let force: CGFloat
-  let timestamp: TimeInterval
 }
 
 struct Stroke {
@@ -87,8 +79,4 @@ struct Page {
     self.background = background
     self.strokes = strokes
   }
-}
-
-struct Note {
-  var pages: [Page]
 }

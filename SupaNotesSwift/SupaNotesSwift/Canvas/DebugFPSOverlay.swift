@@ -76,11 +76,5 @@ import UIKit
 
       lastTimestamp = link.timestamp
     }
-
-    func detach() {
-      displayLink?.invalidate()
-      displayLink = nil
-      label.removeFromSuperview()
-    }
   }
 #endif
