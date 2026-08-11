@@ -4,7 +4,7 @@ import numpy as np
 from models.classifier.network import StrokeClassifier, normalize_sequence
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-CKPT_PATH = os.path.join(SCRIPT_DIR, "xyt_zeroed_t.pt")
+CKPT_PATH = os.path.join(SCRIPT_DIR, "xy_classifier.pt")
 
 
 class ClassifierModel:
@@ -12,7 +12,7 @@ class ClassifierModel:
     def __init__(self):
         ckpt = torch.load(CKPT_PATH, map_location="cpu", weights_only=False)
         self.model = StrokeClassifier(
-            input_features=int(ckpt.get("input_features", 3)),
+            input_features=int(ckpt.get("input_features", 2)),
             width=int(ckpt.get("model_width", 32)),
         )
         self.model.load_state_dict(ckpt["model_state"])

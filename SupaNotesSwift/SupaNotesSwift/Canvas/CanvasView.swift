@@ -1,7 +1,7 @@
 import CoreGraphics
 import UIKit
 
-final class CanvasView: UIView, UIScrollViewDelegate {
+final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegate {
   private let scrollView = UIScrollView()
   private let contentContainer = UIView()
 
@@ -10,6 +10,10 @@ final class CanvasView: UIView, UIScrollViewDelegate {
   private var pageSizes: [CGSize] = []
   private var visiblePageViews: [Int: PageView] = [:]
   private let pageGap: CGFloat = 20
+  private var momentumStopGesture: UIGestureRecognizer?
+  #if DEBUG
+    private let fpsOverlay = DebugFPSOverlay()
+  #endif
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -21,9 +25,35 @@ final class CanvasView: UIView, UIScrollViewDelegate {
     scrollView.bouncesZoom = true
     scrollView.showsVerticalScrollIndicator = false
     scrollView.showsHorizontalScrollIndicator = false
-    addSubview(scrollView)
 
+    let fingerOnly = [UITouch.TouchType.direct.rawValue as NSNumber]
+    scrollView.panGestureRecognizer.allowedTouchTypes = fingerOnly
+    scrollView.pinchGestureRecognizer?.allowedTouchTypes = fingerOnly
+
+    let stopMomentum = UILongPressGestureRecognizer(
+      target: self, action: #selector(handleMomentumStop))
+    stopMomentum.minimumPressDuration = 0
+    stopMomentum.cancelsTouchesInView = false
+    stopMomentum.delegate = self
+
+    momentumStopGesture = stopMomentum
+
+    addSubview(scrollView)
+    scrollView.addGestureRecognizer(stopMomentum)
     scrollView.addSubview(contentContainer)
+
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleForegroundResume),
+      name: UIApplication.willEnterForegroundNotification,
+      object: nil
+    )
+
+    #if DEBUG
+      DispatchQueue.main.async { [weak self] in
+        self?.fpsOverlay.attach()
+      }
+    #endif
   }
 
   @available(*, unavailable)
@@ -31,7 +61,7 @@ final class CanvasView: UIView, UIScrollViewDelegate {
     fatalError()
   }
 
-  func setPages(_ newPages: [Page]) {
+  func setPages(_ newPages: [Page]) {  // choosing to have fresh canvas no matter what for now
     for pageView in visiblePageViews.values {
       pageView.removeFromSuperview()
     }
@@ -73,8 +103,7 @@ final class CanvasView: UIView, UIScrollViewDelegate {
   private func updateVisiblePages() {
     guard !pages.isEmpty else { return }
 
-    let zoomScale = min(
-      max(scrollView.zoomScale, scrollView.minimumZoomScale), scrollView.maximumZoomScale)
+    let zoomScale = scrollView.zoomScale
     let visibleRect = CGRect(
       x: scrollView.contentOffset.x / zoomScale,
       y: scrollView.contentOffset.y / zoomScale,
@@ -97,7 +126,9 @@ final class CanvasView: UIView, UIScrollViewDelegate {
 
     for index in visiblePageViews.keys {
       if !newVisibleIndices.contains(index) {
-        visiblePageViews.removeValue(forKey: index)!.removeFromSuperview()
+        let pageView = visiblePageViews.removeValue(forKey: index)!
+        pages[index].strokes = pageView.currentStrokes()
+        pageView.removeFromSuperview()
       }
     }
 
@@ -119,7 +150,14 @@ final class CanvasView: UIView, UIScrollViewDelegate {
         pageView.frame = targetFrame
         contentContainer.addSubview(pageView)
         visiblePageViews[index] = pageView
+        pageView.onDrawingStateChanged = { [weak self] isDrawing in
+          self?.setZoomEnabled(!isDrawing)
+        }
       }
+    }
+
+    for (_, pageView) in visiblePageViews {
+      pageView.updateActiveStrokeContentScale(zoomScale: zoomScale)
     }
   }
 
@@ -144,6 +182,31 @@ final class CanvasView: UIView, UIScrollViewDelegate {
       bottom: offsetY,
       right: offsetX
     )
+  }
+
+  @objc private func handleForegroundResume() {
+    setPages(pages.map { Page(background: $0.background) })
+    setZoomEnabled(true)
+    scrollView.zoomScale = 1.0
+    scrollView.contentOffset = .zero
+  }
+
+  @objc private func handleMomentumStop(_ gesture: UILongPressGestureRecognizer) {
+    if gesture.state == .began, scrollView.isDecelerating {
+      scrollView.setContentOffset(scrollView.contentOffset, animated: false)
+    }
+  }
+
+  func gestureRecognizer(
+    _ gestureRecognizer: UIGestureRecognizer,
+    shouldRecognizeSimultaneouslyWith _: UIGestureRecognizer
+  ) -> Bool {
+    return gestureRecognizer === momentumStopGesture
+  }
+
+  private func setZoomEnabled(_ enabled: Bool) {
+    scrollView.pinchGestureRecognizer?.isEnabled = enabled
+    scrollView.panGestureRecognizer.isEnabled = enabled
   }
 
   func viewForZooming(in _: UIScrollView) -> UIView? {

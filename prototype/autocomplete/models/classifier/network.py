@@ -9,7 +9,7 @@ class StrokeClassifier(nn.Module):
 
     def __init__(
         self,
-        input_features: int = 3,
+        input_features: int = 2,
         num_classes: int = NUM_CLASSES,
         width: int = 32,
     ):
@@ -51,8 +51,9 @@ def normalize_sequence(strokes, length=160):
         raise ValueError("No finite points in strokes")
 
     lo = all_xy.min(axis=0)
-    span = float(np.max(all_xy.max(axis=0) - lo))
-    span = max(span, 1e-5)
+    hi = all_xy.max(axis=0)
+    span = hi - lo
+    span = np.maximum(span, 1e-5)
     xy = (all_xy - lo) / span * 2.0 - 1.0
 
     old_grid = np.linspace(0.0, 1.0, len(xy), dtype=np.float32)
@@ -60,5 +61,4 @@ def normalize_sequence(strokes, length=160):
     resampled = np.column_stack(
         [np.interp(new_grid, old_grid, xy[:, c]) for c in range(2)]
     ).astype(np.float32)
-    t = np.zeros((length, 1), dtype=np.float32)
-    return np.column_stack((resampled, t)).astype(np.float32)
+    return resampled
