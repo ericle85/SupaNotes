@@ -10,6 +10,7 @@ final class ActiveStrokeView: UIView {
   private let minimumPointDistance: CGFloat = 1.0
   private let renderer: MetalStrokeRenderer
   private let metalLayer = CAMetalLayer()
+  private var drawableSizeNeedsUpdate = false
 
   var onStrokeFinished: ((Stroke) -> Void)?
   var onDrawingStateChanged: ((Bool) -> Void)?
@@ -18,12 +19,10 @@ final class ActiveStrokeView: UIView {
     let newScale = zoomScale * traitCollection.displayScale
     if metalLayer.contentsScale != newScale {
       metalLayer.contentsScale = newScale
-      updateDrawableSize()
       if currentPoints.isEmpty {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-          guard let self, self.currentPoints.isEmpty else { return }
-          self.metalLayer.isHidden = true
-        }
+        drawableSizeNeedsUpdate = true
+      } else {
+        updateDrawableSize()
       }
     }
   }
@@ -59,6 +58,7 @@ final class ActiveStrokeView: UIView {
   override func layoutSubviews() {
     super.layoutSubviews()
     metalLayer.frame = bounds
+    drawableSizeNeedsUpdate = false
     updateDrawableSize()
   }
 
@@ -148,7 +148,15 @@ final class ActiveStrokeView: UIView {
     onDrawingStateChanged?(false)
   }
 
+  private func flushDrawableSizeIfNeeded() {
+    if drawableSizeNeedsUpdate {
+      drawableSizeNeedsUpdate = false
+      updateDrawableSize()
+    }
+  }
+
   private func renderFrame() {
+    flushDrawableSizeIfNeeded()
     guard let drawable = metalLayer.nextDrawable() else {
       return
     }

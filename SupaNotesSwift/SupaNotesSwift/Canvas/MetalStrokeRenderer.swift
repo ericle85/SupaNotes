@@ -73,7 +73,7 @@ final class MetalStrokeRenderer {
       )
     else { return }
 
-    let subdivisions: UInt32 = 16
+    let subdivisions: UInt32 = 8
     let outputCount = (points.count - 1) * Int(subdivisions)
 
     guard
