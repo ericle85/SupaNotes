@@ -146,9 +146,9 @@ final class ActiveStrokeView: UIView {
     }
 
     renderStroke(
-      points: currentPoints.map { $0.location },
+      points: currentPoints,
       color: strokeColor.cgColor,
-      width: strokeWidth,
+      baseWidth: strokeWidth,
       into: context
     )
   }

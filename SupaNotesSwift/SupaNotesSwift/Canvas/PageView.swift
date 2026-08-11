@@ -127,11 +127,10 @@ final class PageView: UIView {
     let visible = snapshot.filter { $0.boundingRect.intersects(rect) }
 
     for stroke in visible {
-      let locations = stroke.points.map { $0.location }
       renderStroke(
-        points: locations,
+        points: stroke.points,
         color: stroke.color.cgColor,
-        width: stroke.width,
+        baseWidth: stroke.width,
         into: context
       )
     }
