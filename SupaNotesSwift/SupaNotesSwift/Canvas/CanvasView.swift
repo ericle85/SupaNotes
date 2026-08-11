@@ -11,7 +11,6 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
   private var visiblePageViews: [Int: PageView] = [:]
   private let pageGap: CGFloat = 20
   private var momentumStopGesture: UIGestureRecognizer?
-  var resetOnResume: Bool = true
   #if DEBUG
     private let fpsOverlay = DebugFPSOverlay()
   #endif
@@ -61,7 +60,6 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
   required init?(coder _: NSCoder) {
     fatalError()
   }
-
 
   func setPages(_ newPages: [Page]) {  // choosing to have fresh canvas no matter what for now
     for pageView in visiblePageViews.values {
@@ -187,19 +185,10 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
   }
 
   @objc private func handleForegroundResume() {
-    if resetOnResume {
-      setPages(pages.map { Page(background: $0.background) })
-      setZoomEnabled(true)
-      scrollView.zoomScale = 1.0
-      scrollView.contentOffset = .zero
-      return
-    }
+    setPages(pages.map { Page(background: $0.background) })
     setZoomEnabled(true)
-    for (_, pageView) in visiblePageViews {
-      pageView.layer.setNeedsDisplay()
-      pageView.setNeedsDisplay()
-    }
-    setNeedsLayout()
+    scrollView.zoomScale = 1.0
+    scrollView.contentOffset = .zero
   }
 
   @objc private func handleMomentumStop(_ gesture: UILongPressGestureRecognizer) {

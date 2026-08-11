@@ -20,7 +20,7 @@ final class CatmullRomSmoothingTests: XCTestCase {
     ]
 
     let path = getCatmullRomPath(from: controlPoints)
-    let sampledPoints = samplePath(path, count: 500)
+    let sampledPoints = samplePath(path)
 
     for controlPoint in controlPoints {
       let closest = sampledPoints.min(by: {
@@ -82,7 +82,7 @@ final class CatmullRomSmoothingTests: XCTestCase {
 
     let closedPoints = controlPoints + [controlPoints[0]]
     let path = getCatmullRomPath(from: closedPoints)
-    let sampled = samplePath(path, count: 200)
+    let sampled = samplePath(path)
 
     guard let lastPoint = sampled.last else {
       XCTFail("Path should have points")
@@ -107,7 +107,7 @@ final class CatmullRomSmoothingTests: XCTestCase {
     ]
 
     let path = getCatmullRomPath(from: collinearPoints)
-    let sampled = samplePath(path, count: 200)
+    let sampled = samplePath(path)
 
     for point in sampled {
       let deviationFromLine = abs(point.x - point.y)
@@ -128,7 +128,7 @@ final class CatmullRomSmoothingTests: XCTestCase {
     ]
 
     let path = getCatmullRomPath(from: duplicatePoints)
-    let sampled = samplePath(path, count: 100)
+    let sampled = samplePath(path)
 
     XCTAssertFalse(sampled.isEmpty, "Should produce a valid path even with duplicates")
 
@@ -148,7 +148,7 @@ final class CatmullRomSmoothingTests: XCTestCase {
     ]
 
     let path = getCatmullRomPath(from: allSame)
-    let sampled = samplePath(path, count: 50)
+    let sampled = samplePath(path)
 
     for point in sampled {
       XCTAssertEqual(point.x, 42, accuracy: epsilon)
@@ -165,7 +165,7 @@ final class CatmullRomSmoothingTests: XCTestCase {
     ]
 
     let path = getCatmullRomPath(from: sharpTurn)
-    let sampled = samplePath(path, count: 300)
+    let sampled = samplePath(path)
 
     for point in sampled {
       XCTAssertFalse(point.x.isNaN)
@@ -194,7 +194,7 @@ final class CatmullRomSmoothingTests: XCTestCase {
     let p1 = CGPoint(x: 0, y: 0)
     let p2 = CGPoint(x: 100, y: 100)
     let path = getCatmullRomPath(from: [p1, p2])
-    let sampled = samplePath(path, count: 50)
+    let sampled = samplePath(path)
 
     XCTAssertFalse(sampled.isEmpty)
 
@@ -236,7 +236,7 @@ final class CatmullRomSmoothingTests: XCTestCase {
     return CGPoint(x: v.x / len, y: v.y / len)
   }
 
-  private func samplePath(_ path: CGPath, count: Int) -> [CGPoint] {
+  private func samplePath(_ path: CGPath) -> [CGPoint] {
     var points: [CGPoint] = []
 
     path.applyWithBlock { elementPointer in

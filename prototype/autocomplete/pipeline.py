@@ -1,25 +1,29 @@
+import logging
+
 from models.classifier.model import ClassifierModel
 from models.ctc.model import CTCModel
 from math_engine.engine import do_autosuggestion
+
+log = logging.getLogger(__name__)
 
 ctc_model = CTCModel()
 classifier_model = ClassifierModel()
 
 def pipeline(strokes):
     kind = classify_strokes(strokes)
-    print(f"kind: {kind}")
+    log.debug("kind: %s", kind)
     if kind == "scribble" or kind == "none":
         return None
 
     strokes_as_string = translate_strokes_to_string(strokes, kind)
-    print(f"strokes as strings: {strokes_as_string}")
+    log.debug("strokes as strings: %s", strokes_as_string)
     suggestion = get_autosuggestion(strokes_as_string, kind)
-    print(f"suggestion: {suggestion}")
+    log.debug("suggestion: %s", suggestion)
     return suggestion
 
 def classify_strokes(strokes) -> str:
     result = classifier_model.classify(strokes)
-    print(f"classify results: {result}")
+    log.debug("classify results: %s", result)
     return result["class"]
 
 def translate_strokes_to_string(strokes, kind) -> str:

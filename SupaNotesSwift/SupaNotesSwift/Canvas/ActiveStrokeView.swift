@@ -145,28 +145,11 @@ final class ActiveStrokeView: UIView {
       return
     }
 
-    let locations = currentPoints.map { $0.location }
-
-    if locations.count == 1 {
-      let radius = strokeWidth / 2
-      let dotRect = CGRect(
-        x: locations[0].x - radius,
-        y: locations[0].y - radius,
-        width: strokeWidth,
-        height: strokeWidth
-      )
-      context.setFillColor(strokeColor.cgColor)
-      context.fillEllipse(in: dotRect)
-      return
-    }
-
-    let path = getCatmullRomPath(from: locations)
-
-    context.setStrokeColor(strokeColor.cgColor)
-    context.setLineWidth(strokeWidth)
-    context.setLineCap(.round)
-    context.setLineJoin(.round)
-    context.addPath(path)
-    context.strokePath()
+    renderStroke(
+      points: currentPoints.map { $0.location },
+      color: strokeColor.cgColor,
+      width: strokeWidth,
+      into: context
+    )
   }
 }
