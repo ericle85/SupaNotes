@@ -77,6 +77,6 @@ fragment float4 stampFragment(
   if (dist > 1.0f) {
     discard_fragment();
   }
-  float alpha = 1.0f - smoothstep(0.85f, 1.0f, dist);
+  float alpha = 1.0f - smoothstep(0.95f, 1.0f, dist);
   return float4(color.rgb, color.a * alpha);
 }
