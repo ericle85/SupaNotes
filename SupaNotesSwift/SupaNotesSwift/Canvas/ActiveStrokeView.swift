@@ -122,7 +122,6 @@ final class ActiveStrokeView: UIView {
         color: strokeColor,
         width: strokeWidth
       )
-      currentPoints = []
       onStrokeFinished?(stroke)
     }
     onDrawingStateChanged?(false)
