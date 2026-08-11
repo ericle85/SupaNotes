@@ -8,7 +8,7 @@ let package = Package(
         .target(
             name: "CatmullRomSmoothing",
             path: "SupaNotesSwift/Canvas",
-            sources: ["CatmullRomSmoothing.swift", "CatmullRomGPU.swift"]
+            sources: ["CatmullRomSmoothing.swift"]
         ),
         .testTarget(
             name: "CatmullRomSmoothingTests",

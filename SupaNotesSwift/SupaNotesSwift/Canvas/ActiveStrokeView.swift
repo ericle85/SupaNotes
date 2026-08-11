@@ -1,5 +1,4 @@
 import CoreGraphics
-import Metal
 import UIKit
 
 final class ActiveStrokeView: UIView {
@@ -8,7 +7,6 @@ final class ActiveStrokeView: UIView {
   private let strokeWidth: CGFloat = 4.0
   private let minimumPointDistance: CGFloat = 1.0
   private var dirtyRect: CGRect = .null
-  private let gpuSmoothing: CatmullRomGPU
 
   var onStrokeFinished: ((Stroke) -> Void)?
   var onDrawingStateChanged: ((Bool) -> Void)?
@@ -21,12 +19,6 @@ final class ActiveStrokeView: UIView {
   }
 
   override init(frame: CGRect) {
-    guard let device = MTLCreateSystemDefaultDevice(),
-      let smoother = CatmullRomGPU(device: device)
-    else { fatalError("Metal not available") }
-
-    self.gpuSmoothing = smoother
-
     super.init(frame: frame)
 
     backgroundColor = .clear
@@ -168,13 +160,7 @@ final class ActiveStrokeView: UIView {
       return
     }
 
-    let smoothed = gpuSmoothing.smooth(points: locations)
-
-    let path = CGMutablePath()
-    path.move(to: smoothed[0])
-    for i in 1..<smoothed.count {
-      path.addLine(to: smoothed[i])
-    }
+    let path = getCatmullRomPath(from: locations)
 
     context.setStrokeColor(strokeColor.cgColor)
     context.setLineWidth(strokeWidth)
