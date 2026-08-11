@@ -12,9 +12,6 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
   private let pageGap: CGFloat = 20
   private var momentumStopGesture: UIGestureRecognizer?
   var resetOnResume: Bool = true
-  #if DEBUG
-    private let fpsOverlay = DebugFPSOverlay()
-  #endif
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -50,12 +47,6 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
       object: nil
     )
 
-    #if DEBUG
-      DispatchQueue.main.async { [weak self] in
-        guard self != nil else { return }
-        self?.fpsOverlay.attach()
-      }
-    #endif
   }
 
   @available(*, unavailable)
@@ -63,11 +54,6 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
     fatalError()
   }
 
-  #if DEBUG
-    deinit {
-      fpsOverlay.detach()
-    }
-  #endif
 
   func setPages(_ newPages: [Page]) {  // choosing to have fresh canvas no matter what for now
     for pageView in visiblePageViews.values {
