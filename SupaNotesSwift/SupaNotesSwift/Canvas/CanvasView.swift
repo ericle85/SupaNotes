@@ -11,9 +11,6 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
   private var visiblePageViews: [Int: PageView] = [:]
   private let pageGap: CGFloat = 20
   private var momentumStopGesture: UIGestureRecognizer?
-  #if DEBUG
-    private let fpsOverlay = DebugFPSOverlay()
-  #endif
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -49,11 +46,6 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
       object: nil
     )
 
-    #if DEBUG
-      DispatchQueue.main.async { [weak self] in
-        self?.fpsOverlay.attach()
-      }
-    #endif
   }
 
   @available(*, unavailable)
