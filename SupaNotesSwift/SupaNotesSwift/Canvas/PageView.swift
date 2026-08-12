@@ -30,7 +30,7 @@ final class PageView: UIView {
     contentScaleFactor = 1.0
     let tiledLayer = layer as! CATiledLayer
     tiledLayer.levelsOfDetail = 4
-    tiledLayer.levelsOfDetailBias = 2
+    tiledLayer.levelsOfDetailBias = 4
     tiledLayer.tileSize = CGSize(width: 512, height: 512)
 
     addSubview(activeStroke)

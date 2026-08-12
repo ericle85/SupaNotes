@@ -95,7 +95,7 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
   private func updateVisiblePages() {
     guard !pages.isEmpty else { return }
 
-    let zoomScale = scrollView.zoomScale
+    let zoomScale = max(scrollView.zoomScale, scrollView.minimumZoomScale)
     let visibleRect = CGRect(
       x: scrollView.contentOffset.x / zoomScale,
       y: scrollView.contentOffset.y / zoomScale,
