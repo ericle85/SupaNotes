@@ -42,8 +42,6 @@ final class CatmullRomSmoothingTests: XCTestCase {
       CGPoint(x: 150, y: 80),
     ]
 
-    let dt: CGFloat = 1e-4
-
     for i in 1..<(controlPoints.count - 1) {
       let p0 = controlPoints[max(i - 1, 0)]
       let p1 = controlPoints[i]
@@ -53,10 +51,10 @@ final class CatmullRomSmoothingTests: XCTestCase {
       let p0prev = controlPoints[max(i - 2, 0)]
 
       let tangentLeft = tangentAt(
-        p0: p0prev, p1: p0, p2: p1, p3: p2, t: 1.0, dt: dt
+        p0: p0prev, p1: p0, p2: p1, p3: p2, t: 1.0
       )
       let tangentRight = tangentAt(
-        p0: p0, p1: p1, p2: p2, p3: p3, t: 0.0, dt: dt
+        p0: p0, p1: p1, p2: p2, p3: p3, t: 0.0
       )
 
       let leftNorm = normalize(tangentLeft)
@@ -173,9 +171,8 @@ final class CatmullRomSmoothingTests: XCTestCase {
     }
 
     let hasOvershoot = sampled.contains { $0.x < -curveEpsilon || $0.x > 101 + curveEpsilon }
-    if hasOvershoot {
-      // ponytail: uniform Catmull-Rom overshoots on tight turns; upgrade to centripetal (α=0.5) when visual quality matters
-    }
+    // ponytail: uniform Catmull-Rom overshoots on tight turns; upgrade to centripetal (α=0.5) when visual quality matters
+    XCTAssertTrue(hasOvershoot, "Uniform Catmull-Rom should overshoot on tight turns")
   }
 
   // MARK: - Boundary Tests
@@ -213,7 +210,7 @@ final class CatmullRomSmoothingTests: XCTestCase {
 
   private func tangentAt(
     p0: CGPoint, p1: CGPoint, p2: CGPoint, p3: CGPoint,
-    t: CGFloat, dt: CGFloat
+    t: CGFloat
   ) -> CGPoint {
     let cp1 = CGPoint(
       x: p1.x + (p2.x - p0.x) / 6.0,
