@@ -1,5 +1,8 @@
-import CoreGraphics
-import UIKit
+#if canImport(UIKit)
+  import UIKit
+#else
+  import CoreGraphics
+#endif
 
 func renderStroke(
   points: [CGPoint],
