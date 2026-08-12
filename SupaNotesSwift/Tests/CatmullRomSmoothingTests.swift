@@ -154,7 +154,7 @@ final class CatmullRomSmoothingTests: XCTestCase {
     }
   }
 
-  func testUniformParameterizationIsDefault() {
+  func testCentripetalReducesOvershootOnTightTurns() {
     let sharpTurn = [
       CGPoint(x: 0, y: 0),
       CGPoint(x: 100, y: 0),
@@ -170,9 +170,8 @@ final class CatmullRomSmoothingTests: XCTestCase {
       XCTAssertFalse(point.y.isNaN)
     }
 
-    let hasOvershoot = sampled.contains { $0.x < -curveEpsilon || $0.x > 101 + curveEpsilon }
-    // ponytail: uniform Catmull-Rom overshoots on tight turns; upgrade to centripetal (α=0.5) when visual quality matters
-    XCTAssertTrue(hasOvershoot, "Uniform Catmull-Rom should overshoot on tight turns")
+    let maxX = sampled.map { $0.x }.max() ?? 0
+    XCTAssertLessThan(maxX, 103, "Centripetal should keep overshoot under 2% of span")
   }
 
   // MARK: - Boundary Tests
@@ -212,14 +211,21 @@ final class CatmullRomSmoothingTests: XCTestCase {
     p0: CGPoint, p1: CGPoint, p2: CGPoint, p3: CGPoint,
     t: CGFloat
   ) -> CGPoint {
-    let cp1 = CGPoint(
-      x: p1.x + (p2.x - p0.x) / 6.0,
-      y: p1.y + (p2.y - p0.y) / 6.0
+    let d01 = sqrt(hypot(p1.x - p0.x, p1.y - p0.y))
+    let d12 = sqrt(hypot(p2.x - p1.x, p2.y - p1.y))
+    let d23 = sqrt(hypot(p3.x - p2.x, p3.y - p2.y))
+
+    let ct1 = centripetalTangentHelper(
+      prev: p0, curr: p1, next: p2, dPrev: d01, dNext: d12
     )
-    let cp2 = CGPoint(
-      x: p2.x - (p3.x - p1.x) / 6.0,
-      y: p2.y - (p3.y - p1.y) / 6.0
+    let ct2 = centripetalTangentHelper(
+      prev: p1, curr: p2, next: p3, dPrev: d12, dNext: d23
     )
+
+    let scale = d12 / 3.0
+
+    let cp1 = CGPoint(x: p1.x + scale * ct1.x, y: p1.y + scale * ct1.y)
+    let cp2 = CGPoint(x: p2.x - scale * ct2.x, y: p2.y - scale * ct2.y)
 
     let tClamped = max(0, min(1, t))
     let oneMinusT = 1.0 - tClamped
@@ -234,6 +240,26 @@ final class CatmullRomSmoothingTests: XCTestCase {
       + 3.0 * tClamped * tClamped * (p2.y - cp2.y)
 
     return CGPoint(x: dx, y: dy)
+  }
+
+  private func centripetalTangentHelper(
+    prev: CGPoint, curr: CGPoint, next: CGPoint,
+    dPrev: CGFloat, dNext: CGFloat
+  ) -> CGPoint {
+    if dPrev < 1e-6 && dNext < 1e-6 {
+      return .zero
+    }
+    if dPrev < 1e-6 {
+      return CGPoint(x: (next.x - curr.x) / dNext, y: (next.y - curr.y) / dNext)
+    }
+    if dNext < 1e-6 {
+      return CGPoint(x: (curr.x - prev.x) / dPrev, y: (curr.y - prev.y) / dPrev)
+    }
+    let dTotal = dPrev + dNext
+    return CGPoint(
+      x: (next.x - curr.x) / dNext - (next.x - prev.x) / dTotal + (curr.x - prev.x) / dPrev,
+      y: (next.y - curr.y) / dNext - (next.y - prev.y) / dTotal + (curr.y - prev.y) / dPrev
+    )
   }
 
   private func normalize(_ v: CGPoint) -> CGPoint {
