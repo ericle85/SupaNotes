@@ -215,17 +215,28 @@ final class CatmullRomSmoothingTests: XCTestCase {
     p0: CGPoint, p1: CGPoint, p2: CGPoint, p3: CGPoint,
     t: CGFloat, dt: CGFloat
   ) -> CGPoint {
-    let tClamped = max(0, min(1, t))
-    let tBefore = max(0, tClamped - dt)
-    let tAfter = min(1, tClamped + dt)
-
-    let before = getCatmullRomPoint(p0: p0, p1: p1, p2: p2, p3: p3, t: tBefore)
-    let after = getCatmullRomPoint(p0: p0, p1: p1, p2: p2, p3: p3, t: tAfter)
-
-    return CGPoint(
-      x: after.x - before.x,
-      y: after.y - before.y
+    let cp1 = CGPoint(
+      x: p1.x + (p2.x - p0.x) / 6.0,
+      y: p1.y + (p2.y - p0.y) / 6.0
     )
+    let cp2 = CGPoint(
+      x: p2.x - (p3.x - p1.x) / 6.0,
+      y: p2.y - (p3.y - p1.y) / 6.0
+    )
+
+    let tClamped = max(0, min(1, t))
+    let oneMinusT = 1.0 - tClamped
+
+    let dx =
+      3.0 * oneMinusT * oneMinusT * (cp1.x - p1.x)
+      + 6.0 * oneMinusT * tClamped * (cp2.x - cp1.x)
+      + 3.0 * tClamped * tClamped * (p2.x - cp2.x)
+    let dy =
+      3.0 * oneMinusT * oneMinusT * (cp1.y - p1.y)
+      + 6.0 * oneMinusT * tClamped * (cp2.y - cp1.y)
+      + 3.0 * tClamped * tClamped * (p2.y - cp2.y)
+
+    return CGPoint(x: dx, y: dy)
   }
 
   private func normalize(_ v: CGPoint) -> CGPoint {
@@ -238,18 +249,42 @@ final class CatmullRomSmoothingTests: XCTestCase {
 
   private func samplePath(_ path: CGPath) -> [CGPoint] {
     var points: [CGPoint] = []
+    var current = CGPoint.zero
 
     path.applyWithBlock { elementPointer in
       let element = elementPointer.pointee
       switch element.type {
       case .moveToPoint:
-        points.append(element.points[0])
+        current = element.points[0]
+        points.append(current)
       case .addLineToPoint:
-        points.append(element.points[0])
+        current = element.points[0]
+        points.append(current)
       case .addQuadCurveToPoint:
-        points.append(element.points[1])
+        current = element.points[1]
+        points.append(current)
       case .addCurveToPoint:
-        points.append(element.points[2])
+        let p0 = current
+        let cp1 = element.points[0]
+        let cp2 = element.points[1]
+        let p3 = element.points[2]
+        let steps = 8
+        for s in 1...steps {
+          let t = CGFloat(s) / CGFloat(steps)
+          let oneMinusT = 1.0 - t
+          let x =
+            oneMinusT * oneMinusT * oneMinusT * p0.x
+            + 3.0 * oneMinusT * oneMinusT * t * cp1.x
+            + 3.0 * oneMinusT * t * t * cp2.x
+            + t * t * t * p3.x
+          let y =
+            oneMinusT * oneMinusT * oneMinusT * p0.y
+            + 3.0 * oneMinusT * oneMinusT * t * cp1.y
+            + 3.0 * oneMinusT * t * t * cp2.y
+            + t * t * t * p3.y
+          points.append(CGPoint(x: x, y: y))
+        }
+        current = p3
       case .closeSubpath:
         break
       @unknown default:
