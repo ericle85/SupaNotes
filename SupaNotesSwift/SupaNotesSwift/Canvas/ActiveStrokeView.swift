@@ -143,9 +143,6 @@ final class ActiveStrokeView: UIView {
   }
 
   override func draw(_: CGRect) {
-    #if DEBUG
-      DebugFPSOverlay.recordDraw()
-    #endif
     guard !currentPoints.isEmpty else {
       return
     }
