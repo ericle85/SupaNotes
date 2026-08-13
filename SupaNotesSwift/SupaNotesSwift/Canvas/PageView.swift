@@ -1,33 +1,34 @@
-import CoreGraphics
 import PencilKit
 import UIKit
 
 final class PageView: UIView, PKCanvasViewDelegate {
-  private let background: PageBackground
-  private let canvasView: PKCanvasView
+  private let canvasView = PKCanvasView()
+  private let gridView: GridBackgroundView
 
-  static let defaultPageSize = CGSize(width: 612, height: 792)
+  static let pageSize = CGSize(width: 612, height: 792)
 
   var onDrawingStateChanged: ((Bool) -> Void)?
 
-  init(page: Page) {
-    let pageSize = Self.pageSizeFor(page.background)
-    let pageFrame = CGRect(origin: .zero, size: pageSize)
+  init(theme: GridTheme) {
+    let frame = CGRect(origin: .zero, size: Self.pageSize)
+    self.gridView = GridBackgroundView(frame: frame, theme: theme)
 
-    self.background = page.background
-    self.canvasView = PKCanvasView(frame: pageFrame)
+    super.init(frame: frame)
 
-    super.init(frame: pageFrame)
+    addSubview(gridView)
 
-    drawBackgroundImage()
-
-    canvasView.drawing = page.drawing
+    canvasView.frame = frame
     canvasView.drawingPolicy = .pencilOnly
     canvasView.backgroundColor = .clear
     canvasView.isOpaque = false
     canvasView.isScrollEnabled = false
     canvasView.tool = PKInkingTool(.pen, color: .black, width: 4)
     canvasView.delegate = self
+
+    let pencilOnly = [UITouch.TouchType.pencil.rawValue as NSNumber]
+    for recognizer in canvasView.gestureRecognizers ?? [] {
+      recognizer.allowedTouchTypes = pencilOnly
+    }
 
     addSubview(canvasView)
   }
@@ -37,41 +38,42 @@ final class PageView: UIView, PKCanvasViewDelegate {
     fatalError()
   }
 
-  func currentDrawing() -> PKDrawing {
-    return canvasView.drawing
-  }
-
-  func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
+  func canvasViewDidBeginUsingTool(_: PKCanvasView) {
     onDrawingStateChanged?(true)
   }
 
-  func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
+  func canvasViewDidEndUsingTool(_: PKCanvasView) {
     onDrawingStateChanged?(false)
   }
 
-  private func drawBackgroundImage() {
-    let pageSize = Self.pageSizeFor(background)
-    let renderer = UIGraphicsImageRenderer(size: pageSize)
-    let image = renderer.image { rendererContext in
-      let context = rendererContext.cgContext
-      let rect = CGRect(origin: .zero, size: pageSize)
-
-      switch background {
-      case .grid(let theme):
-        drawGrid(rect, theme: theme, into: context)
-      case .pdf(let pdfPage):
-        drawPDF(rect, page: pdfPage, into: context)
-      }
+  func updateGridScale(zoomScale: CGFloat) {
+    let newScale = zoomScale * traitCollection.displayScale
+    if gridView.contentScaleFactor != newScale {
+      gridView.contentScaleFactor = newScale
+      gridView.setNeedsDisplay()
     }
+  }
+}
 
-    let backgroundView = UIImageView(image: image)
-    backgroundView.frame = CGRect(origin: .zero, size: pageSize)
-    insertSubview(backgroundView, at: 0)
+private final class GridBackgroundView: UIView {
+  private let theme: GridTheme
+
+  init(frame: CGRect, theme: GridTheme) {
+    self.theme = theme
+    super.init(frame: frame)
+    backgroundColor = theme.backgroundColor
+    contentMode = .redraw
   }
 
-  private func drawGrid(_ rect: CGRect, theme: GridTheme, into context: CGContext) {
-    context.setFillColor(theme.backgroundColor.cgColor)
-    context.fill(rect)
+  @available(*, unavailable)
+  required init?(coder _: NSCoder) {
+    fatalError()
+  }
+
+  override func draw(_ rect: CGRect) {
+    guard let context = UIGraphicsGetCurrentContext() else {
+      return
+    }
 
     context.setStrokeColor(theme.lineColor.cgColor)
     context.setLineWidth(theme.lineWidth)
@@ -93,26 +95,5 @@ final class PageView: UIView, PKCanvasViewDelegate {
     }
 
     context.strokePath()
-  }
-
-  private func drawPDF(_ rect: CGRect, page pdfPage: CGPDFPage, into context: CGContext) {
-    context.setFillColor(UIColor.white.cgColor)
-    context.fill(rect)
-
-    let pageRect = pdfPage.getBoxRect(.mediaBox)
-    context.saveGState()
-    context.translateBy(x: 0, y: pageRect.height)
-    context.scaleBy(x: 1, y: -1)
-    context.drawPDFPage(pdfPage)
-    context.restoreGState()
-  }
-
-  static func pageSizeFor(_ background: PageBackground) -> CGSize {
-    switch background {
-    case .grid:
-      return defaultPageSize
-    case .pdf(let page):
-      return page.getBoxRect(.mediaBox).size
-    }
   }
 }

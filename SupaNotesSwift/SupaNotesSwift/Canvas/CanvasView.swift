@@ -1,19 +1,14 @@
-import CoreGraphics
 import UIKit
 
 final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegate {
   private let scrollView = UIScrollView()
-  private let contentContainer = UIView()
-
-  private var pages: [Page] = []
-  private var pageYOffsets: [CGFloat] = []
-  private var pageSizes: [CGSize] = []
-  private var visiblePageViews: [Int: PageView] = [:]
-  private let pageGap: CGFloat = 20
+  private let pageView: PageView
   private var momentumStopGesture: UIGestureRecognizer?
 
-  override init(frame: CGRect) {
-    super.init(frame: frame)
+  init(theme: GridTheme = .light) {
+    self.pageView = PageView(theme: theme)
+
+    super.init(frame: .zero)
     backgroundColor = .gray
 
     scrollView.delegate = self
@@ -32,20 +27,15 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
     stopMomentum.minimumPressDuration = 0
     stopMomentum.cancelsTouchesInView = false
     stopMomentum.delegate = self
-
     momentumStopGesture = stopMomentum
 
     addSubview(scrollView)
     scrollView.addGestureRecognizer(stopMomentum)
-    scrollView.addSubview(contentContainer)
+    scrollView.addSubview(pageView)
 
-    NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(handleForegroundResume),
-      name: UIApplication.willEnterForegroundNotification,
-      object: nil
-    )
-
+    pageView.onDrawingStateChanged = { [weak self] isDrawing in
+      self?.setZoomEnabled(!isDrawing)
+    }
   }
 
   @available(*, unavailable)
@@ -53,114 +43,16 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
     fatalError()
   }
 
-  func setPages(_ newPages: [Page]) {  // choosing to have fresh canvas no matter what for now
-    for pageView in visiblePageViews.values {
-      pageView.removeFromSuperview()
-    }
-    visiblePageViews.removeAll()
-    pages = newPages
-    precomputeLayout()
-    setNeedsLayout()
-  }
-
-  private func precomputeLayout() {
-    pageSizes = pages.map { PageView.pageSizeFor($0.background) }
-
-    pageYOffsets = []
-    var y: CGFloat = 0
-    for (index, size) in pageSizes.enumerated() {
-      pageYOffsets.append(y)
-      y += size.height
-      if index < pageSizes.count - 1 {
-        y += pageGap
-      }
-    }
-  }
-
-  private func updateContentSize() {
-    let totalHeight =
-      pageYOffsets.isEmpty
-      ? 0
-      : pageYOffsets.last! + pageSizes.last!.height
-    let containerWidth = pageSizes.map(\.width).max() ?? scrollView.bounds.width
-
-    contentContainer.frame = CGRect(
-      x: 0, y: 0,
-      width: containerWidth,
-      height: totalHeight
-    )
-    scrollView.contentSize = CGSize(width: containerWidth, height: totalHeight)
-  }
-
-  private func updateVisiblePages() {
-    guard !pages.isEmpty else { return }
-
-    let zoomScale = max(scrollView.zoomScale, scrollView.minimumZoomScale)
-    let visibleRect = CGRect(
-      x: scrollView.contentOffset.x / zoomScale,
-      y: scrollView.contentOffset.y / zoomScale,
-      width: scrollView.bounds.width / zoomScale,
-      height: scrollView.bounds.height / zoomScale
-    )
-
-    let bufferHeight = visibleRect.height
-    let expandedMinY = visibleRect.minY - bufferHeight
-    let expandedMaxY = visibleRect.maxY + bufferHeight
-
-    var newVisibleIndices: Set<Int> = []
-    for index in 0..<pages.count {
-      let pageMinY = pageYOffsets[index]
-      let pageMaxY = pageMinY + pageSizes[index].height
-      if pageMaxY >= expandedMinY && pageMinY <= expandedMaxY {
-        newVisibleIndices.insert(index)
-      }
-    }
-
-    for index in visiblePageViews.keys {
-      if !newVisibleIndices.contains(index) {
-        let pageView = visiblePageViews.removeValue(forKey: index)!
-        pages[index].drawing = pageView.currentDrawing()
-        pageView.removeFromSuperview()
-      }
-    }
-
-    let containerWidth = contentContainer.bounds.width
-    for index in newVisibleIndices {
-      let size = pageSizes[index]
-      let x = (containerWidth - size.width) / 2
-      let targetFrame = CGRect(
-        x: x,
-        y: pageYOffsets[index],
-        width: size.width,
-        height: size.height
-      )
-
-      if let existing = visiblePageViews[index] {
-        existing.frame = targetFrame
-      } else {
-        let pageView = PageView(page: pages[index])
-        pageView.frame = targetFrame
-        contentContainer.addSubview(pageView)
-        visiblePageViews[index] = pageView
-        pageView.onDrawingStateChanged = { [weak self] isDrawing in
-          self?.setZoomEnabled(!isDrawing)
-        }
-      }
-    }
-
-  }
-
   override func layoutSubviews() {
     super.layoutSubviews()
     scrollView.frame = bounds
-    updateContentSize()
-    updateVisiblePages()
+    scrollView.contentSize = PageView.pageSize
     centerContent()
   }
 
   private func centerContent() {
     let scrollBounds = scrollView.bounds
-    let contentSize = contentContainer.frame.size
+    let contentSize = pageView.frame.size
 
     let offsetX = max(0, (scrollBounds.width - contentSize.width) / 2)
     let offsetY = max(0, (scrollBounds.height - contentSize.height) / 2)
@@ -171,13 +63,6 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
       bottom: offsetY,
       right: offsetX
     )
-  }
-
-  @objc private func handleForegroundResume() {
-    setPages(pages.map { Page(background: $0.background) })
-    setZoomEnabled(true)
-    scrollView.zoomScale = 1.0
-    scrollView.contentOffset = .zero
   }
 
   @objc private func handleMomentumStop(_ gesture: UILongPressGestureRecognizer) {
@@ -199,15 +84,14 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
   }
 
   func viewForZooming(in _: UIScrollView) -> UIView? {
-    return contentContainer
+    return pageView
   }
 
   func scrollViewDidZoom(_: UIScrollView) {
     centerContent()
-    updateVisiblePages()
   }
 
-  func scrollViewDidScroll(_: UIScrollView) {
-    updateVisiblePages()
+  func scrollViewDidEndZooming(_: UIScrollView, with _: UIView?, atScale scale: CGFloat) {
+    pageView.updateGridScale(zoomScale: scale)
   }
 }

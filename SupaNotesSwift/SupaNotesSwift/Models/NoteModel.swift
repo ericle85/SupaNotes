@@ -1,5 +1,3 @@
-import CoreGraphics
-import PencilKit
 import UIKit
 
 struct GridTheme {
@@ -27,22 +25,4 @@ struct GridTheme {
     backgroundColor: UIColor.white,
     lineColor: UIColor(red: 0x6F / 255.0, green: 0x6F / 255.0, blue: 0x6F / 255.0, alpha: 0.25)
   )
-}
-
-enum PageBackground {
-  case grid(GridTheme)
-  case pdf(CGPDFPage)
-}
-
-struct Page {
-  let background: PageBackground
-  var drawing: PKDrawing
-
-  init(
-    background: PageBackground,
-    drawing: PKDrawing = PKDrawing()
-  ) {
-    self.background = background
-    self.drawing = drawing
-  }
 }
