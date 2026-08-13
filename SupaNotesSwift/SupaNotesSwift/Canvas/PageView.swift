@@ -1,43 +1,35 @@
 import CoreGraphics
+import PencilKit
 import UIKit
 
-final class PageView: UIView {
+final class PageView: UIView, PKCanvasViewDelegate {
   private let background: PageBackground
-  private let strokeLock = NSLock()
-  private var strokes: [Stroke]
-  private let activeStroke: ActiveStrokeView
-  var onDrawingStateChanged: ((Bool) -> Void)? {
-    get { activeStroke.onDrawingStateChanged }
-    set { activeStroke.onDrawingStateChanged = newValue }
-  }
+  private let canvasView: PKCanvasView
 
   static let defaultPageSize = CGSize(width: 612, height: 792)
 
-  override static var layerClass: AnyClass {
-    return NoFadeTiledLayer.self
-  }
+  var onDrawingStateChanged: ((Bool) -> Void)?
 
   init(page: Page) {
     let pageSize = Self.pageSizeFor(page.background)
     let pageFrame = CGRect(origin: .zero, size: pageSize)
 
     self.background = page.background
-    self.strokes = page.strokes
-    activeStroke = ActiveStrokeView(frame: pageFrame)
+    self.canvasView = PKCanvasView(frame: pageFrame)
 
     super.init(frame: pageFrame)
 
-    contentScaleFactor = 1.0
-    let tiledLayer = layer as! CATiledLayer
-    tiledLayer.levelsOfDetail = 4
-    tiledLayer.levelsOfDetailBias = 4
-    tiledLayer.tileSize = CGSize(width: 512, height: 512)
+    drawBackgroundImage()
 
-    addSubview(activeStroke)
+    canvasView.drawing = page.drawing
+    canvasView.drawingPolicy = .pencilOnly
+    canvasView.backgroundColor = .clear
+    canvasView.isOpaque = false
+    canvasView.isScrollEnabled = false
+    canvasView.tool = PKInkingTool(.pen, color: .black, width: 4)
+    canvasView.delegate = self
 
-    activeStroke.onStrokeFinished = { [weak self] stroke in
-      self?.addStroke(stroke)
-    }
+    addSubview(canvasView)
   }
 
   @available(*, unavailable)
@@ -45,40 +37,36 @@ final class PageView: UIView {
     fatalError()
   }
 
-  func updateActiveStrokeContentScale(zoomScale: CGFloat) {
-    activeStroke.updateContentScale(zoomScale: zoomScale)
+  func currentDrawing() -> PKDrawing {
+    return canvasView.drawing
   }
 
-  func currentStrokes() -> [Stroke] {
-    strokeLock.lock()
-    let snapshot = strokes
-    strokeLock.unlock()
-    return snapshot
+  func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
+    onDrawingStateChanged?(true)
   }
 
-  private func addStroke(_ stroke: Stroke) {
-    strokeLock.lock()
-    strokes.append(stroke)
-    strokeLock.unlock()
-    setNeedsDisplay(stroke.boundingRect)
+  func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
+    onDrawingStateChanged?(false)
   }
 
-  override func draw(_ rect: CGRect) {
-    guard let context = UIGraphicsGetCurrentContext() else {
-      return
+  private func drawBackgroundImage() {
+    let pageSize = Self.pageSizeFor(background)
+    let renderer = UIGraphicsImageRenderer(size: pageSize)
+    let image = renderer.image { rendererContext in
+      let context = rendererContext.cgContext
+      let rect = CGRect(origin: .zero, size: pageSize)
+
+      switch background {
+      case .grid(let theme):
+        drawGrid(rect, theme: theme, into: context)
+      case .pdf(let pdfPage):
+        drawPDF(rect, page: pdfPage, into: context)
+      }
     }
 
-    drawBackground(rect, into: context)
-    drawStrokes(rect, into: context)
-  }
-
-  private func drawBackground(_ rect: CGRect, into context: CGContext) {
-    switch background {
-    case .grid(let theme):
-      drawGrid(rect, theme: theme, into: context)
-    case .pdf(let pdfPage):
-      drawPDF(rect, page: pdfPage, into: context)
-    }
+    let backgroundView = UIImageView(image: image)
+    backgroundView.frame = CGRect(origin: .zero, size: pageSize)
+    insertSubview(backgroundView, at: 0)
   }
 
   private func drawGrid(_ rect: CGRect, theme: GridTheme, into context: CGContext) {
@@ -117,24 +105,6 @@ final class PageView: UIView {
     context.scaleBy(x: 1, y: -1)
     context.drawPDFPage(pdfPage)
     context.restoreGState()
-  }
-
-  private func drawStrokes(_ rect: CGRect, into context: CGContext) {
-    strokeLock.lock()
-    let snapshot = strokes
-    strokeLock.unlock()
-
-    let visible = snapshot.filter { $0.boundingRect.intersects(rect) }
-
-    for stroke in visible {
-      let locations = stroke.points.map { $0.location }
-      renderStroke(
-        points: locations,
-        color: stroke.color.cgColor,
-        width: stroke.width,
-        into: context
-      )
-    }
   }
 
   static func pageSizeFor(_ background: PageBackground) -> CGSize {

@@ -119,7 +119,7 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
     for index in visiblePageViews.keys {
       if !newVisibleIndices.contains(index) {
         let pageView = visiblePageViews.removeValue(forKey: index)!
-        pages[index].strokes = pageView.currentStrokes()
+        pages[index].drawing = pageView.currentDrawing()
         pageView.removeFromSuperview()
       }
     }
@@ -148,9 +148,6 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
       }
     }
 
-    for (_, pageView) in visiblePageViews {
-      pageView.updateActiveStrokeContentScale(zoomScale: zoomScale)
-    }
   }
 
   override func layoutSubviews() {

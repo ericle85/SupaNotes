@@ -1,4 +1,5 @@
 import CoreGraphics
+import PencilKit
 import UIKit
 
 struct GridTheme {
@@ -28,49 +29,6 @@ struct GridTheme {
   )
 }
 
-struct StrokePoint {
-  let location: CGPoint
-  let force: CGFloat
-  let timestamp: TimeInterval
-}
-
-struct Stroke {
-  let points: [StrokePoint]
-  let color: UIColor
-  let width: CGFloat
-  let boundingRect: CGRect
-
-  init(points: [StrokePoint], color: UIColor, width: CGFloat) {
-    self.points = points
-    self.color = color
-    self.width = width
-    self.boundingRect = Self.computeBoundingRect(points: points, width: width)
-  }
-
-  private static func computeBoundingRect(points: [StrokePoint], width: CGFloat) -> CGRect {
-    guard let first = points.first else {
-      return .zero
-    }
-    var minX = first.location.x
-    var minY = first.location.y
-    var maxX = minX
-    var maxY = minY
-    for point in points.dropFirst() {
-      minX = min(minX, point.location.x)
-      minY = min(minY, point.location.y)
-      maxX = max(maxX, point.location.x)
-      maxY = max(maxY, point.location.y)
-    }
-    let padding = width / 2 + 4
-    return CGRect(
-      x: minX - padding,
-      y: minY - padding,
-      width: maxX - minX + padding * 2,
-      height: maxY - minY + padding * 2
-    )
-  }
-}
-
 enum PageBackground {
   case grid(GridTheme)
   case pdf(CGPDFPage)
@@ -78,13 +36,13 @@ enum PageBackground {
 
 struct Page {
   let background: PageBackground
-  var strokes: [Stroke]
+  var drawing: PKDrawing
 
   init(
     background: PageBackground,
-    strokes: [Stroke] = []
+    drawing: PKDrawing = PKDrawing()
   ) {
     self.background = background
-    self.strokes = strokes
+    self.drawing = drawing
   }
 }
