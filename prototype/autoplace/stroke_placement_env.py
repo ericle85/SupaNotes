@@ -1,7 +1,9 @@
 import pygame
 import random
-from matplotlib.textpath import TextPath
-from matplotlib.font_manager import FontProperties
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+from skimage.morphology import skeletonize
+from collections import deque
 
 
 CANVAS_WIDTH = 800
@@ -10,40 +12,159 @@ BACKGROUND_COLOR = (0, 0, 0)
 TARGET_COLOR = (255, 80, 80)
 SUGGESTION_COLOR = (80, 255, 80)
 POINT_RADIUS = 2
-FONT_SIZE = 120
 OFFSET_RANGE = 200
 POINTS_PER_STROKE = 20
+RENDER_FONT_SIZE = 200
+DISPLAY_SCALE = 0.5
+SIMPLIFY_TOLERANCE = 1.5
 
 
-def extract_strokes_from_text(text, font_size):
-    font_props = FontProperties(family="Arial")
-    text_path = TextPath((0, 0), text, size=font_size, prop=font_props)
-    vertices = text_path.vertices
-    codes = text_path.codes
+def render_text_to_skeleton(text, font_size):
+    try:
+        font = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", font_size)
+    except OSError:
+        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", font_size)
 
-    MOVETO = 1
-    CLOSEPOLY = 79
+    bbox = font.getbbox(text)
+    padding = 20
+    width = bbox[2] - bbox[0] + padding * 2
+    height = bbox[3] - bbox[1] + padding * 2
+
+    img = Image.new("L", (width, height), 0)
+    draw = ImageDraw.Draw(img)
+    draw.text((padding - bbox[0], padding - bbox[1]), text, fill=255, font=font)
+
+    binary = np.array(img) > 128
+    skeleton = skeletonize(binary)
+    return skeleton
+
+
+def find_neighbors(skeleton, y, x):
+    neighbors = []
+    for dy in [-1, 0, 1]:
+        for dx in [-1, 0, 1]:
+            if dy == 0 and dx == 0:
+                continue
+            ny = y + dy
+            nx = x + dx
+            if 0 <= ny < skeleton.shape[0] and 0 <= nx < skeleton.shape[1]:
+                if skeleton[ny, nx]:
+                    neighbors.append((ny, nx))
+    return neighbors
+
+
+def trace_skeleton_to_strokes(skeleton):
+    visited = np.zeros_like(skeleton, dtype=bool)
+    neighbor_count = np.zeros_like(skeleton, dtype=int)
+
+    ys, xs = np.where(skeleton)
+    for y, x in zip(ys, xs):
+        neighbor_count[y, x] = len(find_neighbors(skeleton, y, x))
+
+    endpoints = set()
+    junctions = set()
+    for y, x in zip(ys, xs):
+        count = neighbor_count[y, x]
+        if count == 1:
+            endpoints.add((y, x))
+        elif count >= 3:
+            junctions.add((y, x))
 
     strokes = []
-    current_stroke = []
 
-    for vertex, code in zip(vertices, codes):
-        if code == MOVETO:
-            if len(current_stroke) > 1:
-                strokes.append(current_stroke)
-            current_stroke = [vertex.tolist()]
-        elif code == CLOSEPOLY:
-            if len(current_stroke) > 1:
-                current_stroke.append(current_stroke[0])
-                strokes.append(current_stroke)
-            current_stroke = []
-        else:
-            current_stroke.append(vertex.tolist())
+    start_points = list(endpoints)
+    for y, x in zip(ys, xs):
+        if (y, x) not in endpoints and not visited[y, x]:
+            start_points.append((y, x))
 
-    if len(current_stroke) > 1:
-        strokes.append(current_stroke)
+    for start_y, start_x in start_points:
+        if visited[start_y, start_x]:
+            continue
+
+        stroke = [(start_x, start_y)]
+        visited[start_y, start_x] = True
+        current = (start_y, start_x)
+
+        while True:
+            neighbors = find_neighbors(skeleton, current[0], current[1])
+            unvisited = [(ny, nx) for ny, nx in neighbors if not visited[ny, nx]]
+
+            if len(unvisited) == 0:
+                break
+
+            next_point = unvisited[0]
+            visited[next_point[0], next_point[1]] = True
+            stroke.append((next_point[1], next_point[0]))
+            current = next_point
+
+            if current in junctions or current in endpoints:
+                break
+
+        if len(stroke) >= 2:
+            strokes.append(stroke)
 
     return strokes
+
+
+def simplify_stroke(stroke, tolerance):
+    if len(stroke) <= 2:
+        return stroke
+
+    start = stroke[0]
+    end = stroke[-1]
+    max_dist = 0
+    max_idx = 0
+
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+    line_len = (dx * dx + dy * dy) ** 0.5
+
+    for i in range(1, len(stroke) - 1):
+        if line_len == 0:
+            dist = ((stroke[i][0] - start[0]) ** 2 + (stroke[i][1] - start[1]) ** 2) ** 0.5
+        else:
+            dist = abs(dy * stroke[i][0] - dx * stroke[i][1] + end[0] * start[1] - end[1] * start[0]) / line_len
+
+        if dist > max_dist:
+            max_dist = dist
+            max_idx = i
+
+    if max_dist > tolerance:
+        left = simplify_stroke(stroke[:max_idx + 1], tolerance)
+        right = simplify_stroke(stroke[max_idx:], tolerance)
+        return left[:-1] + right
+
+    return [start, end]
+
+
+def build_strokes_from_arial(text):
+    skeleton = render_text_to_skeleton(text, RENDER_FONT_SIZE)
+    raw_strokes = trace_skeleton_to_strokes(skeleton)
+
+    scaled = []
+    for stroke in raw_strokes:
+        simplified = simplify_stroke(stroke, SIMPLIFY_TOLERANCE)
+        scaled_stroke = [[x * DISPLAY_SCALE, y * DISPLAY_SCALE] for x, y in simplified]
+        scaled.append(scaled_stroke)
+
+    return scaled
+
+
+def center_strokes(strokes, canvas_width, canvas_height):
+    all_points = [p for s in strokes for p in s]
+    min_x = min(p[0] for p in all_points)
+    max_x = max(p[0] for p in all_points)
+    min_y = min(p[1] for p in all_points)
+    max_y = max(p[1] for p in all_points)
+
+    offset_x = canvas_width / 2 - (min_x + max_x) / 2
+    offset_y = canvas_height / 2 - (min_y + max_y) / 2
+
+    return [[[x + offset_x, y + offset_y] for x, y in stroke] for stroke in strokes]
+
+
+def apply_offset(strokes, dx, dy):
+    return [[[x + dx, y + dy] for x, y in stroke] for stroke in strokes]
 
 
 def sample_points_along_stroke(stroke, num_points):
@@ -57,12 +178,10 @@ def sample_points_along_stroke(stroke, num_points):
     if total_length == 0:
         return [stroke[0]] * num_points
 
-    sampled = []
     step = total_length / (num_points - 1) if num_points > 1 else 0
-
+    sampled = []
     accumulated = 0.0
     segment_index = 0
-    segment_accumulated = 0.0
 
     for i in range(num_points):
         target_dist = i * step
@@ -81,33 +200,6 @@ def sample_points_along_stroke(stroke, num_points):
         sampled.append([x, y])
 
     return sampled
-
-
-def flip_y_and_center(strokes, canvas_width, canvas_height):
-    all_points = [p for s in strokes for p in s]
-    min_x = min(p[0] for p in all_points)
-    max_x = max(p[0] for p in all_points)
-    min_y = min(p[1] for p in all_points)
-    max_y = max(p[1] for p in all_points)
-
-    center_x = (min_x + max_x) / 2
-    center_y = (min_y + max_y) / 2
-
-    offset_x = canvas_width / 2 - center_x
-    offset_y = canvas_height / 2 + center_y
-
-    centered = []
-    for stroke in strokes:
-        new_stroke = []
-        for x, y in stroke:
-            new_stroke.append([x + offset_x, -y + offset_y])
-        centered.append(new_stroke)
-
-    return centered
-
-
-def apply_offset(strokes, dx, dy):
-    return [[[x + dx, y + dy] for x, y in stroke] for stroke in strokes]
 
 
 def sample_all_strokes(strokes, points_per_stroke):
@@ -137,8 +229,8 @@ def run():
     pygame.display.set_caption("AutoPlace Env — drag green to overlap red")
     clock = pygame.time.Clock()
 
-    raw_strokes = extract_strokes_from_text("Hello World", FONT_SIZE)
-    base_strokes = flip_y_and_center(raw_strokes, CANVAS_WIDTH, CANVAS_HEIGHT)
+    raw_strokes = build_strokes_from_arial("Hello World")
+    base_strokes = center_strokes(raw_strokes, CANVAS_WIDTH, CANVAS_HEIGHT)
     sampled_strokes = sample_all_strokes(base_strokes, POINTS_PER_STROKE)
 
     target_dx, target_dy = random_offset()
