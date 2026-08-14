@@ -22,8 +22,14 @@ final class StrokeCollector {
     private var lastProcessedStrokeCount = 0
     private var debounceTimer: Timer?
     var onBoundingBox: ((CGRect) -> Void)?
+    var onScribbleDetected: ((CGRect) -> Void)?
 
     var drawingProvider: (() -> PKDrawing)?
+
+    func syncStrokeCount() {
+        guard let drawing = drawingProvider?() else { return }
+        lastProcessedStrokeCount = drawing.strokes.count
+    }
 
     func pencilLifted() {
         debounceTimer?.invalidate()
@@ -59,9 +65,15 @@ final class StrokeCollector {
         onBoundingBox?(boundingBox)
 
         let converted = newStrokes.map { convertPKStrokeToStrokePoints($0) }
+        let scribbleBounds = boundingBox
 
-        DispatchQueue.global(qos: .userInitiated).async {
-            runAutocompletePipeline(strokes: converted)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let kind = runAutocompletePipeline(strokes: converted)
+            if kind == "scribble" {
+                DispatchQueue.main.async {
+                    self?.onScribbleDetected?(scribbleBounds)
+                }
+            }
         }
     }
 }

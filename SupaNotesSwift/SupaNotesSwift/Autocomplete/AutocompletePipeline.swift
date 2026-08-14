@@ -1,23 +1,22 @@
 import Foundation
 
-func runAutocompletePipeline(strokes: [[StrokePoint]]) {
+func runAutocompletePipeline(strokes: [[StrokePoint]]) -> String {
     do {
         let classifier = try ClassifierModelInference()
-        let ctcModel = try CTCModelInference()
-
         let kind = try classifier.classify(strokes: strokes)
         print("[Pipeline] Classification: \(kind)")
 
         if kind == "scribble" || kind == "none" {
             print("[Pipeline] Skipping — classified as \(kind)")
-            return
+            return kind
         }
 
         if kind == "google" {
             print("[Pipeline] Writing detected — placeholder (Google Digital Ink)")
-            return
+            return kind
         }
 
+        let ctcModel = try CTCModelInference()
         let transcription = try ctcModel.transcribe(strokes: strokes)
         print("[Pipeline] CTC transcription: \(transcription)")
 
@@ -26,7 +25,10 @@ func runAutocompletePipeline(strokes: [[StrokePoint]]) {
         } else {
             print("[Pipeline] No suggestion returned")
         }
+
+        return kind
     } catch {
         print("[Pipeline] Error: \(error.localizedDescription)")
+        return "error"
     }
 }

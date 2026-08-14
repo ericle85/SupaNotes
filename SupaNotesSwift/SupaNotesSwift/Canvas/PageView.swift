@@ -49,6 +49,9 @@ final class PageView: UIView, PKCanvasViewDelegate {
     strokeCollector.onBoundingBox = { [weak self] rect in
       self?.showBoundingBox(rect)
     }
+    strokeCollector.onScribbleDetected = { [weak self] bounds in
+      self?.applyScribbleErase(scribbleBounds: bounds)
+    }
   }
 
   override func didMoveToWindow() {
@@ -81,6 +84,42 @@ final class PageView: UIView, PKCanvasViewDelegate {
     let padded = rect.insetBy(dx: -4, dy: -4)
     boundingBoxLayer.path = UIBezierPath(roundedRect: padded, cornerRadius: 4).cgPath
     boundingBoxLayer.isHidden = false
+  }
+
+  private func applyScribbleErase(scribbleBounds: CGRect) {
+    let oldDrawing = canvasView.drawing
+    let erasedStrokes = oldDrawing.strokes.filter { $0.renderBounds.intersects(scribbleBounds) }
+    let keptStrokes = oldDrawing.strokes.filter { !$0.renderBounds.intersects(scribbleBounds) }
+
+    if erasedStrokes.isEmpty { return }
+
+    let erasedDrawing = PKDrawing(strokes: erasedStrokes)
+    let combinedBounds = erasedStrokes.reduce(CGRect.null) { $0.union($1.renderBounds) }
+    let image = erasedDrawing.image(from: combinedBounds, scale: UIScreen.main.scale)
+
+    let overlay = UIImageView(image: image)
+    overlay.frame = combinedBounds
+    canvasView.addSubview(overlay)
+
+    let newDrawing = PKDrawing(strokes: keptStrokes)
+    setDrawingWithUndo(newDrawing, replacing: oldDrawing)
+
+    boundingBoxLayer.isHidden = true
+
+    UIView.animate(withDuration: 0.3, animations: {
+      overlay.alpha = 0
+    }, completion: { _ in
+      overlay.removeFromSuperview()
+    })
+  }
+
+  private func setDrawingWithUndo(_ newDrawing: PKDrawing, replacing oldDrawing: PKDrawing) {
+    canvasView.drawing = newDrawing
+    strokeCollector.syncStrokeCount()
+
+    canvasView.undoManager?.registerUndo(withTarget: self) { pageView in
+      pageView.setDrawingWithUndo(oldDrawing, replacing: newDrawing)
+    }
   }
 
   func updateGridScale(zoomScale: CGFloat) {
