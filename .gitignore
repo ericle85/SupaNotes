@@ -1,6 +1,9 @@
 # Claude Code local settings
 .claude/settings.local.json
 
+# Exported CoreML models in prototype (re-exportable)
+prototype/autocomplete/models/classifier/StrokeClassifier.mlpackage/
+
 # Xcode Build Server (machine-specific paths)
 buildServer.json
 
