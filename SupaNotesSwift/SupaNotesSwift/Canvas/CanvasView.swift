@@ -94,4 +94,5 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
   func scrollViewDidEndZooming(_: UIScrollView, with _: UIView?, atScale scale: CGFloat) {
     pageView.updateGridScale(zoomScale: scale)
   }
+
 }

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct CanvasViewRepresentable: UIViewRepresentable {
   func makeUIView(context _: Context) -> CanvasView {
-    return CanvasView()
+    CanvasView()
   }
 
   func updateUIView(_: CanvasView, context _: Context) {}

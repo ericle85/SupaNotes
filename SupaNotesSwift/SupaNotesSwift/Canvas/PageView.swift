@@ -2,12 +2,14 @@ import PencilKit
 import UIKit
 
 final class PageView: UIView, PKCanvasViewDelegate {
-  private let canvasView = PKCanvasView()
+  let canvasView = PKCanvasView()
   private let gridView: GridBackgroundView
 
   static let pageSize = CGSize(width: 612, height: 792)
 
   var onDrawingStateChanged: ((Bool) -> Void)?
+
+  private var toolPicker: PKToolPicker?
 
   init(theme: GridTheme) {
     let frame = CGRect(origin: .zero, size: Self.pageSize)
@@ -31,6 +33,17 @@ final class PageView: UIView, PKCanvasViewDelegate {
     }
 
     addSubview(canvasView)
+  }
+
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    guard let window, toolPicker == nil else { return }
+
+    let picker = PKToolPicker()
+    picker.addObserver(canvasView)
+    picker.setVisible(true, forFirstResponder: canvasView)
+    toolPicker = picker
+    canvasView.becomeFirstResponder()
   }
 
   @available(*, unavailable)
