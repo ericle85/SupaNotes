@@ -10,6 +10,8 @@ final class PageView: UIView, PKCanvasViewDelegate {
   var onDrawingStateChanged: ((Bool) -> Void)?
 
   private var toolPicker: PKToolPicker?
+  private let strokeCollector = StrokeCollector()
+  private let boundingBoxLayer = CAShapeLayer()
 
   init(theme: GridTheme) {
     let frame = CGRect(origin: .zero, size: Self.pageSize)
@@ -33,6 +35,20 @@ final class PageView: UIView, PKCanvasViewDelegate {
     }
 
     addSubview(canvasView)
+
+    boundingBoxLayer.fillColor = nil
+    boundingBoxLayer.strokeColor = UIColor.systemBlue.cgColor
+    boundingBoxLayer.lineWidth = 2.0
+    boundingBoxLayer.lineDashPattern = [6, 4]
+    boundingBoxLayer.isHidden = true
+    canvasView.layer.addSublayer(boundingBoxLayer)
+
+    strokeCollector.drawingProvider = { [weak self] in
+      self?.canvasView.drawing ?? PKDrawing()
+    }
+    strokeCollector.onBoundingBox = { [weak self] rect in
+      self?.showBoundingBox(rect)
+    }
   }
 
   override func didMoveToWindow() {
@@ -53,10 +69,18 @@ final class PageView: UIView, PKCanvasViewDelegate {
 
   func canvasViewDidBeginUsingTool(_: PKCanvasView) {
     onDrawingStateChanged?(true)
+    strokeCollector.pencilTouched()
   }
 
   func canvasViewDidEndUsingTool(_: PKCanvasView) {
     onDrawingStateChanged?(false)
+    strokeCollector.pencilLifted()
+  }
+
+  private func showBoundingBox(_ rect: CGRect) {
+    let padded = rect.insetBy(dx: -4, dy: -4)
+    boundingBoxLayer.path = UIBezierPath(roundedRect: padded, cornerRadius: 4).cgPath
+    boundingBoxLayer.isHidden = false
   }
 
   func updateGridScale(zoomScale: CGFloat) {
