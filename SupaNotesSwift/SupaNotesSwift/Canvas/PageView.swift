@@ -49,8 +49,8 @@ final class PageView: UIView, PKCanvasViewDelegate {
     strokeCollector.onBoundingBox = { [weak self] rect in
       self?.showBoundingBox(rect)
     }
-    strokeCollector.onScribbleDetected = { [weak self] bounds in
-      self?.applyScribbleErase(scribbleBounds: bounds)
+    strokeCollector.onScribbleDetected = { [weak self] bounds, startIndex in
+      self?.applyScribbleErase(scribbleBounds: bounds, scribbleStartIndex: startIndex)
     }
   }
 
@@ -86,12 +86,20 @@ final class PageView: UIView, PKCanvasViewDelegate {
     boundingBoxLayer.isHidden = false
   }
 
-  private func applyScribbleErase(scribbleBounds: CGRect) {
+  private func applyScribbleErase(scribbleBounds: CGRect, scribbleStartIndex: Int) {
     let oldDrawing = canvasView.drawing
-    let erasedStrokes = oldDrawing.strokes.filter { $0.renderBounds.intersects(scribbleBounds) }
-    let keptStrokes = oldDrawing.strokes.filter { !$0.renderBounds.intersects(scribbleBounds) }
+    let allStrokes = oldDrawing.strokes
 
-    if erasedStrokes.isEmpty { return }
+    let preExisting = allStrokes.prefix(scribbleStartIndex)
+    let overlappedByScribble = preExisting.filter { $0.renderBounds.intersects(scribbleBounds) }
+
+    if overlappedByScribble.isEmpty {
+      return
+    }
+
+    let scribbleStrokes = Array(allStrokes.suffix(from: scribbleStartIndex))
+    let erasedStrokes = overlappedByScribble + scribbleStrokes
+    let keptStrokes = Array(preExisting.filter { !$0.renderBounds.intersects(scribbleBounds) })
 
     let erasedDrawing = PKDrawing(strokes: erasedStrokes)
     let combinedBounds = erasedStrokes.reduce(CGRect.null) { $0.union($1.renderBounds) }

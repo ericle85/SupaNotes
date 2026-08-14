@@ -22,7 +22,7 @@ final class StrokeCollector {
     private var lastProcessedStrokeCount = 0
     private var debounceTimer: Timer?
     var onBoundingBox: ((CGRect) -> Void)?
-    var onScribbleDetected: ((CGRect) -> Void)?
+    var onScribbleDetected: ((CGRect, Int) -> Void)?
 
     var drawingProvider: (() -> PKDrawing)?
 
@@ -66,12 +66,13 @@ final class StrokeCollector {
 
         let converted = newStrokes.map { convertPKStrokeToStrokePoints($0) }
         let scribbleBounds = boundingBox
+        let scribbleStartIndex = lastProcessedStrokeCount - newStrokes.count
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let kind = runAutocompletePipeline(strokes: converted)
             if kind == "scribble" {
                 DispatchQueue.main.async {
-                    self?.onScribbleDetected?(scribbleBounds)
+                    self?.onScribbleDetected?(scribbleBounds, scribbleStartIndex)
                 }
             }
         }
