@@ -30,13 +30,3 @@ func runAutocompletePipeline(strokes: [[StrokePoint]]) {
         print("[Pipeline] Error: \(error.localizedDescription)")
     }
 }
-
-func runAutocompletePipelineFromSample() {
-    let strokes = parseInkMLFromBundle(resourceName: "math")
-    if strokes.isEmpty {
-        print("[Pipeline] No strokes loaded from sample")
-        return
-    }
-    print("[Pipeline] Loaded \(strokes.count) strokes from math.inkml")
-    runAutocompletePipeline(strokes: strokes)
-}
