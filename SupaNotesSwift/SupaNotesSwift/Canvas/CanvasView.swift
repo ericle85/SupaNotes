@@ -5,11 +5,11 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
   private let pageView: PageView
   private var momentumStopGesture: UIGestureRecognizer?
 
-  init(theme: GridTheme = .light) {
+  init(theme: GridTheme = .adaptive) {
     self.pageView = PageView(theme: theme)
 
     super.init(frame: .zero)
-    backgroundColor = .gray
+    backgroundColor = .systemGray3
 
     scrollView.delegate = self
     scrollView.minimumZoomScale = 0.75

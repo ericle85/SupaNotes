@@ -4,7 +4,7 @@ import numpy as np
 from pipeline import pipeline
 from math_engine.engine import do_autosuggestion
 
-
+# OUTDATED
 class PipelineHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/suggest":

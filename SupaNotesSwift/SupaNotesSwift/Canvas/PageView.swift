@@ -157,6 +157,14 @@ private final class GridBackgroundView: UIView {
     fatalError()
   }
 
+  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+    super.traitCollectionDidChange(previousTraitCollection)
+    if traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
+      backgroundColor = theme.backgroundColor
+      setNeedsDisplay()
+    }
+  }
+
   override func draw(_ rect: CGRect) {
     guard let context = UIGraphicsGetCurrentContext() else {
       return

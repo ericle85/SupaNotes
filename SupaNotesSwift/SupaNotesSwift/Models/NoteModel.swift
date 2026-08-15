@@ -25,4 +25,19 @@ struct GridTheme {
     backgroundColor: UIColor.white,
     lineColor: UIColor(red: 0x6F / 255.0, green: 0x6F / 255.0, blue: 0x6F / 255.0, alpha: 0.25)
   )
+
+  static let adaptive = GridTheme(
+    backgroundColor: UIColor { traits in
+      if traits.userInterfaceStyle == .dark {
+        return UIColor(red: 0x14 / 255.0, green: 0x14 / 255.0, blue: 0x14 / 255.0, alpha: 1.0)
+      }
+      return .white
+    },
+    lineColor: UIColor { traits in
+      if traits.userInterfaceStyle == .dark {
+        return UIColor(red: 0x20 / 255.0, green: 0x20 / 255.0, blue: 0x20 / 255.0, alpha: 1.0)
+      }
+      return UIColor(red: 0x6F / 255.0, green: 0x6F / 255.0, blue: 0x6F / 255.0, alpha: 0.25)
+    }
+  )
 }
