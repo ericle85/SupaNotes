@@ -72,6 +72,13 @@ playground.xcworkspace
 # CocoaPods
 Pods/
 
+# Native third-party build sources and generated artifacts
+ThirdParty/SymEngine/
+ThirdParty/gmp/
+ThirdParty/gmp-6.3.0/
+ThirdParty/**/build/
+ThirdParty/**/install/
+
 # Carthage
 #
 # Add this line if you want to avoid checking in source code from Carthage dependencies.
