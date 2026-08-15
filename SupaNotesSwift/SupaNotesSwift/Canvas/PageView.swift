@@ -114,11 +114,14 @@ final class PageView: UIView, PKCanvasViewDelegate {
 
     boundingBoxLayer.isHidden = true
 
-    UIView.animate(withDuration: 0.3, animations: {
-      overlay.alpha = 0
-    }, completion: { _ in
-      overlay.removeFromSuperview()
-    })
+    UIView.animate(
+      withDuration: 0.3,
+      animations: {
+        overlay.alpha = 0
+      },
+      completion: { _ in
+        overlay.removeFromSuperview()
+      })
   }
 
   private func setDrawingWithUndo(_ newDrawing: PKDrawing, replacing oldDrawing: PKDrawing) {
