@@ -59,7 +59,6 @@ final class PageView: UIView, PKCanvasViewDelegate {
     guard let window, toolPicker == nil else { return }
 
     let picker = PKToolPicker()
-    picker.selectedTool = PKInkingTool(.pen, color: .black, width: 4)
     picker.addObserver(canvasView)
     picker.setVisible(true, forFirstResponder: canvasView)
     toolPicker = picker
