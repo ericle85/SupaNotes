@@ -1,0 +1,7 @@
+platform :ios, '16.0'
+
+target 'SupaNotesSwift' do
+  use_frameworks!
+
+  pod 'GoogleMLKit/DigitalInkRecognition', '~> 7.0'
+end

@@ -1,6 +1,6 @@
 import Foundation
 
-func runAutocompletePipeline(strokes: [[StrokePoint]]) -> String {
+func runAutocompletePipeline(strokes: [[StrokePoint]]) async -> String {
     do {
         let classifier = try ClassifierModelInference()
         let kind = try classifier.classify(strokes: strokes)
@@ -12,7 +12,8 @@ func runAutocompletePipeline(strokes: [[StrokePoint]]) -> String {
         }
 
         if kind == "google" {
-            print("[Pipeline] Writing detected — placeholder (Google Digital Ink)")
+            let transcription = try await recognizeDigitalInk(strokes: strokes)
+            print("[Pipeline] Digital Ink transcription: \(transcription)")
             return kind
         }
 

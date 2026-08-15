@@ -6,13 +6,22 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		51C1ACE36CC6B685FA8C3F17 /* Pods_SupaNotesSwift.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 84132BD795FA1AFB1F5DA00A /* Pods_SupaNotesSwift.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
+		84132BD795FA1AFB1F5DA00A /* Pods_SupaNotesSwift.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_SupaNotesSwift.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		BFA960A43023D41B007659EA /* SupaNotesSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SupaNotesSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D91FCE5B5503B3528AE7A602 /* Pods-SupaNotesSwift.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SupaNotesSwift.release.xcconfig"; path = "Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift.release.xcconfig"; sourceTree = "<group>"; };
+		FA3D114174564515B822ADC7 /* Pods-SupaNotesSwift.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SupaNotesSwift.debug.xcconfig"; path = "Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		BFA960A63023D41B007659EA /* SupaNotesSwift */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = SupaNotesSwift;
 			sourceTree = "<group>";
 		};
@@ -23,17 +32,38 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				51C1ACE36CC6B685FA8C3F17 /* Pods_SupaNotesSwift.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		3CFE1AF37DEB21507794F321 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				84132BD795FA1AFB1F5DA00A /* Pods_SupaNotesSwift.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		99D08F376E88896751333AB3 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				FA3D114174564515B822ADC7 /* Pods-SupaNotesSwift.debug.xcconfig */,
+				D91FCE5B5503B3528AE7A602 /* Pods-SupaNotesSwift.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
+			sourceTree = "<group>";
+		};
 		BFA9609B3023D41B007659EA = {
 			isa = PBXGroup;
 			children = (
 				BFA960A63023D41B007659EA /* SupaNotesSwift */,
 				BFA960A53023D41B007659EA /* Products */,
+				99D08F376E88896751333AB3 /* Pods */,
+				3CFE1AF37DEB21507794F321 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -52,9 +82,12 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = BFA960AF3023D41C007659EA /* Build configuration list for PBXNativeTarget "SupaNotesSwift" */;
 			buildPhases = (
+				BEF87D6F1BB3BA87AEAAD225 /* [CP] Check Pods Manifest.lock */,
 				BFA960A03023D41B007659EA /* Sources */,
 				BFA960A13023D41B007659EA /* Frameworks */,
 				BFA960A23023D41B007659EA /* Resources */,
+				7080CE29609421420ACF4575 /* [CP] Embed Pods Frameworks */,
+				1DBAE985E8AF2D72C6D28F1F /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -64,8 +97,6 @@
 				BFA960A63023D41B007659EA /* SupaNotesSwift */,
 			);
 			name = SupaNotesSwift;
-			packageProductDependencies = (
-			);
 			productName = SupaNotesSwift;
 			productReference = BFA960A43023D41B007659EA /* SupaNotesSwift.app */;
 			productType = "com.apple.product-type.application";
@@ -113,6 +144,65 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		1DBAE985E8AF2D72C6D28F1F /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift-resources-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		7080CE29609421420ACF4575 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		BEF87D6F1BB3BA87AEAAD225 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-SupaNotesSwift-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		BFA960A03023D41B007659EA /* Sources */ = {
@@ -163,7 +253,7 @@
 				DEVELOPMENT_TEAM = 7ARN6P5ZCL;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -227,7 +317,7 @@
 				DEVELOPMENT_TEAM = 7ARN6P5ZCL;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -248,6 +338,7 @@
 		};
 		BFA960B03023D41C007659EA /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = FA3D114174564515B822ADC7 /* Pods-SupaNotesSwift.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -281,6 +372,7 @@
 		};
 		BFA960B13023D41C007659EA /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = D91FCE5B5503B3528AE7A602 /* Pods-SupaNotesSwift.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

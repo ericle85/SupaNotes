@@ -34,7 +34,7 @@ final class StrokeCollector {
     func pencilLifted() {
         debounceTimer?.invalidate()
         debounceTimer = Timer.scheduledTimer(
-            withTimeInterval: 1.0,
+            withTimeInterval: 0.75,
             repeats: false
         ) { [weak self] _ in
             guard let self, let drawing = self.drawingProvider?() else { return }
@@ -68,10 +68,10 @@ final class StrokeCollector {
         let scribbleBounds = boundingBox
         let scribbleStartIndex = lastProcessedStrokeCount - newStrokes.count
 
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let kind = runAutocompletePipeline(strokes: converted)
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let kind = await runAutocompletePipeline(strokes: converted)
             if kind == "scribble" {
-                DispatchQueue.main.async {
+                await MainActor.run {
                     self?.onScribbleDetected?(scribbleBounds, scribbleStartIndex)
                 }
             }

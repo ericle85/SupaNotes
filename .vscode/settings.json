@@ -1,5 +1,8 @@
 {
   "sweetpad.build.derivedDataPath": ".derivedData",
+  "sweetpad.build.xcodeWorkspacePath": "SupaNotesSwift/SupaNotesSwift.xcworkspace",
   "python-envs.defaultEnvManager": "ms-python.python:conda",
-  "python-envs.defaultPackageManager": "ms-python.python:conda"
+  "python-envs.defaultPackageManager": "ms-python.python:conda",
+  "sweetpad.build.xcodeWorkspacePath": "SupaNotesSwift/SupaNotesSwift.xcworkspace",
+  "sweetpad.build.scheme": "SupaNotesSwift"
 }
