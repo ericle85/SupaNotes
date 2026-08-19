@@ -1,4 +1,4 @@
-from sympy import solve, Eq
+from sympy import solve, Eq, latex
 from sympy.core.relational import Relational
 
 from math_engine.ctc_to_autosuggest_translator import (
@@ -41,7 +41,7 @@ def _solve_equation(equation, free_symbols, solve_for=None):
         return None
 
     formatted_values = [format_result(s, s.simplify()) for s in solutions]
-    return f"{target}={', '.join(formatted_values)}"
+    return f"{latex(target)}={', '.join(formatted_values)}"
 
 
 PLACEMENT_SOLVE = "alignWithEqualSignAbove"
@@ -53,7 +53,7 @@ def _self_check():
     assert do_autosuggestion("3*4+1=") == ("13", "append")
     assert do_autosuggestion("2+x=")[0] is None
     assert do_autosuggestion("2+2")[0] is None
-    assert do_autosuggestion(r"\frac{6}{9}=") == ("2/3", "append")
+    assert do_autosuggestion(r"\frac{6}{9}=") == (r"\frac{2}{3}", "append")
     assert do_autosuggestion(r"\frac{2}{3}=") == ("0.667", "append")
     assert do_autosuggestion(r"\frac{1}{2}=") == ("0.5", "append")
 
@@ -63,7 +63,7 @@ def _self_check():
     assert do_autosuggestion("2x-8=")[0] is None
 
     from sympy import Symbol
-    assert do_autosuggestion("2x+y=10", solve_for=Symbol("x")) == ("x=5 - y/2", PLACEMENT_SOLVE)
+    assert do_autosuggestion("2x+y=10", solve_for=Symbol("x")) == (r"x=5 - \frac{y}{2}", PLACEMENT_SOLVE)
 
     print("engine self-check passed")
 

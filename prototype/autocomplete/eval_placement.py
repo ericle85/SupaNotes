@@ -81,6 +81,26 @@ def place_suggestion(bbox, mode, strokes=None, transcription="", suggestion=""):
     return None
 
 
+def estimate_stroke_height(strokes):
+    heights = []
+    for stroke in strokes:
+        h = stroke[:, 1].max() - stroke[:, 1].min()
+        if h > 1.0:
+            heights.append(h)
+    if not heights:
+        return 20.0
+    return float(np.percentile(heights, 40))
+
+
+def stroke_height_to_fontsize(stroke_height, ax):
+    y_min, y_max = ax.get_ylim()
+    fig = ax.get_figure()
+    fig_height_inches = fig.get_size_inches()[1]
+    data_range = abs(y_max - y_min)
+    points_per_data_unit = (fig_height_inches * 72.0) / data_range
+    return stroke_height * points_per_data_unit
+
+
 def visualize(strokes, bbox, placement, suggestion_text, mode):
     fig, ax = plt.subplots(1, 1, figsize=(10, 6))
 
@@ -100,35 +120,56 @@ def visualize(strokes, bbox, placement, suggestion_text, mode):
 
     if placement:
         px, py = placement
+        latex_str = f"${suggestion_text}$"
+        ghost_color = (0.4, 0.4, 0.4, 0.5)
+
+        ax.set_aspect("equal")
+        ax.invert_yaxis()
+        ax.autoscale_view()
+        fig.canvas.draw()
+
+        fontsize = stroke_height_to_fontsize(estimate_stroke_height(strokes), ax)
+
         equal_idx = suggestion_text.find("=")
         if mode == "alignWithEqualSignAbove" and equal_idx >= 0:
             prefix = suggestion_text[:equal_idx]
-            suffix = suggestion_text[equal_idx:]
-            font_props = {"fontsize": 14, "fontweight": "bold", "family": "monospace"}
+            after_eq = suggestion_text[equal_idx + 1:]
+            eq_text = ax.text(
+                px, py, "$=$",
+                color=ghost_color, verticalalignment="center",
+                horizontalalignment="center",
+                fontsize=fontsize,
+            )
+            fig.canvas.draw()
+            eq_bb = eq_text.get_window_extent()
+            inv = ax.transData.inverted()
+            eq_left, _ = inv.transform((eq_bb.x0, eq_bb.y0))
+            eq_right, _ = inv.transform((eq_bb.x1, eq_bb.y0))
             if prefix:
                 ax.text(
-                    px, py, prefix,
-                    color="green", verticalalignment="center",
+                    eq_left, py, f"${prefix}$",
+                    color=ghost_color, verticalalignment="center",
                     horizontalalignment="right",
-                    **font_props,
+                    fontsize=fontsize,
                 )
-            ax.text(
-                px, py, suffix,
-                color="green", verticalalignment="center",
-                horizontalalignment="left",
-                **font_props,
-            )
+            if after_eq:
+                ax.text(
+                    eq_right, py, f"${after_eq}$",
+                    color=ghost_color, verticalalignment="center",
+                    horizontalalignment="left",
+                    fontsize=fontsize,
+                )
         else:
             ax.text(
-                px, py, suggestion_text,
-                fontsize=14, color="green",
-                verticalalignment="center",
-                fontweight="bold",
+                px, py, latex_str,
+                color=ghost_color, verticalalignment="center",
+                fontsize=fontsize,
             )
         ax.scatter([px], [py], color="red", s=40, zorder=5)
+    else:
+        ax.set_aspect("equal")
+        ax.invert_yaxis()
 
-    ax.set_aspect("equal")
-    ax.invert_yaxis()
     ax.set_title(f"Placement: {mode} | Suggestion: '{suggestion_text}'")
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
