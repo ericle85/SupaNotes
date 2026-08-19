@@ -18,7 +18,7 @@ func estimateStrokeHeight(strokes: [PKStroke]) -> CGFloat {
   return sorted[min(idx, sorted.count - 1)]
 }
 
-func findEqualSignXCenter(strokes: [PKStroke]) -> CGFloat? {
+func findEqualSignCenter(strokes: [PKStroke]) -> CGPoint? {
   var horizontals: [(midX: CGFloat, midY: CGFloat)] = []
 
   for stroke in strokes {
@@ -37,7 +37,7 @@ func findEqualSignXCenter(strokes: [PKStroke]) -> CGFloat? {
       let xDist = abs(a.midX - b.midX)
       let yDist = abs(a.midY - b.midY)
       if xDist < 10.0 && yDist > 2.0 && yDist < 12.0 {
-        return (a.midX + b.midX) / 2
+        return CGPoint(x: (a.midX + b.midX) / 2, y: (a.midY + b.midY) / 2)
       }
     }
   }
@@ -58,7 +58,7 @@ func computeSuggestionPosition(bbox: CGRect, mode: String, strokes: [PKStroke]) 
   }
 
   if mode == "alignWithEqualSignAbove" {
-    let equalX = findEqualSignXCenter(strokes: strokes) ?? bbox.minX
+    let equalX = findEqualSignCenter(strokes: strokes)?.x ?? bbox.minX
     return CGPoint(x: equalX, y: bbox.maxY + lineHeight * 0.5)
   }
 

@@ -35,7 +35,7 @@ def compute_bbox(strokes):
     }
 
 
-def find_equal_sign_x_center(strokes):
+def find_equal_sign_center(strokes):
     horizontal_strokes = []
     for stroke in strokes:
         x_range = stroke[:, 0].max() - stroke[:, 0].min()
@@ -52,7 +52,7 @@ def find_equal_sign_x_center(strokes):
             x_dist = abs(x1 - x2)
             y_dist = abs(y1 - y2)
             if x_dist < 10.0 and 2.0 < y_dist < 12.0:
-                return (x1 + x2) / 2
+                return (x1 + x2) / 2, (y1 + y2) / 2
 
     return None
 
@@ -72,10 +72,11 @@ def place_suggestion(bbox, mode, strokes=None, transcription="", suggestion=""):
         return x, y
 
     if mode == "alignWithEqualSignAbove":
-        equal_x = find_equal_sign_x_center(strokes)
-        if equal_x is None:
+        equal_center = find_equal_sign_center(strokes)
+        if equal_center is None:
             return bbox["min_x"], bbox["max_y"] + line_height * 0.5
 
+        equal_x, _ = equal_center
         y = bbox["max_y"] + line_height * 0.5
         return equal_x, y
 
@@ -149,6 +150,20 @@ def visualize(strokes, bbox, placement, suggestion_text, mode):
             [(px_img - dot_r, py_img - dot_r), (px_img + dot_r, py_img + dot_r)],
             fill="red",
         )
+
+    if mode == "alignWithEqualSignAbove" and placement:
+        equal_center = find_equal_sign_center(strokes)
+        if equal_center is not None:
+            eq_x, eq_y = equal_center
+            eq_x_img = (eq_x - bbox["min_x"] + margin) * scale
+            eq_y_img = (eq_y - bbox["min_y"] + margin) * scale
+            px_data, py_data = placement
+            py_img = (py_data - bbox["min_y"] + margin) * scale
+            draw.line(
+                [(eq_x_img, eq_y_img), (eq_x_img, py_img)],
+                fill="green",
+                width=2,
+            )
 
     bb_x0 = margin * scale - 2
     bb_y0 = margin * scale - 2
