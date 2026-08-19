@@ -34,7 +34,29 @@ def compute_bbox(strokes):
     }
 
 
-def place_suggestion(bbox, mode):
+def find_equal_sign_x_center(strokes):
+    horizontal_strokes = []
+    for stroke in strokes:
+        x_range = stroke[:, 0].max() - stroke[:, 0].min()
+        y_range = stroke[:, 1].max() - stroke[:, 1].min()
+        if x_range > 3.0 and y_range / (x_range + 0.01) < 0.4:
+            mid_x = (stroke[:, 0].min() + stroke[:, 0].max()) / 2
+            mid_y = (stroke[:, 1].min() + stroke[:, 1].max()) / 2
+            horizontal_strokes.append((mid_x, mid_y, stroke))
+
+    for i in range(len(horizontal_strokes)):
+        for j in range(i + 1, len(horizontal_strokes)):
+            x1, y1, s1 = horizontal_strokes[i]
+            x2, y2, s2 = horizontal_strokes[j]
+            x_dist = abs(x1 - x2)
+            y_dist = abs(y1 - y2)
+            if x_dist < 10.0 and 2.0 < y_dist < 12.0:
+                return (x1 + x2) / 2
+
+    return None
+
+
+def place_suggestion(bbox, mode, strokes=None, transcription="", suggestion=""):
     gap = 8.0
     line_height = bbox["max_y"] - bbox["min_y"]
 
@@ -47,6 +69,14 @@ def place_suggestion(bbox, mode):
         x = bbox["min_x"]
         y = bbox["max_y"] + line_height * 0.5
         return x, y
+
+    if mode == "alignWithEqualSignAbove":
+        equal_x = find_equal_sign_x_center(strokes)
+        if equal_x is None:
+            return bbox["min_x"], bbox["max_y"] + line_height * 0.5
+
+        y = bbox["max_y"] + line_height * 0.5
+        return equal_x, y
 
     return None
 
@@ -70,12 +100,31 @@ def visualize(strokes, bbox, placement, suggestion_text, mode):
 
     if placement:
         px, py = placement
-        ax.text(
-            px, py, suggestion_text,
-            fontsize=14, color="green",
-            verticalalignment="center",
-            fontweight="bold",
-        )
+        equal_idx = suggestion_text.find("=")
+        if mode == "alignWithEqualSignAbove" and equal_idx >= 0:
+            prefix = suggestion_text[:equal_idx]
+            suffix = suggestion_text[equal_idx:]
+            font_props = {"fontsize": 14, "fontweight": "bold", "family": "monospace"}
+            if prefix:
+                ax.text(
+                    px, py, prefix,
+                    color="green", verticalalignment="center",
+                    horizontalalignment="right",
+                    **font_props,
+                )
+            ax.text(
+                px, py, suffix,
+                color="green", verticalalignment="center",
+                horizontalalignment="left",
+                **font_props,
+            )
+        else:
+            ax.text(
+                px, py, suggestion_text,
+                fontsize=14, color="green",
+                verticalalignment="center",
+                fontweight="bold",
+            )
         ax.scatter([px], [py], color="red", s=40, zorder=5)
 
     ax.set_aspect("equal")
@@ -117,7 +166,7 @@ if __name__ == "__main__":
     print(f"Placement: {mode}")
     print(f"BBox: x=[{bbox['min_x']:.1f}, {bbox['max_x']:.1f}] y=[{bbox['min_y']:.1f}, {bbox['max_y']:.1f}]")
 
-    placement = place_suggestion(bbox, mode)
+    placement = place_suggestion(bbox, mode, strokes=strokes, transcription=transcription, suggestion=suggestion)
     if placement:
         print(f"Computed position: x={placement[0]:.1f}, y={placement[1]:.1f}")
     else:
