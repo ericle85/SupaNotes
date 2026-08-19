@@ -13,13 +13,23 @@ def pipeline(strokes):
     kind = classify_strokes(strokes)
     log.debug("kind: %s", kind)
     if kind == "scribble" or kind == "none":
-        return None
+        return {
+            "classification": kind,
+            "transcription": None,
+            "suggestion": None,
+            "placement": "N/A",
+        }
 
     strokes_as_string = translate_strokes_to_string(strokes, kind)
     log.debug("strokes as strings: %s", strokes_as_string)
-    suggestion = get_autosuggestion(strokes_as_string, kind)
+    suggestion, placement = get_autosuggestion(strokes_as_string, kind)
     log.debug("suggestion: %s", suggestion)
-    return suggestion
+    return {
+        "classification": kind,
+        "transcription": strokes_as_string,
+        "suggestion": suggestion,
+        "placement": placement,
+    }
 
 def classify_strokes(strokes) -> str:
     result = classifier_model.classify(strokes)
@@ -34,12 +44,12 @@ def translate_strokes_to_string(strokes, kind) -> str:
         return "PLACE HOLDER GOOGLE"
     raise NotImplementedError
 
-def get_autosuggestion(strokes_as_string, kind) -> str:
+def get_autosuggestion(strokes_as_string, kind):
     if kind == "math":
         return do_autosuggestion(strokes_as_string)
-    
+
     if kind == "writing":
-        return "place holder google"
+        return "place holder google", "N/A"
     raise NotImplementedError
 
 
@@ -76,20 +86,25 @@ if __name__ == "__main__":
     import numpy as np
     import argparse
 
+    logging.basicConfig(level=logging.DEBUG)
+
     parser = argparse.ArgumentParser()
+    parser.add_argument("inkml_path", nargs="?", default=None)
     parser.add_argument("--english", action="store_true")
     parser.add_argument("--stdin", action="store_true")
     args, _ = parser.parse_known_args()
 
     if args.english:
         strokes = load_deepwriting_sample("samples/deepwriting_validation.npz")
-        pipeline(strokes)
+        result = pipeline(strokes)
     elif args.stdin:
         raw = json.load(sys.stdin)
         strokes = [np.array(s) for s in raw]
         result = pipeline(strokes)
-        print(json.dumps({"result": result}))
     else:
         from models.ctc.preprocessing import parse_inkml
-        strokes, _ = parse_inkml("samples/math.inkml")
-        pipeline(strokes)
+        path = args.inkml_path if args.inkml_path else "samples/math.inkml"
+        strokes, label = parse_inkml(path)
+        result = pipeline(strokes)
+
+    print(json.dumps(result, indent=2))

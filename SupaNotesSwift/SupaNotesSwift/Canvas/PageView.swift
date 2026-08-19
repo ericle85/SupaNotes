@@ -10,7 +10,7 @@ final class PageView: UIView, PKCanvasViewDelegate {
   var onDrawingStateChanged: ((Bool) -> Void)?
 
   private var toolPicker: PKToolPicker?
-  private let strokeCollector = StrokeCollector()
+  let strokeCollector = StrokeCollector()
   private let boundingBoxLayer = CAShapeLayer()
 
   init(theme: GridTheme) {

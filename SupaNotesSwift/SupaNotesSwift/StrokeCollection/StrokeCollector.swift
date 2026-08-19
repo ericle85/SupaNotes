@@ -24,6 +24,8 @@ final class StrokeCollector {
   private var debounceTimer: Timer?
   var onBoundingBox: ((CGRect) -> Void)?
   var onScribbleDetected: ((CGRect, Int) -> Void)?
+  private(set) var lastPipelineResult: PipelineResult?
+  private(set) var lastPipelineStrokes: [PKStroke] = []
 
   var drawingProvider: (() -> PKDrawing)?
 
@@ -56,8 +58,9 @@ final class StrokeCollector {
       return
     }
 
-    let newStrokes = allStrokes[lastProcessedStrokeCount..<currentCount]
+    let newStrokes = Array(allStrokes[lastProcessedStrokeCount..<currentCount])
     lastProcessedStrokeCount = currentCount
+    lastPipelineStrokes = newStrokes
 
     var boundingBox = CGRect.null
     for stroke in newStrokes {
@@ -70,9 +73,10 @@ final class StrokeCollector {
     let scribbleStartIndex = lastProcessedStrokeCount - newStrokes.count
 
     Task { [weak self] in
-      let kind = await runAutocompletePipeline(strokes: converted)
-      if kind == "scribble" {
-        await MainActor.run {
+      let result = await runAutocompletePipeline(strokes: converted)
+      await MainActor.run {
+        self?.lastPipelineResult = result
+        if result.classification == "scribble" {
           self?.onScribbleDetected?(scribbleBounds, scribbleStartIndex)
         }
       }

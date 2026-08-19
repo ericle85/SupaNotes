@@ -40,4 +40,6 @@ Coding Rules:
     
 Swift: 
     - Swift lint & swift format commands to be run after all changes are made.
+    - After pod changes or linker errors, run `pod install` from SupaNotesSwift/ before building.
+    - Build: `xcodebuild build -workspace SupaNotesSwift.xcworkspace -scheme SupaNotesSwift -destination 'platform=iOS,id=00008122-000661223EB9801C' -quiet`
     Once you are done working, build on ipad air 13 inch (M3). 
