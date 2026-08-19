@@ -2,9 +2,10 @@ import json
 import os
 import xml.etree.ElementTree as ET
 
-import matplotlib.patches as patches
-import matplotlib.pyplot as plt
 import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+
+from placement_utils import compute_equal_sign_center_offset
 
 
 def parse_inkml(path):
@@ -92,91 +93,79 @@ def estimate_stroke_height(strokes):
     return float(np.percentile(heights, 50))
 
 
-def stroke_height_to_fontsize(stroke_height, ax):
-    y_min, y_max = ax.get_ylim()
-    fig = ax.get_figure()
-    fig_height_inches = fig.get_size_inches()[1]
-    data_range = abs(y_max - y_min)
-    points_per_data_unit = (fig_height_inches * 72.0) / data_range
-    return stroke_height * points_per_data_unit
+def strokes_to_image_coords(strokes, bbox, margin, scale):
+    shifted = []
+    for stroke in strokes:
+        xs = (stroke[:, 0] - bbox["min_x"] + margin) * scale
+        ys = (stroke[:, 1] - bbox["min_y"] + margin) * scale
+        shifted.append(np.column_stack([xs, ys]))
+    return shifted
 
 
 def visualize(strokes, bbox, placement, suggestion_text, mode):
-    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    margin = 20.0
+    data_w = bbox["max_x"] - bbox["min_x"] + 2 * margin
+    data_h = bbox["max_y"] - bbox["min_y"] + 2 * margin
 
-    for stroke in strokes:
-        ax.plot(stroke[:, 0], stroke[:, 1], "k-", linewidth=2)
+    scale = 8.0
+    img_w = int(data_w * scale)
+    img_h = int(data_h * scale * 1.8)
 
-    rect = patches.Rectangle(
-        (bbox["min_x"] - 2, bbox["min_y"] - 2),
-        bbox["max_x"] - bbox["min_x"] + 4,
-        bbox["max_y"] - bbox["min_y"] + 4,
-        linewidth=1,
-        edgecolor="blue",
-        facecolor="none",
-        linestyle="--",
-    )
-    ax.add_patch(rect)
+    img = Image.new("RGB", (img_w, img_h), "white")
+    draw = ImageDraw.Draw(img)
+
+    img_strokes = strokes_to_image_coords(strokes, bbox, margin, scale)
+    for s in img_strokes:
+        pts = [(x, y) for x, y in s]
+        if len(pts) >= 2:
+            draw.line(pts, fill="black", width=3)
+
+    stroke_h = estimate_stroke_height(strokes)
+    fontsize = max(12, int(stroke_h * scale * 0.8))
+    try:
+        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", fontsize)
+    except OSError:
+        font = ImageFont.load_default()
+
+    ghost_color = (120, 120, 120)
 
     if placement:
-        px, py = placement
-        latex_str = f"${suggestion_text}$"
-        ghost_color = (0.4, 0.4, 0.4, 0.5)
-
-        ax.set_aspect("equal")
-        ax.invert_yaxis()
-        ax.autoscale_view()
-        fig.canvas.draw()
-
-        fontsize = stroke_height_to_fontsize(estimate_stroke_height(strokes), ax)
+        px_data, py_data = placement
+        px_img = (px_data - bbox["min_x"] + margin) * scale
+        py_img = (py_data - bbox["min_y"] + margin) * scale
 
         equal_idx = suggestion_text.find("=")
         if mode == "alignWithEqualSignAbove" and equal_idx >= 0:
-            prefix = suggestion_text[:equal_idx]
-            after_eq = suggestion_text[equal_idx + 1:]
-            eq_text = ax.text(
-                px, py, "$=$",
-                color=ghost_color, verticalalignment="center",
-                horizontalalignment="center",
-                fontsize=fontsize,
+            eq_offset = compute_equal_sign_center_offset(
+                suggestion_text, lambda t: draw.textlength(t, font=font)
             )
-            fig.canvas.draw()
-            eq_bb = eq_text.get_window_extent()
-            inv = ax.transData.inverted()
-            eq_left, _ = inv.transform((eq_bb.x0, eq_bb.y0))
-            eq_right, _ = inv.transform((eq_bb.x1, eq_bb.y0))
-            if prefix:
-                ax.text(
-                    eq_left, py, f"${prefix}$",
-                    color=ghost_color, verticalalignment="center",
-                    horizontalalignment="right",
-                    fontsize=fontsize,
-                )
-            if after_eq:
-                ax.text(
-                    eq_right, py, f"${after_eq}$",
-                    color=ghost_color, verticalalignment="center",
-                    horizontalalignment="left",
-                    fontsize=fontsize,
-                )
+            text_x = px_img - eq_offset
+            draw.text((text_x, py_img), suggestion_text, fill=ghost_color, font=font, anchor="lm")
         else:
-            ax.text(
-                px, py, latex_str,
-                color=ghost_color, verticalalignment="center",
-                fontsize=fontsize,
-            )
-        ax.scatter([px], [py], color="red", s=40, zorder=5)
-    else:
-        ax.set_aspect("equal")
-        ax.invert_yaxis()
+            draw.text((px_img, py_img), suggestion_text, fill=ghost_color, font=font, anchor="lm")
 
-    ax.set_title(f"Placement: {mode} | Suggestion: '{suggestion_text}'")
-    ax.grid(True, alpha=0.3)
-    plt.tight_layout()
+        dot_r = 5
+        draw.ellipse(
+            [(px_img - dot_r, py_img - dot_r), (px_img + dot_r, py_img + dot_r)],
+            fill="red",
+        )
 
-    out_path = os.path.join(os.path.dirname(args.folder), f"placement_eval.png")
-    plt.savefig(out_path, dpi=150)
-    plt.show()
+    bb_x0 = margin * scale - 2
+    bb_y0 = margin * scale - 2
+    bb_x1 = (bbox["max_x"] - bbox["min_x"] + margin) * scale + 2
+    bb_y1 = (bbox["max_y"] - bbox["min_y"] + margin) * scale + 2
+    draw.rectangle([bb_x0, bb_y0, bb_x1, bb_y1], outline="blue", width=1)
+
+    title = f"Placement: {mode} | Suggestion: '{suggestion_text}'"
+    try:
+        title_font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 16)
+    except OSError:
+        title_font = ImageFont.load_default()
+    draw.text((10, 10), title, fill="black", font=title_font)
+
+    out_path = os.path.join(os.path.dirname(args.folder), "placement_eval.png")
+    img.save(out_path)
+    img.show()
     print(f"Saved to {out_path}")
 
 
