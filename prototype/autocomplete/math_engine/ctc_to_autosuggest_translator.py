@@ -25,6 +25,8 @@ _LATEX_NORMALIZERS = (
     (re.compile(r"\\(?:" + _DECORATOR_COMMANDS + r")\{([^{}]*)\}"), r"\1"),
     (re.compile(r"\^\s*\\circ"), ""),
     (re.compile(r"(?<![A-Za-z\\])(?:" + _BARE_FUNCTIONS + r")(?=\s*\()"), lambda m: "\\" + m.group(0)),
+    (re.compile(r"(\d)\("), r"\1 \\cdot ("),
+    (re.compile(r"\)\("), r") \\cdot ("),
 )
 
 
@@ -85,6 +87,8 @@ def _self_check() -> None:
     assert structure(translate_ctc_line_to_sympy(r"\vec{v}")) == structure(Symbol("v"))
     assert structure(translate_ctc_line_to_sympy("2x + 3 = 11").lhs) == structure(2 * Symbol("x") + 3)
     assert structure(translate_ctc_line_to_sympy("(x+1)(x-2)")) == structure((Symbol("x") + 1) * (Symbol("x") - 2))
+    assert translate_ctc_line_to_sympy("5(2+3)").simplify() == 25
+    assert translate_ctc_line_to_sympy("3(x+1)").expand() == 3 * Symbol("x") + 3
     from sympy import sin, asin, S
     assert translate_ctc_line_to_sympy(r"sin(\pi)") == S.Zero
     assert translate_ctc_line_to_sympy(r"\sin(\frac{\pi}{2})") == S.One

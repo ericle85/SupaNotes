@@ -15,7 +15,7 @@ final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegat
 
     scrollView.delegate = self
     scrollView.minimumZoomScale = 0.75
-    scrollView.maximumZoomScale = 10.0
+    scrollView.maximumZoomScale = 2
     scrollView.bouncesZoom = true
     scrollView.showsVerticalScrollIndicator = false
     scrollView.showsHorizontalScrollIndicator = false

@@ -100,6 +100,17 @@ std::string latexToSymEngine(const std::string &input) {
       continue;
     }
 
+    if (input[i] == '(' && !result.empty()) {
+      char last = result.back();
+      if (std::isdigit(last) || last == ')') {
+        result += '*';
+      }
+    }
+
+    if (std::isdigit(input[i]) && !result.empty() && result.back() == ')') {
+      result += '*';
+    }
+
     result += input[i];
   }
 

@@ -51,6 +51,8 @@ def _self_check():
     assert do_autosuggestion("2+2=") == ("4", "append")
     assert do_autosuggestion(r"\frac{10}{2}=") == ("5", "append")
     assert do_autosuggestion("3*4+1=") == ("13", "append")
+    assert do_autosuggestion("5(2+3)=") == ("25", "append")
+    assert do_autosuggestion("2(3+4)=") == ("14", "append")
     assert do_autosuggestion("2+x=")[0] is None
     assert do_autosuggestion("2+2")[0] is None
     assert do_autosuggestion(r"\frac{6}{9}=") == (r"\frac{2}{3}", "append")
