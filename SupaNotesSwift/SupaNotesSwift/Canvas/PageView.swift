@@ -12,6 +12,7 @@ final class PageView: UIView, PKCanvasViewDelegate {
   private var toolPicker: PKToolPicker?
   let strokeCollector = StrokeCollector()
   private let boundingBoxLayer = CAShapeLayer()
+  private let suggestionOverlay = MathSuggestionOverlay()
 
   init(theme: GridTheme) {
     let frame = CGRect(origin: .zero, size: Self.pageSize)
@@ -52,6 +53,12 @@ final class PageView: UIView, PKCanvasViewDelegate {
     strokeCollector.onScribbleDetected = { [weak self] bounds, startIndex in
       self?.applyScribbleErase(scribbleBounds: bounds, scribbleStartIndex: startIndex)
     }
+    strokeCollector.onSuggestion = { [weak self] result, strokes, bbox in
+      self?.showSuggestion(result: result, strokes: strokes, bbox: bbox)
+    }
+
+    suggestionOverlay.frame = frame
+    addSubview(suggestionOverlay)
   }
 
   override func didMoveToWindow() {
@@ -72,12 +79,26 @@ final class PageView: UIView, PKCanvasViewDelegate {
 
   func canvasViewDidBeginUsingTool(_: PKCanvasView) {
     onDrawingStateChanged?(true)
+    suggestionOverlay.hide()
     strokeCollector.pencilTouched()
   }
 
   func canvasViewDidEndUsingTool(_: PKCanvasView) {
     onDrawingStateChanged?(false)
     strokeCollector.pencilLifted()
+  }
+
+  private func showSuggestion(result: PipelineResult, strokes: [PKStroke], bbox: CGRect) {
+    guard let suggestion = result.suggestion else { return }
+    guard let position = computeSuggestionPosition(bbox: bbox, mode: result.placement, strokes: strokes) else { return }
+
+    let strokeHeight = estimateStrokeHeight(strokes: strokes)
+    suggestionOverlay.show(
+      suggestion: suggestion,
+      mode: result.placement,
+      position: position,
+      strokeHeight: strokeHeight
+    )
   }
 
   private func showBoundingBox(_ rect: CGRect) {

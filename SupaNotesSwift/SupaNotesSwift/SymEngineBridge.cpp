@@ -122,7 +122,7 @@ extern "C" const char *symengine_simplify_expression(const char *expression) {
     }
 
     const SymEngine::RCP<const SymEngine::Basic> simplified = SymEngine::simplify(parsed);
-    const std::string result = SymEngine::str(*simplified);
+    const std::string result = SymEngine::latex(*simplified);
     return strdup(result.c_str());
   } catch (...) {
     return nullptr;
@@ -164,13 +164,13 @@ extern "C" const char *symengine_solve_equation(const char *expression) {
       }
 
       std::ostringstream oss;
-      oss << SymEngine::str(*sym) << "=";
+      oss << SymEngine::latex(*sym) << "=";
       bool first = true;
       for (const auto &elem : elements) {
         if (!first) {
           oss << ", ";
         }
-        oss << SymEngine::str(*elem);
+        oss << SymEngine::latex(*elem);
         first = false;
       }
       return strdup(oss.str().c_str());

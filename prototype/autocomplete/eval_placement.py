@@ -89,7 +89,7 @@ def estimate_stroke_height(strokes):
             heights.append(h)
     if not heights:
         return 20.0
-    return float(np.percentile(heights, 40))
+    return float(np.percentile(heights, 50))
 
 
 def stroke_height_to_fontsize(stroke_height, ax):

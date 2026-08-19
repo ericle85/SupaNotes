@@ -22,6 +22,7 @@ PODS:
     - GoogleUtilities/Logger
     - GoogleUtilities/Privacy
   - GTMSessionFetcher/Core (3.5.0)
+  - iosMath (0.9.4)
   - MLKitCommon (12.0.0):
     - GoogleDataTransport (~> 10.0)
     - GoogleToolboxForMac/Logger (< 5.0, >= 4.2.1)
@@ -45,6 +46,7 @@ PODS:
 
 DEPENDENCIES:
   - GoogleMLKit/DigitalInkRecognition (~> 7.0)
+  - iosMath (~> 0.9)
 
 SPEC REPOS:
   trunk:
@@ -53,6 +55,7 @@ SPEC REPOS:
     - GoogleToolboxForMac
     - GoogleUtilities
     - GTMSessionFetcher
+    - iosMath
     - MLKitCommon
     - MLKitDigitalInkRecognition
     - MLKitMDD
@@ -66,6 +69,7 @@ SPEC CHECKSUMS:
   GoogleToolboxForMac: d1a2cbf009c453f4d6ded37c105e2f67a32206d8
   GoogleUtilities: 766ace00c6b10d8148408f329d10c4f051931850
   GTMSessionFetcher: 5aea5ba6bd522a239e236100971f10cb71b96ab6
+  iosMath: f7a6cbadf9d836d2149c2a84c435b1effc244cba
   MLKitCommon: 07c2c33ae5640e5380beaaa6e4b9c249a205542d
   MLKitDigitalInkRecognition: 42c38de99db7074ea19c9a92dafb1672f64a2649
   MLKitMDD: a8d5a4d6a3520403d7beea887ae6ed837cf0ad26
@@ -73,6 +77,6 @@ SPEC CHECKSUMS:
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   SSZipArchive: 8a6ee5677c8e304bebc109e39cf0da91ccef22ea
 
-PODFILE CHECKSUM: 70f8a8ef5c13bdce539d03366c48446f38dc5677
+PODFILE CHECKSUM: 75b4e9807d6cd1a0de4b37b08b964961e7343b92
 
 COCOAPODS: 1.17.0

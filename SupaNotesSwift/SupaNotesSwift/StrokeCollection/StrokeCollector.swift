@@ -24,6 +24,7 @@ final class StrokeCollector {
   private var debounceTimer: Timer?
   var onBoundingBox: ((CGRect) -> Void)?
   var onScribbleDetected: ((CGRect, Int) -> Void)?
+  var onSuggestion: ((PipelineResult, [PKStroke], CGRect) -> Void)?
   private(set) var lastPipelineResult: PipelineResult?
   private(set) var lastPipelineStrokes: [PKStroke] = []
 
@@ -78,6 +79,9 @@ final class StrokeCollector {
         self?.lastPipelineResult = result
         if result.classification == "scribble" {
           self?.onScribbleDetected?(scribbleBounds, scribbleStartIndex)
+        }
+        if result.suggestion != nil {
+          self?.onSuggestion?(result, newStrokes, boundingBox)
         }
       }
     }
