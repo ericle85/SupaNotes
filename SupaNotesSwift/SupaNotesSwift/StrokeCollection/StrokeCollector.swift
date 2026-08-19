@@ -1,22 +1,34 @@
 import Foundation
 import PencilKit
 
-func convertPKStrokeToStrokePoints(_ stroke: PKStroke) -> [StrokePoint] {
-  let path = stroke.path
-  var points = [StrokePoint]()
-  points.reserveCapacity(path.count)
+func convertPKStrokesToStrokePoints(_ strokes: [PKStroke]) -> [[StrokePoint]] {
+  let strokeGap: Float = 0.05
+  var result = [[StrokePoint]]()
+  var cumulativeTime: Float = 0
 
-  for i in 0..<path.count {
-    let point = path[i]
-    points.append(
-      StrokePoint(
-        x: Float(point.location.x),
-        y: Float(point.location.y),
-        t: Float(point.timeOffset)
-      ))
+  for stroke in strokes {
+    let path = stroke.path
+    var points = [StrokePoint]()
+    points.reserveCapacity(path.count)
+
+    for i in 0..<path.count {
+      let point = path[i]
+      points.append(
+        StrokePoint(
+          x: Float(point.location.x),
+          y: Float(point.location.y),
+          t: cumulativeTime + Float(point.timeOffset)
+        ))
+    }
+
+    if let lastTime = points.last?.t {
+      cumulativeTime = lastTime + strokeGap
+    }
+
+    result.append(points)
   }
 
-  return points
+  return result
 }
 
 final class StrokeCollector {
@@ -69,7 +81,7 @@ final class StrokeCollector {
     }
     onBoundingBox?(boundingBox)
 
-    let converted = newStrokes.map { convertPKStrokeToStrokePoints($0) }
+    let converted = convertPKStrokesToStrokePoints(newStrokes)
     let scribbleBounds = boundingBox
     let scribbleStartIndex = lastProcessedStrokeCount - newStrokes.count
 
