@@ -97,7 +97,8 @@ final class PageView: UIView, PKCanvasViewDelegate {
       suggestion: suggestion,
       mode: result.placement,
       position: position,
-      strokeHeight: strokeHeight
+      strokeHeight: strokeHeight,
+      strokesBBox: bbox
     )
   }
 

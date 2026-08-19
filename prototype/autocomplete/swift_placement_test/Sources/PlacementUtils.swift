@@ -12,11 +12,6 @@ struct StrokeBounds {
     var midY: Double { (minY + maxY) / 2 }
 }
 
-struct Point {
-    let x: Double
-    let y: Double
-}
-
 func computeStrokeBounds(_ points: [Point]) -> StrokeBounds {
     let xs = points.map(\.x)
     let ys = points.map(\.y)
@@ -34,16 +29,19 @@ func computeOverallBBox(strokes: [[Point]]) -> StrokeBounds {
 }
 
 func findEqualSignCenter(strokes: [[Point]]) -> (x: Double, y: Double)? {
-    var horizontals: [(midX: Double, midY: Double)] = []
+    var horizontals: [(midX: Double, midY: Double, width: Double)] = []
 
     for stroke in strokes {
         let bounds = computeStrokeBounds(stroke)
         let xRange = bounds.width
         let yRange = bounds.height
         if xRange > 3.0 && yRange / (xRange + 0.01) < 0.4 {
-            horizontals.append((midX: bounds.midX, midY: bounds.midY))
+            horizontals.append((midX: bounds.midX, midY: bounds.midY, width: xRange))
         }
     }
+
+    var bestPair: (x: Double, y: Double)? = nil
+    var bestXDist = Double.greatestFiniteMagnitude
 
     for i in 0..<horizontals.count {
         for j in (i + 1)..<horizontals.count {
@@ -51,13 +49,15 @@ func findEqualSignCenter(strokes: [[Point]]) -> (x: Double, y: Double)? {
             let b = horizontals[j]
             let xDist = abs(a.midX - b.midX)
             let yDist = abs(a.midY - b.midY)
-            if xDist < 10.0 && yDist > 2.0 && yDist < 12.0 {
-                return ((a.midX + b.midX) / 2, (a.midY + b.midY) / 2)
+            let widthRatio = min(a.width, b.width) / max(a.width, b.width)
+            if widthRatio > 0.5 && xDist < 10.0 && yDist > 2.0 && yDist < 12.0 && xDist < bestXDist {
+                bestXDist = xDist
+                bestPair = ((a.midX + b.midX) / 2, (a.midY + b.midY) / 2)
             }
         }
     }
 
-    return nil
+    return bestPair
 }
 
 func computeSuggestionPosition(

@@ -25,60 +25,60 @@ def parse_inkml(path):
     return strokes
 
 
-def compute_bbox(strokes):
-    all_pts = np.concatenate(strokes)
+def compute_stroke_bounds(points):
     return {
-        "min_x": all_pts[:, 0].min(),
-        "max_x": all_pts[:, 0].max(),
-        "min_y": all_pts[:, 1].min(),
-        "max_y": all_pts[:, 1].max(),
+        "min_x": points[:, 0].min(),
+        "max_x": points[:, 0].max(),
+        "min_y": points[:, 1].min(),
+        "max_y": points[:, 1].max(),
+        "width": points[:, 0].max() - points[:, 0].min(),
+        "height": points[:, 1].max() - points[:, 1].min(),
+        "mid_x": (points[:, 0].min() + points[:, 0].max()) / 2,
+        "mid_y": (points[:, 1].min() + points[:, 1].max()) / 2,
     }
 
 
-def find_equal_sign_center(strokes):
-    horizontal_strokes = []
-    for stroke in strokes:
-        x_range = stroke[:, 0].max() - stroke[:, 0].min()
-        y_range = stroke[:, 1].max() - stroke[:, 1].min()
-        if x_range > 3.0 and y_range / (x_range + 0.01) < 0.4:
-            mid_x = (stroke[:, 0].min() + stroke[:, 0].max()) / 2
-            mid_y = (stroke[:, 1].min() + stroke[:, 1].max()) / 2
-            horizontal_strokes.append((mid_x, mid_y, stroke))
+def compute_overall_bbox(strokes):
+    all_pts = np.concatenate(strokes)
+    return compute_stroke_bounds(all_pts)
 
-    for i in range(len(horizontal_strokes)):
-        for j in range(i + 1, len(horizontal_strokes)):
-            x1, y1, s1 = horizontal_strokes[i]
-            x2, y2, s2 = horizontal_strokes[j]
-            x_dist = abs(x1 - x2)
-            y_dist = abs(y1 - y2)
-            if x_dist < 10.0 and 2.0 < y_dist < 12.0:
-                return (x1 + x2) / 2, (y1 + y2) / 2
+
+def find_equal_sign_center(strokes):
+    horizontals = []
+
+    for stroke in strokes:
+        bounds = compute_stroke_bounds(stroke)
+        x_range = bounds["width"]
+        y_range = bounds["height"]
+        if x_range > 3.0 and y_range / (x_range + 0.01) < 0.4:
+            horizontals.append((bounds["mid_x"], bounds["mid_y"]))
+
+    for i in range(len(horizontals)):
+        for j in range(i + 1, len(horizontals)):
+            a_mid_x, a_mid_y = horizontals[i]
+            b_mid_x, b_mid_y = horizontals[j]
+            x_dist = abs(a_mid_x - b_mid_x)
+            y_dist = abs(a_mid_y - b_mid_y)
+            if x_dist < 10.0 and y_dist > 2.0 and y_dist < 12.0:
+                return (a_mid_x + b_mid_x) / 2, (a_mid_y + b_mid_y) / 2
 
     return None
 
 
-def place_suggestion(bbox, mode, strokes=None, transcription="", suggestion=""):
-    gap = 8.0
+def compute_suggestion_position(bbox, mode, strokes):
     line_height = bbox["max_y"] - bbox["min_y"]
 
     if mode == "append":
-        x = bbox["max_x"] + gap
-        y = (bbox["min_y"] + bbox["max_y"]) / 2
-        return x, y
+        gap = 8.0
+        return bbox["max_x"] + gap, (bbox["min_y"] + bbox["max_y"]) / 2
 
     if mode == "below":
-        x = bbox["min_x"]
-        y = bbox["max_y"] + line_height * 0.5
-        return x, y
+        return bbox["min_x"], bbox["max_y"] + line_height * 0.5
 
     if mode == "alignWithEqualSignAbove":
         equal_center = find_equal_sign_center(strokes)
-        if equal_center is None:
-            return bbox["min_x"], bbox["max_y"] + line_height * 0.5
-
-        equal_x, _ = equal_center
-        y = bbox["max_y"] + line_height * 0.5
-        return equal_x, y
+        equal_x = equal_center[0] if equal_center else bbox["min_x"]
+        return equal_x, bbox["max_y"] + line_height * 0.5
 
     return None
 
@@ -195,7 +195,7 @@ if __name__ == "__main__":
     pipeline_path = os.path.join(args.folder, "pipeline_output.json")
 
     strokes = parse_inkml(inkml_path)
-    bbox = compute_bbox(strokes)
+    bbox = compute_overall_bbox(strokes)
 
     with open(pipeline_path) as f:
         pipeline = json.load(f)
@@ -211,7 +211,7 @@ if __name__ == "__main__":
     print(f"Placement: {mode}")
     print(f"BBox: x=[{bbox['min_x']:.1f}, {bbox['max_x']:.1f}] y=[{bbox['min_y']:.1f}, {bbox['max_y']:.1f}]")
 
-    placement = place_suggestion(bbox, mode, strokes=strokes, transcription=transcription, suggestion=suggestion)
+    placement = compute_suggestion_position(bbox, mode, strokes)
     if placement:
         print(f"Computed position: x={placement[0]:.1f}, y={placement[1]:.1f}")
     else:

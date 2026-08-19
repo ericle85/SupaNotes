@@ -1,6 +1,6 @@
-import iosMath
 import PencilKit
 import UIKit
+import iosMath
 
 func estimateStrokeHeight(strokes: [PKStroke]) -> CGFloat {
   let heights = strokes.compactMap { stroke -> CGFloat? in
@@ -18,17 +18,39 @@ func estimateStrokeHeight(strokes: [PKStroke]) -> CGFloat {
   return sorted[min(idx, sorted.count - 1)]
 }
 
+func strokePathBounds(_ stroke: PKStroke) -> CGRect {
+  let path = stroke.path
+  if path.count == 0 {
+    return .zero
+  }
+  var minX = path[0].location.x
+  var maxX = minX
+  var minY = path[0].location.y
+  var maxY = minY
+  for idx in 1..<path.count {
+    let point = path[idx].location
+    if point.x < minX { minX = point.x }
+    if point.x > maxX { maxX = point.x }
+    if point.y < minY { minY = point.y }
+    if point.y > maxY { maxY = point.y }
+  }
+  return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+}
+
 func findEqualSignCenter(strokes: [PKStroke]) -> CGPoint? {
-  var horizontals: [(midX: CGFloat, midY: CGFloat)] = []
+  var horizontals: [(midX: CGFloat, midY: CGFloat, width: CGFloat)] = []
 
   for stroke in strokes {
-    let bounds = stroke.renderBounds
+    let bounds = strokePathBounds(stroke)
     let xRange = bounds.width
     let yRange = bounds.height
     if xRange > 3.0 && yRange / (xRange + 0.01) < 0.4 {
-      horizontals.append((midX: bounds.midX, midY: bounds.midY))
+      horizontals.append((midX: bounds.midX, midY: bounds.midY, width: xRange))
     }
   }
+
+  var bestPair: CGPoint? = nil
+  var bestXDist: CGFloat = .greatestFiniteMagnitude
 
   for i in 0..<horizontals.count {
     for j in (i + 1)..<horizontals.count {
@@ -36,13 +58,15 @@ func findEqualSignCenter(strokes: [PKStroke]) -> CGPoint? {
       let b = horizontals[j]
       let xDist = abs(a.midX - b.midX)
       let yDist = abs(a.midY - b.midY)
-      if xDist < 10.0 && yDist > 2.0 && yDist < 12.0 {
-        return CGPoint(x: (a.midX + b.midX) / 2, y: (a.midY + b.midY) / 2)
+      let widthRatio = min(a.width, b.width) / max(a.width, b.width)
+      if widthRatio > 0.5 && xDist < 10.0 && yDist > 2.0 && yDist < 12.0 && xDist < bestXDist {
+        bestXDist = xDist
+        bestPair = CGPoint(x: (a.midX + b.midX) / 2, y: (a.midY + b.midY) / 2)
       }
     }
   }
 
-  return nil
+  return bestPair
 }
 
 func computeSuggestionPosition(bbox: CGRect, mode: String, strokes: [PKStroke]) -> CGPoint? {
@@ -80,15 +104,17 @@ final class MathSuggestionOverlay: UIView {
     fatalError()
   }
 
-  func show(suggestion: String, mode: String, position: CGPoint, strokeHeight: CGFloat) {
+  func show(
+    suggestion: String, mode: String, position: CGPoint, strokeHeight: CGFloat, strokesBBox: CGRect
+  ) {
     subviews.forEach { $0.removeFromSuperview() }
     isHidden = false
 
-    // ponytail: 1.4 cap-height calibration, tune per iosMath font metrics
     let fontSize = strokeHeight * 1.4
 
     if mode == "alignWithEqualSignAbove" {
-      showAligned(suggestion: suggestion, equalCenter: position, fontSize: fontSize)
+      showAligned(
+        suggestion: suggestion, equalCenter: position, fontSize: fontSize, strokesBBox: strokesBBox)
     } else {
       showAppended(suggestion: suggestion, at: position, fontSize: fontSize)
     }
@@ -111,7 +137,9 @@ final class MathSuggestionOverlay: UIView {
     addSubview(label)
   }
 
-  private func showAligned(suggestion: String, equalCenter: CGPoint, fontSize: CGFloat) {
+  private func showAligned(
+    suggestion: String, equalCenter: CGPoint, fontSize: CGFloat, strokesBBox: CGRect
+  ) {
     guard let eqIdx = suggestion.firstIndex(of: "=") else {
       showAppended(suggestion: suggestion, at: equalCenter, fontSize: fontSize)
       return
@@ -122,36 +150,56 @@ final class MathSuggestionOverlay: UIView {
 
     let eqLabel = makeMathLabel(latex: "=", fontSize: fontSize)
     let eqSize = eqLabel.intrinsicContentSize
+
+    var labels: [(MTMathUILabel, CGSize)] = [(eqLabel, eqSize)]
+
+    var prefixLabel: MTMathUILabel? = nil
+    if !prefix.isEmpty {
+      let label = makeMathLabel(latex: prefix, fontSize: fontSize)
+      prefixLabel = label
+      labels.append((label, label.intrinsicContentSize))
+    }
+
+    var suffixLabel: MTMathUILabel? = nil
+    if !afterEq.isEmpty {
+      let label = makeMathLabel(latex: afterEq, fontSize: fontSize)
+      suffixLabel = label
+      labels.append((label, label.intrinsicContentSize))
+    }
+
+    let tallestHeight = labels.map(\.1.height).max() ?? eqSize.height
+    let gap: CGFloat = 8.0
+    let minY = strokesBBox.maxY + gap + tallestHeight / 2
+    let centerY = max(equalCenter.y, minY)
+
     eqLabel.frame = CGRect(
       x: equalCenter.x - eqSize.width / 2,
-      y: equalCenter.y - eqSize.height / 2,
+      y: centerY - eqSize.height / 2,
       width: eqSize.width,
       height: eqSize.height
     )
     addSubview(eqLabel)
 
-    if !prefix.isEmpty {
-      let prefixLabel = makeMathLabel(latex: prefix, fontSize: fontSize)
-      let prefixSize = prefixLabel.intrinsicContentSize
-      prefixLabel.frame = CGRect(
-        x: eqLabel.frame.minX - prefixSize.width,
-        y: equalCenter.y - prefixSize.height / 2,
-        width: prefixSize.width,
-        height: prefixSize.height
+    if let label = prefixLabel {
+      let size = label.intrinsicContentSize
+      label.frame = CGRect(
+        x: eqLabel.frame.minX - size.width,
+        y: centerY - size.height / 2,
+        width: size.width,
+        height: size.height
       )
-      addSubview(prefixLabel)
+      addSubview(label)
     }
 
-    if !afterEq.isEmpty {
-      let suffixLabel = makeMathLabel(latex: afterEq, fontSize: fontSize)
-      let suffixSize = suffixLabel.intrinsicContentSize
-      suffixLabel.frame = CGRect(
+    if let label = suffixLabel {
+      let size = label.intrinsicContentSize
+      label.frame = CGRect(
         x: eqLabel.frame.maxX,
-        y: equalCenter.y - suffixSize.height / 2,
-        width: suffixSize.width,
-        height: suffixSize.height
+        y: centerY - size.height / 2,
+        width: size.width,
+        height: size.height
       )
-      addSubview(suffixLabel)
+      addSubview(label)
     }
   }
 
