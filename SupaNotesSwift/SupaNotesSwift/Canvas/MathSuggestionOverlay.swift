@@ -209,6 +209,7 @@ final class MathSuggestionOverlay: UIView {
     label.fontSize = fontSize
     label.textColor = ghostColor
     label.backgroundColor = .clear
+    label.contentInsets = MTEdgeInsets(top: 0, left: 0, bottom: fontSize * 0.15, right: 0)
     return label
   }
 }
