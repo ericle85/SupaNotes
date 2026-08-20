@@ -7,7 +7,7 @@ TESTS_DIR = os.path.dirname(__file__)
 REPO_ROOT = os.path.join(TESTS_DIR, "..")
 SWIFT_CLI_SRC = os.path.join(TESTS_DIR, "swift_placement_cli.swift")
 SUGGESTION_PLACEMENT_SRC = os.path.join(
-    REPO_ROOT, "SupaNotesSwift", "SupaNotesSwift", "Autocomplete", "SuggestionPlacement.swift"
+    REPO_ROOT, "SupaNotesSwift", "SupaNotesSwift", "Autocomplete", "Utils", "SuggestionPlacement.swift"
 )
 SWIFT_CLI_BIN = "/tmp/placement_cli"
 STROKES_DIR = os.path.expanduser("~/Downloads/strokes_exported/alignWithEquals")
