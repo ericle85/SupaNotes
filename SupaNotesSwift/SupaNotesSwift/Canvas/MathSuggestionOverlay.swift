@@ -28,7 +28,7 @@ func strokesBounds(_ strokes: [PKStroke]) -> [CGRect] {
 final class MathSuggestionOverlay: UIView {
   private let ghostColor = UIColor.gray.withAlphaComponent(0.5)
   private let buttonSize: CGFloat = 28
-  private let buttonGap: CGFloat = 6
+  private let buttonGap: CGFloat = 4
 
   private(set) var currentMathLabels: [MTMathUILabel] = []
   private(set) var acceptButtonFrame: CGRect = .null
@@ -191,8 +191,10 @@ final class MathSuggestionOverlay: UIView {
       return
     }
 
+    let bottomInset = currentMathLabels.first?.contentInsets.bottom ?? 0
+    let visualMidY = contentRect.minY + (contentRect.height - bottomInset) / 2
     let totalButtonHeight = buttonSize * 2 + buttonGap
-    let buttonsTopY = contentRect.midY - totalButtonHeight / 2
+    let buttonsTopY = visualMidY - totalButtonHeight / 2
     let buttonsX = contentRect.maxX + buttonGap
 
     let acceptIcon = makeIconView(systemName: "checkmark", color: .systemGreen)

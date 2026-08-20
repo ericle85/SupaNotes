@@ -149,7 +149,7 @@ final class PageView: UIView, PKCanvasViewDelegate {
   private func showBoundingBox(_ rect: CGRect) {
     let padded = rect.insetBy(dx: -4, dy: -4)
     boundingBoxLayer.path = UIBezierPath(roundedRect: padded, cornerRadius: 4).cgPath
-    boundingBoxLayer.isHidden = true
+    boundingBoxLayer.isHidden = false
   }
 
   private func applyScribbleErase(scribbleBounds: CGRect, scribbleStartIndex: Int) {
