@@ -28,12 +28,23 @@ def do_autosuggestion(raw_ctc_string: str, solve_for=None):
     return format_result(sympy_expression, result), "append"
 
 
+def _is_already_solved(equation, target):
+    if equation.lhs == target and not equation.rhs.free_symbols:
+        return True
+    if equation.rhs == target and not equation.lhs.free_symbols:
+        return True
+    return False
+
+
 def _solve_equation(equation, free_symbols, solve_for=None):
     if solve_for is not None:
         target = solve_for
     elif len(free_symbols) == 1:
         target = next(iter(free_symbols))
     else:
+        return None
+
+    if _is_already_solved(equation, target):
         return None
 
     solutions = solve(equation, target)
@@ -63,6 +74,7 @@ def _self_check():
     assert do_autosuggestion("x^2=9") == ("x=-3, 3", PLACEMENT_SOLVE)
     assert do_autosuggestion("x^2+2x+1=0") == ("x=-1", PLACEMENT_SOLVE)
     assert do_autosuggestion("2x-8=")[0] is None
+    assert do_autosuggestion("x=2")[0] is None
 
     from sympy import Symbol
     assert do_autosuggestion("2x+y=10", solve_for=Symbol("x")) == (r"x=5 - \frac{y}{2}", PLACEMENT_SOLVE)

@@ -507,6 +507,16 @@ extern "C" const char *symengine_solve_equation(const char *expression) {
     }
 
     const auto sym = SymEngine::rcp_static_cast<const SymEngine::Symbol>(*freeSyms.begin());
+
+    const bool lhsIsSym = SymEngine::eq(*lhs, *sym);
+    const bool rhsIsSym = SymEngine::eq(*rhs, *sym);
+    if (lhsIsSym && SymEngine::free_symbols(*rhs).empty()) {
+      return nullptr;
+    }
+    if (rhsIsSym && SymEngine::free_symbols(*lhs).empty()) {
+      return nullptr;
+    }
+
     const auto solutionSet = SymEngine::solve(equation, sym);
 
     if (SymEngine::is_a<SymEngine::FiniteSet>(*solutionSet)) {
