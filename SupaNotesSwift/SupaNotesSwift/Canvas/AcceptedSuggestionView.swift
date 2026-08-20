@@ -23,6 +23,13 @@ final class AcceptedSuggestionView: UIView {
       label.textColor = .label
       addSubview(label)
     }
+
+    registerForTraitChanges([UITraitUserInterfaceStyle.self]) {
+      (view: AcceptedSuggestionView, _: UITraitCollection) in
+      for case let label as MTMathUILabel in view.subviews {
+        label.textColor = .label
+      }
+    }
   }
 
   @available(*, unavailable)
