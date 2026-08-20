@@ -27,6 +27,18 @@ func strokesBounds(_ strokes: [PKStroke]) -> [CGRect] {
 
 final class MathSuggestionOverlay: UIView {
   private let ghostColor = UIColor.gray.withAlphaComponent(0.5)
+  private let buttonSize: CGFloat = 28
+  private let buttonGap: CGFloat = 6
+
+  private(set) var currentMathLabels: [MTMathUILabel] = []
+  private(set) var acceptButtonFrame: CGRect = .null
+  private(set) var denyButtonFrame: CGRect = .null
+  private(set) var acceptIconView: UIImageView?
+  private(set) var denyIconView: UIImageView?
+
+  var onAccept: (([MTMathUILabel]) -> Void)?
+  // TODO: package denied interaction for training data
+  var onDeny: (() -> Void)?
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -43,7 +55,7 @@ final class MathSuggestionOverlay: UIView {
   func show(
     suggestion: String, mode: String, position: CGPoint, strokeHeight: CGFloat, strokesBBox: CGRect
   ) {
-    subviews.forEach { $0.removeFromSuperview() }
+    clearContent()
     isHidden = false
 
     let fontSize = strokeHeight * 1.4
@@ -54,11 +66,35 @@ final class MathSuggestionOverlay: UIView {
     } else {
       showAppended(suggestion: suggestion, at: position, fontSize: fontSize)
     }
+
+    addButtons()
   }
 
   func hide() {
     isHidden = true
+    clearContent()
+  }
+
+  func handleAccept() {
+    let labels = currentMathLabels
+    currentMathLabels = []
+    clearContent()
+    isHidden = true
+    onAccept?(labels)
+  }
+
+  func handleDeny() {
+    hide()
+    onDeny?()
+  }
+
+  private func clearContent() {
     subviews.forEach { $0.removeFromSuperview() }
+    currentMathLabels = []
+    acceptButtonFrame = .null
+    denyButtonFrame = .null
+    acceptIconView = nil
+    denyIconView = nil
   }
 
   private func showAppended(suggestion: String, at point: CGPoint, fontSize: CGFloat) {
@@ -71,6 +107,7 @@ final class MathSuggestionOverlay: UIView {
       height: size.height
     )
     addSubview(label)
+    currentMathLabels = [label]
   }
 
   private func showAligned(
@@ -89,14 +126,14 @@ final class MathSuggestionOverlay: UIView {
 
     var labels: [(MTMathUILabel, CGSize)] = [(eqLabel, eqSize)]
 
-    var prefixLabel: MTMathUILabel? = nil
+    var prefixLabel: MTMathUILabel?
     if !prefix.isEmpty {
       let label = makeMathLabel(latex: prefix, fontSize: fontSize)
       prefixLabel = label
       labels.append((label, label.intrinsicContentSize))
     }
 
-    var suffixLabel: MTMathUILabel? = nil
+    var suffixLabel: MTMathUILabel?
     if !afterEq.isEmpty {
       let label = makeMathLabel(latex: afterEq, fontSize: fontSize)
       suffixLabel = label
@@ -116,6 +153,8 @@ final class MathSuggestionOverlay: UIView {
     )
     addSubview(eqLabel)
 
+    var collected: [MTMathUILabel] = [eqLabel]
+
     if let label = prefixLabel {
       let size = label.intrinsicContentSize
       label.frame = CGRect(
@@ -125,6 +164,7 @@ final class MathSuggestionOverlay: UIView {
         height: size.height
       )
       addSubview(label)
+      collected.append(label)
     }
 
     if let label = suffixLabel {
@@ -136,7 +176,47 @@ final class MathSuggestionOverlay: UIView {
         height: size.height
       )
       addSubview(label)
+      collected.append(label)
     }
+
+    currentMathLabels = collected
+  }
+
+  private func addButtons() {
+    var contentRect = CGRect.null
+    for label in currentMathLabels {
+      contentRect = contentRect.union(label.frame)
+    }
+    if contentRect.isNull {
+      return
+    }
+
+    let totalButtonHeight = buttonSize * 2 + buttonGap
+    let buttonsTopY = contentRect.midY - totalButtonHeight / 2
+    let buttonsX = contentRect.maxX + buttonGap
+
+    let acceptIcon = makeIconView(systemName: "checkmark", color: .systemGreen)
+    acceptIcon.frame = CGRect(x: buttonsX, y: buttonsTopY, width: buttonSize, height: buttonSize)
+    addSubview(acceptIcon)
+    acceptButtonFrame = acceptIcon.frame
+    acceptIconView = acceptIcon
+
+    let denyIcon = makeIconView(systemName: "xmark", color: .systemRed)
+    denyIcon.frame = CGRect(
+      x: buttonsX, y: buttonsTopY + buttonSize + buttonGap, width: buttonSize, height: buttonSize)
+    addSubview(denyIcon)
+    denyButtonFrame = denyIcon.frame
+    denyIconView = denyIcon
+  }
+
+  private func makeIconView(systemName: String, color: UIColor) -> UIImageView {
+    let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+    let image = UIImage(systemName: systemName, withConfiguration: config)
+    let imageView = UIImageView(image: image)
+    imageView.tintColor = color
+    imageView.contentMode = .center
+    imageView.isUserInteractionEnabled = false
+    return imageView
   }
 
   private func makeMathLabel(latex: String, fontSize: CGFloat) -> MTMathUILabel {

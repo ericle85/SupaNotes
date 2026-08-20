@@ -1,5 +1,6 @@
 import PencilKit
 import UIKit
+import iosMath
 
 final class PageView: UIView, PKCanvasViewDelegate {
   let canvasView = PKCanvasView()
@@ -58,7 +59,46 @@ final class PageView: UIView, PKCanvasViewDelegate {
     }
 
     suggestionOverlay.frame = frame
+    suggestionOverlay.onAccept = { [weak self] labels in
+      self?.acceptSuggestion(mathLabels: labels)
+    }
+    suggestionOverlay.onDeny = { [weak self] in
+      self?.denySuggestion()
+    }
     addSubview(suggestionOverlay)
+
+    let suggestionTap = UITapGestureRecognizer(
+      target: self, action: #selector(handleSuggestionTap(_:)))
+    suggestionTap.allowedTouchTypes = [
+      UITouch.TouchType.direct.rawValue as NSNumber,
+      UITouch.TouchType.pencil.rawValue as NSNumber,
+    ]
+    addGestureRecognizer(suggestionTap)
+
+    let hoverGesture = UIHoverGestureRecognizer(
+      target: self, action: #selector(handleSuggestionHover(_:)))
+    addGestureRecognizer(hoverGesture)
+  }
+
+  private func isSuggestionButtonHit(_ point: CGPoint) -> Bool {
+    if suggestionOverlay.isHidden {
+      return false
+    }
+    let overlayPoint = convert(point, to: suggestionOverlay)
+    if suggestionOverlay.acceptButtonFrame.contains(overlayPoint) {
+      return true
+    }
+    if suggestionOverlay.denyButtonFrame.contains(overlayPoint) {
+      return true
+    }
+    return false
+  }
+
+  override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+    if isSuggestionButtonHit(point) {
+      return self
+    }
+    return super.hitTest(point, with: event)
   }
 
   override func didMoveToWindow() {
@@ -91,7 +131,10 @@ final class PageView: UIView, PKCanvasViewDelegate {
   private func showSuggestion(result: PipelineResult, strokes: [PKStroke], bbox: CGRect) {
     guard let suggestion = result.suggestion else { return }
     let bounds = strokesBounds(strokes)
-    guard let position = computeSuggestionPosition(bbox: bbox, mode: result.placement, strokeBounds: bounds) else { return }
+    guard
+      let position = computeSuggestionPosition(
+        bbox: bbox, mode: result.placement, strokeBounds: bounds)
+    else { return }
 
     let strokeHeight = estimateStrokeHeight(strokeBounds: bounds)
     suggestionOverlay.show(
@@ -106,7 +149,7 @@ final class PageView: UIView, PKCanvasViewDelegate {
   private func showBoundingBox(_ rect: CGRect) {
     let padded = rect.insetBy(dx: -4, dy: -4)
     boundingBoxLayer.path = UIBezierPath(roundedRect: padded, cornerRadius: 4).cgPath
-    boundingBoxLayer.isHidden = false
+    boundingBoxLayer.isHidden = true
   }
 
   private func applyScribbleErase(scribbleBounds: CGRect, scribbleStartIndex: Int) {
@@ -156,6 +199,71 @@ final class PageView: UIView, PKCanvasViewDelegate {
     }
   }
 
+  @objc private func handleSuggestionTap(_ gesture: UITapGestureRecognizer) {
+    if suggestionOverlay.isHidden {
+      return
+    }
+    let point = gesture.location(in: suggestionOverlay)
+    if suggestionOverlay.acceptButtonFrame.contains(point) {
+      suggestionOverlay.handleAccept()
+      return
+    }
+    if suggestionOverlay.denyButtonFrame.contains(point) {
+      suggestionOverlay.handleDeny()
+      return
+    }
+  }
+
+  private var lastHoveredIcon: UIImageView?
+
+  @objc private func handleSuggestionHover(_ gesture: UIHoverGestureRecognizer) {
+    if suggestionOverlay.isHidden {
+      resetHoverScale()
+      return
+    }
+    let point = gesture.location(in: suggestionOverlay)
+
+    var hoveredIcon: UIImageView?
+    if suggestionOverlay.acceptButtonFrame.contains(point) {
+      hoveredIcon = suggestionOverlay.acceptIconView
+    } else if suggestionOverlay.denyButtonFrame.contains(point) {
+      hoveredIcon = suggestionOverlay.denyIconView
+    }
+
+    if gesture.state == .ended || gesture.state == .cancelled {
+      resetHoverScale()
+      return
+    }
+
+    if hoveredIcon !== lastHoveredIcon {
+      resetHoverScale()
+      if let icon = hoveredIcon {
+        lastHoveredIcon = icon
+        UIView.animate(withDuration: 0.15) {
+          icon.transform = CGAffineTransform(scaleX: 1.3, y: 1.3)
+        }
+      }
+    }
+  }
+
+  private func resetHoverScale() {
+    if let icon = lastHoveredIcon {
+      UIView.animate(withDuration: 0.15) {
+        icon.transform = .identity
+      }
+      lastHoveredIcon = nil
+    }
+  }
+
+  private func acceptSuggestion(mathLabels: [MTMathUILabel]) {
+    let accepted = AcceptedSuggestionView(mathLabels: mathLabels)
+    addSubview(accepted)
+  }
+
+  private func denySuggestion() {
+    // TODO: package denied interaction for training data
+  }
+
   func updateGridScale(zoomScale: CGFloat) {
     let newScale = zoomScale * traitCollection.displayScale
     if gridView.contentScaleFactor != newScale {
@@ -174,7 +282,8 @@ private final class GridBackgroundView: UIView {
     backgroundColor = theme.backgroundColor
     contentMode = .redraw
 
-    registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (view: GridBackgroundView, _: UITraitCollection) in
+    registerForTraitChanges([UITraitUserInterfaceStyle.self]) {
+      (view: GridBackgroundView, _: UITraitCollection) in
       view.backgroundColor = view.theme.backgroundColor
       view.setNeedsDisplay()
     }
