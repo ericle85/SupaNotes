@@ -6,9 +6,13 @@
 #include <sstream>
 #include <string>
 
+#include <iomanip>
+
 #include <symengine/basic.h>
 #include <symengine/parser.h>
 #include <symengine/printers.h>
+#include <symengine/eval_double.h>
+#include <symengine/rational.h>
 #include <symengine/simplify.h>
 #include <symengine/solve.h>
 #include <symengine/sets.h>
@@ -117,6 +121,69 @@ std::string latexToSymEngine(const std::string &input) {
   return result;
 }
 
+bool inputHasUnsimplifiedFraction(const std::string &raw) {
+  std::size_t pos = raw.find("\\frac{");
+  if (pos == std::string::npos) {
+    return false;
+  }
+
+  pos += 6;
+  std::string numStr;
+  int depth = 1;
+  while (pos < raw.size() && depth > 0) {
+    if (raw[pos] == '{') { ++depth; }
+    else if (raw[pos] == '}') { --depth; }
+    if (depth > 0) { numStr += raw[pos]; }
+    ++pos;
+  }
+
+  if (pos >= raw.size() || raw[pos] != '{') {
+    return false;
+  }
+  ++pos;
+  std::string denStr;
+  depth = 1;
+  while (pos < raw.size() && depth > 0) {
+    if (raw[pos] == '{') { ++depth; }
+    else if (raw[pos] == '}') { --depth; }
+    if (depth > 0) { denStr += raw[pos]; }
+    ++pos;
+  }
+
+  try {
+    long long num = std::stoll(numStr);
+    long long den = std::stoll(denStr);
+    if (den == 0) { return false; }
+    num = std::abs(num);
+    den = std::abs(den);
+    while (den != 0) {
+      long long t = den;
+      den = num % den;
+      num = t;
+    }
+    return num > 1;
+  } catch (...) {
+    return false;
+  }
+}
+
+std::string rationalToDecimalString(const SymEngine::RCP<const SymEngine::Basic> &expr, int precision) {
+  double value = SymEngine::eval_double(*expr);
+  std::ostringstream oss;
+  oss << std::fixed << std::setprecision(precision) << value;
+  std::string s = oss.str();
+  std::size_t dot = s.find('.');
+  if (dot != std::string::npos) {
+    std::size_t lastNonZero = s.find_last_not_of('0');
+    if (lastNonZero == dot) {
+      s.erase(dot);
+    } else {
+      s.erase(lastNonZero + 1);
+    }
+  }
+  return s;
+}
+
 }
 
 extern "C" const char *symengine_simplify_expression(const char *expression) {
@@ -133,6 +200,16 @@ extern "C" const char *symengine_simplify_expression(const char *expression) {
     }
 
     const SymEngine::RCP<const SymEngine::Basic> simplified = SymEngine::simplify(parsed);
+
+    if (SymEngine::is_a<SymEngine::Rational>(*simplified)) {
+      if (inputHasUnsimplifiedFraction(expression)) {
+        const std::string result = SymEngine::latex(*simplified);
+        return strdup(result.c_str());
+      }
+      const std::string result = rationalToDecimalString(simplified, 3);
+      return strdup(result.c_str());
+    }
+
     const std::string result = SymEngine::latex(*simplified);
     return strdup(result.c_str());
   } catch (...) {
@@ -181,7 +258,8 @@ extern "C" const char *symengine_solve_equation(const char *expression) {
         if (!first) {
           oss << ", ";
         }
-        oss << SymEngine::latex(*elem);
+        const auto simplified = SymEngine::simplify(elem);
+        oss << SymEngine::latex(*simplified);
         first = false;
       }
       return strdup(oss.str().c_str());
