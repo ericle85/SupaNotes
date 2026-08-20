@@ -63,7 +63,7 @@ final class PageView: UIView, PKCanvasViewDelegate {
 
   override func didMoveToWindow() {
     super.didMoveToWindow()
-    guard let window, toolPicker == nil else { return }
+    guard window != nil, toolPicker == nil else { return }
 
     let picker = PKToolPicker()
     picker.addObserver(canvasView)
@@ -126,7 +126,7 @@ final class PageView: UIView, PKCanvasViewDelegate {
 
     let erasedDrawing = PKDrawing(strokes: erasedStrokes)
     let combinedBounds = erasedStrokes.reduce(CGRect.null) { $0.union($1.renderBounds) }
-    let image = erasedDrawing.image(from: combinedBounds, scale: UIScreen.main.scale)
+    let image = erasedDrawing.image(from: combinedBounds, scale: traitCollection.displayScale)
 
     let overlay = UIImageView(image: image)
     overlay.frame = combinedBounds
@@ -173,19 +173,16 @@ private final class GridBackgroundView: UIView {
     super.init(frame: frame)
     backgroundColor = theme.backgroundColor
     contentMode = .redraw
+
+    registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (view: GridBackgroundView, _: UITraitCollection) in
+      view.backgroundColor = view.theme.backgroundColor
+      view.setNeedsDisplay()
+    }
   }
 
   @available(*, unavailable)
   required init?(coder _: NSCoder) {
     fatalError()
-  }
-
-  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
-    super.traitCollectionDidChange(previousTraitCollection)
-    if traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
-      backgroundColor = theme.backgroundColor
-      setNeedsDisplay()
-    }
   }
 
   override func draw(_ rect: CGRect) {
