@@ -24,7 +24,7 @@ namespace SymEngine
 
 class IRBuilder;
 
-class LLVMVisitor : public RewriteTrigVisitor<LLVMVisitor>
+class LLVMVisitor : public BaseVisitor<LLVMVisitor>
 {
 protected:
     vec_basic symbols;
@@ -43,9 +43,6 @@ protected:
     std::string membuffer;
     llvm::Function *get_function_type(llvm::LLVMContext *);
     virtual llvm::Type *get_float_type(llvm::LLVMContext *) = 0;
-    // Subclasses might want to call e.g.
-    // llvm::ExecutionEngine::InstallLazyFunctionCreator
-    virtual void modify_execution_engine(llvm::ExecutionEngine *) {}
 
 public:
     LLVMVisitor();
@@ -108,8 +105,6 @@ public:
 class LLVMDoubleVisitor : public LLVMVisitor
 {
 public:
-    using LLVMVisitor::visit;
-
     LLVMDoubleVisitor();
     ~LLVMDoubleVisitor() override;
     double call(const std::vector<double> &vec) const;
@@ -135,8 +130,6 @@ public:
 class LLVMFloatVisitor : public LLVMVisitor
 {
 public:
-    using LLVMVisitor::visit;
-
     LLVMFloatVisitor();
     ~LLVMFloatVisitor() override;
     float call(const std::vector<float> &vec) const;
@@ -164,8 +157,6 @@ public:
 class LLVMLongDoubleVisitor : public LLVMVisitor
 {
 public:
-    using LLVMVisitor::visit;
-
     LLVMLongDoubleVisitor();
     ~LLVMLongDoubleVisitor() override;
     long double call(const std::vector<long double> &vec) const;

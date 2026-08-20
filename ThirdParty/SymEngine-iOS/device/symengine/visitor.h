@@ -90,30 +90,6 @@ void preorder_traversal_stop(const Basic &b, StopVisitor &v);
 void postorder_traversal_stop(const Basic &b, StopVisitor &v);
 void preorder_traversal_local_stop(const Basic &b, LocalStopVisitor &v);
 
-class HasBasicVisitor : public BaseVisitor<HasBasicVisitor, StopVisitor>
-{
-protected:
-    Ptr<const Basic> looking_for_;
-    bool has_;
-
-public:
-    HasBasicVisitor(Ptr<const Basic> looking_for);
-    bool apply(const Basic &b)
-    {
-        has_ = false;
-        stop_ = false;
-        preorder_traversal_stop(b, *this);
-        return has_;
-    }
-    void bvisit(const Basic &arg)
-    {
-        if (eq(*looking_for_, arg)) {
-            has_ = true;
-            stop_ = true;
-        }
-    }
-};
-
 class HasSymbolVisitor : public BaseVisitor<HasSymbolVisitor, StopVisitor>
 {
 protected:
@@ -139,7 +115,7 @@ public:
         }
     }
 
-    void bvisit(const Basic &x) {}
+    void bvisit(const Basic &x){};
 
     bool apply(const Basic &b)
     {
@@ -150,7 +126,6 @@ public:
     }
 };
 
-bool has_basic(const Basic &b, const Basic &x);
 bool has_symbol(const Basic &b, const Basic &x);
 
 class CoeffVisitor : public BaseVisitor<CoeffVisitor, StopVisitor>
@@ -358,63 +333,6 @@ public:
     void bvisit(const Symbol &x);
     void bvisit(const Constant &x);
     void bvisit(const Basic &x);
-};
-
-template <class Derived, class Base = Visitor>
-class RewriteTrigVisitor : public BaseVisitor<Derived, Base>
-{
-public:
-    using BaseVisitor<Derived, Base>::BaseVisitor;
-    using BaseVisitor<Derived, Base>::visit;
-
-    void visit(const Cot &x) override
-    {
-        div(one, tan(x.get_arg()))->accept(*this);
-    };
-    void visit(const Csc &x) override
-    {
-        div(one, sin(x.get_arg()))->accept(*this);
-    };
-    void visit(const Sec &x) override
-    {
-        div(one, cos(x.get_arg()))->accept(*this);
-    };
-    void visit(const ACot &x) override
-    {
-        atan(div(one, x.get_arg()))->accept(*this);
-    };
-    void visit(const ACsc &x) override
-    {
-        asin(div(one, x.get_arg()))->accept(*this);
-    };
-    void visit(const ASec &x) override
-    {
-        acos(div(one, x.get_arg()))->accept(*this);
-    };
-    void visit(const Coth &x) override
-    {
-        div(one, tanh(x.get_arg()))->accept(*this);
-    };
-    void visit(const Csch &x) override
-    {
-        div(one, sinh(x.get_arg()))->accept(*this);
-    };
-    void visit(const Sech &x) override
-    {
-        div(one, cosh(x.get_arg()))->accept(*this);
-    };
-    void visit(const ACoth &x) override
-    {
-        atanh(div(one, x.get_arg()))->accept(*this);
-    };
-    void visit(const ACsch &x) override
-    {
-        asinh(div(one, x.get_arg()))->accept(*this);
-    };
-    void visit(const ASech &x) override
-    {
-        acosh(div(one, x.get_arg()))->accept(*this);
-    };
 };
 
 unsigned count_ops(const vec_basic &a);

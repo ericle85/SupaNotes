@@ -1,6 +1,3 @@
-#ifndef SYMENGINE_STRINGBOX_H
-#define SYMENGINE_STRINGBOX_H
-
 #include <string>
 #include <vector>
 
@@ -54,5 +51,3 @@ public:
 };
 
 }; // namespace SymEngine
-
-#endif

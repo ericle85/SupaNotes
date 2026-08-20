@@ -344,6 +344,7 @@
 					"$(inherited)",
 					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device",
 					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device/symengine/utilities/cereal/include",
+					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device/flint",
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
@@ -352,6 +353,8 @@
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-lsymengine",
+					"-lflint",
+					"-lmpfr",
 					"-lgmp",
 				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -393,6 +396,7 @@
 					"$(inherited)",
 					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device",
 					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device/symengine/utilities/cereal/include",
+					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device/flint",
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
@@ -401,6 +405,8 @@
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-lsymengine",
+					"-lflint",
+					"-lmpfr",
 					"-lgmp",
 				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;

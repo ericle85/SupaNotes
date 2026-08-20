@@ -5,11 +5,7 @@
 #include <cstddef>
 #include <stdexcept>
 #include <string>
-#if __cplusplus <= 201703L
 #include <ciso646>
-#else
-#include <version>
-#endif
 
 #include <symengine/symengine_config.h>
 #include <symengine/symengine_assert.h>

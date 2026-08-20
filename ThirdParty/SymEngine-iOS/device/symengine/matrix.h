@@ -7,18 +7,11 @@
 namespace SymEngine
 {
 
-enum MatrixTypeID {
-    SYMENGINE_DENSE_MATRIX,
-    SYMENGINE_CSR_MATRIX,
-};
-
 // Base class for matrices
 class MatrixBase
 {
 public:
     virtual ~MatrixBase(){};
-
-    virtual MatrixTypeID get_type_code() const = 0;
 
     bool is_square() const
     {
@@ -118,12 +111,6 @@ public:
     DenseMatrix(unsigned row, unsigned col, const vec_basic &l);
     DenseMatrix(const vec_basic &column_elements);
     DenseMatrix &operator=(const DenseMatrix &other) = default;
-    // type_code
-    const static MatrixTypeID type_code_id = SYMENGINE_DENSE_MATRIX;
-    virtual MatrixTypeID get_type_code() const override
-    {
-        return SYMENGINE_DENSE_MATRIX;
-    }
     // Resize
     void resize(unsigned i, unsigned j);
 
@@ -369,11 +356,6 @@ public:
               std::vector<unsigned> &&j, vec_basic &&x);
     CSRMatrix &operator=(CSRMatrix &&other);
     CSRMatrix(const CSRMatrix &) = default;
-    const static MatrixTypeID type_code_id = SYMENGINE_CSR_MATRIX;
-    virtual MatrixTypeID get_type_code() const override
-    {
-        return SYMENGINE_CSR_MATRIX;
-    }
     std::tuple<std::vector<unsigned>, std::vector<unsigned>, vec_basic>
     as_vectors() const;
 
@@ -594,7 +576,7 @@ void reduced_row_echelon_form(const DenseMatrix &A, DenseMatrix &B,
 template <class T>
 inline bool is_a(const MatrixBase &b)
 {
-    return T::type_code_id == b.get_type_code();
+    return typeid(T) == typeid(b);
 }
 
 // Test two matrices for equality

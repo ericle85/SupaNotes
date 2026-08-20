@@ -31,13 +31,13 @@
 /* #undef WITH_SYMENGINE_VIRTUAL_TYPEID */
 
 /* Define if you want to enable Flint support in SymEngine */
-/* #undef HAVE_SYMENGINE_FLINT */
+#define HAVE_SYMENGINE_FLINT
 
 /* Define if you want to enable ARB support in SymEngine */
-/* #undef HAVE_SYMENGINE_ARB */
+#define HAVE_SYMENGINE_ARB
 
 /* Define if you want to enable MPFR support in SymEngine */
-/* #undef HAVE_SYMENGINE_MPFR */
+#define HAVE_SYMENGINE_MPFR
 
 /* Define if you want to enable Piranha support in SymEngine */
 /* #undef HAVE_SYMENGINE_PIRANHA */
@@ -72,16 +72,13 @@
 /* Define if the C++ compiler has std::to_string */
 #define HAVE_SYMENGINE_STD_TO_STRING
 
-/* Define if the C++ compiler has RTTI */
-#define HAVE_SYMENGINE_RTTI 1
-
 #define SYMENGINE_GMPXX 0
 #define SYMENGINE_PIRANHA 1
 #define SYMENGINE_FLINT 2
 #define SYMENGINE_GMP 3
 #define SYMENGINE_BOOSTMP 4
 
-#define SYMENGINE_INTEGER_CLASS SYMENGINE_GMP
+#define SYMENGINE_INTEGER_CLASS SYMENGINE_FLINT
 
 #define SYMENGINE_SIZEOF_LONG_DOUBLE 8
 
@@ -94,10 +91,6 @@
 #include <symengine/symengine_export.h>
 
 #ifdef __CLING__
-#include "symengine/symengine_config_cling.h"
-#endif
-
-#if defined(__CLANG_REPL__) && defined(__EMSCRIPTEN__)
 #include "symengine/symengine_config_cling.h"
 #endif
 
