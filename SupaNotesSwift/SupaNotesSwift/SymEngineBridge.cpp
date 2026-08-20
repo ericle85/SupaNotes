@@ -271,6 +271,67 @@ std::string replaceImaginaryUnit(const std::string &latex) {
   return result;
 }
 
+SymEngine::RCP<const SymEngine::Basic> distributeCoeffIntoAdd(
+    const SymEngine::RCP<const SymEngine::Basic> &expr) {
+  if (!SymEngine::is_a<SymEngine::Mul>(*expr)) {
+    return expr;
+  }
+
+  auto &m = SymEngine::down_cast<const SymEngine::Mul &>(*expr);
+  auto coeff = m.get_coef();
+  auto dict = m.get_dict();
+
+  SymEngine::RCP<const SymEngine::Basic> numerator;
+  SymEngine::RCP<const SymEngine::Number> newCoeff;
+
+  if (SymEngine::is_a<SymEngine::Rational>(*coeff)) {
+    auto &rat = SymEngine::down_cast<const SymEngine::Rational &>(*coeff);
+    numerator = rat.get_num();
+    newCoeff = SymEngine::rcp_static_cast<const SymEngine::Number>(
+        SymEngine::div(SymEngine::integer(1), rat.get_den()));
+  } else if (SymEngine::is_a<SymEngine::Integer>(*coeff)) {
+    numerator = coeff;
+    newCoeff = SymEngine::rcp_static_cast<const SymEngine::Number>(SymEngine::integer(1));
+  } else {
+    return expr;
+  }
+
+  if (SymEngine::eq(*numerator, *SymEngine::integer(1)) ||
+      SymEngine::eq(*numerator, *SymEngine::integer(-1))) {
+    return expr;
+  }
+
+  for (auto &entry : dict) {
+    if (!SymEngine::is_a<SymEngine::Add>(*entry.first)) {
+      continue;
+    }
+    if (!SymEngine::eq(*entry.second, *SymEngine::integer(1))) {
+      continue;
+    }
+
+    auto distributed = SymEngine::expand(SymEngine::mul(numerator, entry.first));
+    SymEngine::map_basic_basic newDict(dict);
+    newDict.erase(entry.first);
+    newDict[distributed] = SymEngine::integer(1);
+    return SymEngine::Mul::from_dict(newCoeff, std::move(newDict));
+  }
+
+  return expr;
+}
+
+std::string insertCdot(const std::string &latex) {
+  std::string result;
+  result.reserve(latex.size() + 16);
+  for (std::size_t i = 0; i < latex.size(); ++i) {
+    result += latex[i];
+    if (std::isdigit(latex[i]) && i + 2 < latex.size() &&
+        latex[i + 1] == ' ' && std::isdigit(latex[i + 2])) {
+      result += " \\cdot";
+    }
+  }
+  return result;
+}
+
 }
 
 extern "C" const char *symengine_simplify_expression(const char *expression) {
@@ -343,6 +404,10 @@ extern "C" const char *symengine_solve_equation(const char *expression) {
         return nullptr;
       }
 
+      SymEngine::map_basic_basic oddRootSubs;
+      oddRootSubs[SymEngine::pow(SymEngine::integer(-1), SymEngine::rational(1, 3))] =
+          SymEngine::integer(-1);
+
       std::ostringstream oss;
       oss << SymEngine::latex(*sym) << "=";
       bool first = true;
@@ -350,11 +415,13 @@ extern "C" const char *symengine_solve_equation(const char *expression) {
         if (!first) {
           oss << ", ";
         }
-        const auto simplified = simplifySqrtInSums(SymEngine::simplify(elem));
+        auto simplified = SymEngine::simplify(SymEngine::simplify(elem)->subs(oddRootSubs));
+        simplified = distributeCoeffIntoAdd(simplified);
+        simplified = simplifySqrtInSums(simplified);
         oss << SymEngine::latex(*simplified);
         first = false;
       }
-      const std::string result = replaceImaginaryUnit(oss.str());
+      const std::string result = insertCdot(replaceImaginaryUnit(oss.str()));
       return strdup(result.c_str());
     }
 
