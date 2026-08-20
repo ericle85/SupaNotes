@@ -3,6 +3,8 @@ Use base python env to run python scripts
 
 For a fresh conversation, before any code is written lets work through questions you have about the topic. Lets talk brief and concise so we can ping pong ideas more often. Lets hash out cases, we are more looking at things through a technical lense
 
+The repo has both an autocomplete pipeline in python under prototype/ and in the swiftApp which uses symEngine instead of SymPy. When building autocomplete behavior, make changes first in python, then add cases to @compareSympyAndSymEngine.py. Another agent can ensure identical behavior between SymPy and SymEngine later.
+
 Coding Rules:
     - Never write a README.md
     - Only simple code
