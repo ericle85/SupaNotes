@@ -6,7 +6,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-from compareSympyAndSymEngine import (
+from test_compareSympyAndSymEngine import (
     SIMPLIFY_CASES, SOLVE_CASES, NO_RESULT_CASES,
     compile_bridge, load_bridge, load_python_engine,
     cpp_simplify, cpp_solve, sort_solutions,

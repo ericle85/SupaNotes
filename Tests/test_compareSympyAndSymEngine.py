@@ -7,13 +7,13 @@ BRIDGE_CPP = os.path.join(
     os.path.dirname(__file__),
     "..",
     "SupaNotesSwift",
+    "SupaNotesSwift",
     "SymEngineBridge.cpp",
 )
 DYLIB_PATH = "/tmp/libSymEngineBridge.dylib"
 
 PYTHON_ENGINE_DIR = os.path.join(
     os.path.dirname(__file__),
-    "..",
     "..",
     "prototype",
     "autocomplete",

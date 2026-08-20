@@ -90,9 +90,10 @@ final class PageView: UIView, PKCanvasViewDelegate {
 
   private func showSuggestion(result: PipelineResult, strokes: [PKStroke], bbox: CGRect) {
     guard let suggestion = result.suggestion else { return }
-    guard let position = computeSuggestionPosition(bbox: bbox, mode: result.placement, strokes: strokes) else { return }
+    let bounds = strokesBounds(strokes)
+    guard let position = computeSuggestionPosition(bbox: bbox, mode: result.placement, strokeBounds: bounds) else { return }
 
-    let strokeHeight = estimateStrokeHeight(strokes: strokes)
+    let strokeHeight = estimateStrokeHeight(strokeBounds: bounds)
     suggestionOverlay.show(
       suggestion: suggestion,
       mode: result.placement,
