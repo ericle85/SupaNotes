@@ -21,7 +21,7 @@ def render_row(status, label, expr, latex_str, color="white"):
     fig.patch.set_alpha(0)
 
     status_color = "lime" if status == "PASS" else "red"
-    header = f"{status}  {label:12s}  {expr:20s}  "
+    header = f"{status}  {label:12s}  "
     ax.text(
         0.01, 0.5,
         header,
@@ -32,6 +32,17 @@ def render_row(status, label, expr, latex_str, color="white"):
         horizontalalignment='left',
         transform=ax.transAxes,
     )
+
+    if expr:
+        ax.text(
+            0.20, 0.5,
+            f"${expr}$",
+            fontsize=18,
+            color="cyan",
+            verticalalignment='center',
+            horizontalalignment='left',
+            transform=ax.transAxes,
+        )
 
     if latex_str is not None:
         ax.text(
