@@ -38,6 +38,7 @@ SOLVE_CASES = [
     ("x^{2}=16", "x=-4, 4"),
     ("x^{2}-5x+6=0", "x=2, 3"),
     ("5x^{3}=8", r"x=\frac{2 \cdot 5^{\frac{2}{3}}}{5}, \frac{5^{\frac{2}{3}} \left(-1 - \sqrt{3} i\right)}{5}, \frac{5^{\frac{2}{3}} \left(-1 + \sqrt{3} i\right)}{5}"),
+    ("4x^{3}=8", r"x=\sqrt[3]{2}, \frac{\sqrt[3]{2} \left(-1 - \sqrt{3} i\right)}{2}, \frac{\sqrt[3]{2} \left(-1 + \sqrt{3} i\right)}{2}"),
 ]
 
 NO_RESULT_CASES = [

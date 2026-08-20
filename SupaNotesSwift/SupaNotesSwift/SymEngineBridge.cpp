@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <numeric>
 #include <sstream>
 #include <string>
 
@@ -22,6 +23,7 @@
 #include <symengine/integer.h>
 #include <symengine/add.h>
 #include <symengine/number.h>
+#include <symengine/complex.h>
 
 namespace {
 
@@ -222,6 +224,116 @@ SymEngine::RCP<const SymEngine::Basic> simplifySqrtCoefficient(
   return expr;
 }
 
+SymEngine::RCP<const SymEngine::Basic> simplifyCubeRootCoefficient(
+    const SymEngine::RCP<const SymEngine::Basic> &expr) {
+  if (!SymEngine::is_a<SymEngine::Mul>(*expr)) {
+    return expr;
+  }
+
+  auto &m = SymEngine::down_cast<const SymEngine::Mul &>(*expr);
+  auto coeff = m.get_coef();
+  auto dict = m.get_dict();
+
+  for (auto &p : dict) {
+    if (!SymEngine::is_a<SymEngine::Integer>(*p.first)) {
+      continue;
+    }
+    if (!SymEngine::eq(*p.second, *SymEngine::rational(1, 3))) {
+      continue;
+    }
+
+    long long n = SymEngine::down_cast<const SymEngine::Integer &>(*p.first).as_int();
+    bool negative = (n < 0);
+    long long absN = std::abs(n);
+
+    long long outside = 1;
+    long long inside = absN;
+    for (long long f = 2; f * f * f <= inside; ++f) {
+      while (inside % (f * f * f) == 0) {
+        inside /= (f * f * f);
+        outside *= f;
+      }
+    }
+
+    if (outside > 1 || negative) {
+      long long outsideFactor = negative ? -outside : outside;
+      auto newCoeff = SymEngine::rcp_static_cast<const SymEngine::Number>(
+          SymEngine::mul(coeff, SymEngine::integer(outsideFactor)));
+      SymEngine::map_basic_basic newDict(dict);
+      newDict.erase(p.first);
+      if (inside > 1) {
+        newDict[SymEngine::integer(inside)] = SymEngine::rational(1, 3);
+      }
+      return SymEngine::Mul::from_dict(newCoeff, std::move(newDict));
+    }
+    break;
+  }
+
+  return expr;
+}
+
+long long denominatorOf(const SymEngine::RCP<const SymEngine::Number> &num) {
+  if (SymEngine::is_a<SymEngine::Rational>(*num)) {
+    return std::abs(SymEngine::down_cast<const SymEngine::Rational &>(*num).get_den()->as_int());
+  }
+  if (SymEngine::is_a<SymEngine::Complex>(*num)) {
+    auto &c = SymEngine::down_cast<const SymEngine::Complex &>(*num);
+    long long rd = denominatorOf(c.real_part());
+    long long id = denominatorOf(c.imaginary_part());
+    return std::lcm(rd, id);
+  }
+  return 1;
+}
+
+SymEngine::RCP<const SymEngine::Basic> factorDenominatorFromAdd(
+    const SymEngine::RCP<const SymEngine::Basic> &expr) {
+  if (!SymEngine::is_a<SymEngine::Mul>(*expr)) {
+    return expr;
+  }
+
+  auto &m = SymEngine::down_cast<const SymEngine::Mul &>(*expr);
+  auto coeff = m.get_coef();
+  auto dict = m.get_dict();
+
+  for (auto &entry : dict) {
+    if (!SymEngine::is_a<SymEngine::Add>(*entry.first)) {
+      continue;
+    }
+    if (!SymEngine::eq(*entry.second, *SymEngine::integer(1))) {
+      continue;
+    }
+
+    auto &add = SymEngine::down_cast<const SymEngine::Add &>(*entry.first);
+    long long commonDen = denominatorOf(add.get_coef());
+
+    for (auto &term : add.get_dict()) {
+      auto termCoeff = term.second;
+      if (!SymEngine::is_a<SymEngine::Rational>(*termCoeff) &&
+          !SymEngine::is_a<SymEngine::Integer>(*termCoeff) &&
+          !SymEngine::is_a<SymEngine::Complex>(*termCoeff)) {
+        commonDen = 1;
+        break;
+      }
+      commonDen = std::lcm(commonDen, denominatorOf(
+          SymEngine::rcp_static_cast<const SymEngine::Number>(termCoeff)));
+    }
+
+    if (commonDen <= 1) {
+      continue;
+    }
+
+    auto scaledAdd = SymEngine::expand(SymEngine::mul(entry.first, SymEngine::integer(commonDen)));
+    auto newCoeff = SymEngine::rcp_static_cast<const SymEngine::Number>(
+        SymEngine::div(coeff, SymEngine::integer(commonDen)));
+    SymEngine::map_basic_basic newDict(dict);
+    newDict.erase(entry.first);
+    newDict[scaledAdd] = SymEngine::integer(1);
+    return SymEngine::Mul::from_dict(newCoeff, std::move(newDict));
+  }
+
+  return expr;
+}
+
 SymEngine::RCP<const SymEngine::Basic> simplifySqrtInSums(
     const SymEngine::RCP<const SymEngine::Basic> &expr) {
   if (SymEngine::is_a<SymEngine::Add>(*expr)) {
@@ -231,7 +343,7 @@ SymEngine::RCP<const SymEngine::Basic> simplifySqrtInSums(
     }
     return result;
   }
-  return simplifySqrtCoefficient(expr);
+  return simplifyCubeRootCoefficient(simplifySqrtCoefficient(expr));
 }
 
 std::string replaceImaginaryUnit(const std::string &latex) {
@@ -416,7 +528,9 @@ extern "C" const char *symengine_solve_equation(const char *expression) {
           oss << ", ";
         }
         auto simplified = SymEngine::simplify(SymEngine::simplify(elem)->subs(oddRootSubs));
+        simplified = simplifyCubeRootCoefficient(simplified);
         simplified = distributeCoeffIntoAdd(simplified);
+        simplified = factorDenominatorFromAdd(simplified);
         simplified = simplifySqrtInSums(simplified);
         oss << SymEngine::latex(*simplified);
         first = false;
