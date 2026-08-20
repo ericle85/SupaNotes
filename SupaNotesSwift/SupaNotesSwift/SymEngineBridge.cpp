@@ -25,17 +25,6 @@
 
 namespace {
 
-std::string stripTrailingEquals(const std::string &expression) {
-  std::string normalized = expression;
-  const std::size_t equalsPosition = normalized.find_last_of('=');
-
-  if (equalsPosition != std::string::npos && equalsPosition == normalized.size() - 1) {
-    normalized.erase(equalsPosition);
-  }
-
-  return normalized;
-}
-
 std::string latexToSymEngine(const std::string &input) {
   std::string result;
   result.reserve(input.size());
@@ -245,6 +234,43 @@ SymEngine::RCP<const SymEngine::Basic> simplifySqrtInSums(
   return simplifySqrtCoefficient(expr);
 }
 
+std::string replaceImaginaryUnit(const std::string &latex) {
+  std::string result;
+  result.reserve(latex.size());
+
+  for (std::size_t i = 0; i < latex.size(); ++i) {
+    if (latex[i] != 'j') {
+      result += latex[i];
+      continue;
+    }
+
+    if (i + 1 < latex.size() && latex[i + 1] == ' ' &&
+        i + 2 < latex.size() && latex[i + 2] == '\\') {
+      std::size_t cmdEnd = i + 2;
+      while (cmdEnd < latex.size() && latex[cmdEnd] != '{') {
+        ++cmdEnd;
+      }
+      if (cmdEnd < latex.size()) {
+        int depth = 1;
+        std::size_t braceEnd = cmdEnd + 1;
+        while (braceEnd < latex.size() && depth > 0) {
+          if (latex[braceEnd] == '{') { ++depth; }
+          if (latex[braceEnd] == '}') { --depth; }
+          ++braceEnd;
+        }
+        result += latex.substr(i + 2, braceEnd - (i + 2));
+        result += " i";
+        i = braceEnd - 1;
+        continue;
+      }
+    }
+
+    result += "i";
+  }
+
+  return result;
+}
+
 }
 
 extern "C" const char *symengine_simplify_expression(const char *expression) {
@@ -328,7 +354,8 @@ extern "C" const char *symengine_solve_equation(const char *expression) {
         oss << SymEngine::latex(*simplified);
         first = false;
       }
-      return strdup(oss.str().c_str());
+      const std::string result = replaceImaginaryUnit(oss.str());
+      return strdup(result.c_str());
     }
 
     return nullptr;
