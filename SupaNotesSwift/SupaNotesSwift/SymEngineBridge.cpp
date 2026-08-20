@@ -17,6 +17,11 @@
 #include <symengine/solve.h>
 #include <symengine/sets.h>
 #include <symengine/visitor.h>
+#include <symengine/pow.h>
+#include <symengine/mul.h>
+#include <symengine/integer.h>
+#include <symengine/add.h>
+#include <symengine/number.h>
 
 namespace {
 
@@ -184,6 +189,62 @@ std::string rationalToDecimalString(const SymEngine::RCP<const SymEngine::Basic>
   return s;
 }
 
+SymEngine::RCP<const SymEngine::Basic> simplifySqrtCoefficient(
+    const SymEngine::RCP<const SymEngine::Basic> &expr) {
+  if (!SymEngine::is_a<SymEngine::Mul>(*expr)) {
+    return expr;
+  }
+
+  auto &m = SymEngine::down_cast<const SymEngine::Mul &>(*expr);
+  auto coeff = m.get_coef();
+  auto dict = m.get_dict();
+
+  for (auto &p : dict) {
+    if (!SymEngine::is_a<SymEngine::Integer>(*p.first)) {
+      continue;
+    }
+    if (!SymEngine::eq(*p.second, *SymEngine::rational(1, 2))) {
+      continue;
+    }
+
+    long long n = SymEngine::down_cast<const SymEngine::Integer &>(*p.first).as_int();
+    long long outside = 1;
+    long long inside = n;
+    for (long long f = 2; f * f <= inside; ++f) {
+      while (inside % (f * f) == 0) {
+        inside /= (f * f);
+        outside *= f;
+      }
+    }
+
+    if (outside > 1) {
+      auto newCoeff = SymEngine::rcp_static_cast<const SymEngine::Number>(
+          SymEngine::mul(coeff, SymEngine::integer(outside)));
+      SymEngine::map_basic_basic newDict(dict);
+      newDict.erase(p.first);
+      if (inside > 1) {
+        newDict[SymEngine::integer(inside)] = SymEngine::rational(1, 2);
+      }
+      return SymEngine::Mul::from_dict(newCoeff, std::move(newDict));
+    }
+    break;
+  }
+
+  return expr;
+}
+
+SymEngine::RCP<const SymEngine::Basic> simplifySqrtInSums(
+    const SymEngine::RCP<const SymEngine::Basic> &expr) {
+  if (SymEngine::is_a<SymEngine::Add>(*expr)) {
+    SymEngine::RCP<const SymEngine::Basic> result = SymEngine::integer(0);
+    for (const auto &arg : expr->get_args()) {
+      result = SymEngine::add(result, simplifySqrtInSums(arg));
+    }
+    return result;
+  }
+  return simplifySqrtCoefficient(expr);
+}
+
 }
 
 extern "C" const char *symengine_simplify_expression(const char *expression) {
@@ -192,7 +253,12 @@ extern "C" const char *symengine_simplify_expression(const char *expression) {
   }
 
   try {
-    const std::string normalized = latexToSymEngine(stripTrailingEquals(expression));
+    const std::string input(expression);
+    if (input.empty() || input.back() != '=') {
+      return nullptr;
+    }
+
+    const std::string normalized = latexToSymEngine(input.substr(0, input.size() - 1));
     const SymEngine::RCP<const SymEngine::Basic> parsed = SymEngine::parse(normalized);
 
     if (!SymEngine::free_symbols(*parsed).empty()) {
@@ -258,7 +324,7 @@ extern "C" const char *symengine_solve_equation(const char *expression) {
         if (!first) {
           oss << ", ";
         }
-        const auto simplified = SymEngine::simplify(elem);
+        const auto simplified = simplifySqrtInSums(SymEngine::simplify(elem));
         oss << SymEngine::latex(*simplified);
         first = false;
       }

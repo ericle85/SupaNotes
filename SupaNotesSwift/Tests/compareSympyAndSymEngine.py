@@ -51,7 +51,7 @@ def compile_bridge():
         [
             "c++", "-shared", "-fPIC", "-std=c++17",
             "-I/opt/homebrew/include",
-            "-L/opt/homebrew/lib", "-lsymengine",
+            "-L/opt/homebrew/lib", "-lsymengine", "-lflint", "-lgmp",
             "-o", DYLIB_PATH,
             BRIDGE_CPP,
         ],
