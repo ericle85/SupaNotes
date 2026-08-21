@@ -9,15 +9,29 @@
 /* Begin PBXBuildFile section */
 		51C1ACE36CC6B685FA8C3F17 /* Pods_SupaNotesSwift.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 84132BD795FA1AFB1F5DA00A /* Pods_SupaNotesSwift.framework */; };
 		C1A9B7D73D0D4B3E9A7C0001 /* CommittedSuggestionEraserUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A9B7D63D0D4B3E9A7C0001 /* CommittedSuggestionEraserUITests.swift */; };
+		DA1FB989983B8EE1522D0C67 /* Pods_SupaNotesSwiftUITests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4F1B0F2645DE21CDB17F1ED4 /* Pods_SupaNotesSwiftUITests.framework */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		C1A9B7E13D0D4B3E9A7C0002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BFA9609C3023D41B007659EA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BFA960A33023D41B007659EA;
+			remoteInfo = SupaNotesSwift;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		0FA392FF914AA06967A2DB77 /* Pods-SupaNotesSwiftUITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SupaNotesSwiftUITests.debug.xcconfig"; path = "Target Support Files/Pods-SupaNotesSwiftUITests/Pods-SupaNotesSwiftUITests.debug.xcconfig"; sourceTree = "<group>"; };
+		246FB30F59271C7FCF89D4DA /* Pods-SupaNotesSwiftUITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SupaNotesSwiftUITests.release.xcconfig"; path = "Target Support Files/Pods-SupaNotesSwiftUITests/Pods-SupaNotesSwiftUITests.release.xcconfig"; sourceTree = "<group>"; };
+		4F1B0F2645DE21CDB17F1ED4 /* Pods_SupaNotesSwiftUITests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_SupaNotesSwiftUITests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		84132BD795FA1AFB1F5DA00A /* Pods_SupaNotesSwift.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_SupaNotesSwift.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		BFA960A43023D41B007659EA /* SupaNotesSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SupaNotesSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		D91FCE5B5503B3528AE7A602 /* Pods-SupaNotesSwift.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SupaNotesSwift.release.xcconfig"; path = "Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift.release.xcconfig"; sourceTree = "<group>"; };
-		FA3D114174564515B822ADC7 /* Pods-SupaNotesSwift.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SupaNotesSwift.debug.xcconfig"; path = "Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift.debug.xcconfig"; sourceTree = "<group>"; };
 		C1A9B7D53D0D4B3E9A7C0001 /* SupaNotesSwiftUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SupaNotesSwiftUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C1A9B7D63D0D4B3E9A7C0001 /* CommittedSuggestionEraserUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommittedSuggestionEraserUITests.swift; sourceTree = "<group>"; };
+		D91FCE5B5503B3528AE7A602 /* Pods-SupaNotesSwift.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SupaNotesSwift.release.xcconfig"; path = "Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift.release.xcconfig"; sourceTree = "<group>"; };
+		FA3D114174564515B822ADC7 /* Pods-SupaNotesSwift.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SupaNotesSwift.debug.xcconfig"; path = "Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -39,6 +53,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C1A9B7DC3D0D4B3E9A7C0001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DA1FB989983B8EE1522D0C67 /* Pods_SupaNotesSwiftUITests.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -46,6 +68,7 @@
 			isa = PBXGroup;
 			children = (
 				84132BD795FA1AFB1F5DA00A /* Pods_SupaNotesSwift.framework */,
+				4F1B0F2645DE21CDB17F1ED4 /* Pods_SupaNotesSwiftUITests.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -55,6 +78,8 @@
 			children = (
 				FA3D114174564515B822ADC7 /* Pods-SupaNotesSwift.debug.xcconfig */,
 				D91FCE5B5503B3528AE7A602 /* Pods-SupaNotesSwift.release.xcconfig */,
+				0FA392FF914AA06967A2DB77 /* Pods-SupaNotesSwiftUITests.debug.xcconfig */,
+				246FB30F59271C7FCF89D4DA /* Pods-SupaNotesSwiftUITests.release.xcconfig */,
 			);
 			name = Pods;
 			path = Pods;
@@ -91,23 +116,6 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		C1A9B7D83D0D4B3E9A7C0001 /* SupaNotesSwiftUITests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = C1A9B7E03D0D4B3E9A7C0001 /* Build configuration list for SupaNotesSwiftUITests */;
-			buildPhases = (
-				C1A9B7DB3D0D4B3E9A7C0001 /* Sources */,
-				C1A9B7DC3D0D4B3E9A7C0001 /* Frameworks */,
-				C1A9B7DD3D0D4B3E9A7C0001 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = SupaNotesSwiftUITests;
-			productName = SupaNotesSwiftUITests;
-			productReference = C1A9B7D53D0D4B3E9A7C0001 /* SupaNotesSwiftUITests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
-		};
 		BFA960A33023D41B007659EA /* SupaNotesSwift */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = BFA960AF3023D41C007659EA /* Build configuration list for PBXNativeTarget "SupaNotesSwift" */;
@@ -130,6 +138,25 @@
 			productName = SupaNotesSwift;
 			productReference = BFA960A43023D41B007659EA /* SupaNotesSwift.app */;
 			productType = "com.apple.product-type.application";
+		};
+		C1A9B7D83D0D4B3E9A7C0001 /* SupaNotesSwiftUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C1A9B7E03D0D4B3E9A7C0001 /* Build configuration list for PBXNativeTarget "SupaNotesSwiftUITests" */;
+			buildPhases = (
+				47CDA99E197C90AC4D1D4DBF /* [CP] Check Pods Manifest.lock */,
+				C1A9B7DB3D0D4B3E9A7C0001 /* Sources */,
+				C1A9B7DC3D0D4B3E9A7C0001 /* Frameworks */,
+				C1A9B7DD3D0D4B3E9A7C0001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C1A9B7E23D0D4B3E9A7C0003 /* PBXTargetDependency */,
+			);
+			name = SupaNotesSwiftUITests;
+			productName = SupaNotesSwiftUITests;
+			productReference = C1A9B7D53D0D4B3E9A7C0001 /* SupaNotesSwiftUITests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -159,7 +186,7 @@
 			productRefGroup = BFA960A53023D41B007659EA /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
-			 targets = (
+			targets = (
 				BFA960A33023D41B007659EA /* SupaNotesSwift */,
 				C1A9B7D83D0D4B3E9A7C0001 /* SupaNotesSwiftUITests */,
 			);
@@ -167,14 +194,14 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		C1A9B7DD3D0D4B3E9A7C0001 /* Resources */ = {
+		BFA960A23023D41B007659EA /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		BFA960A23023D41B007659EA /* Resources */ = {
+		C1A9B7DD3D0D4B3E9A7C0001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -199,6 +226,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		47CDA99E197C90AC4D1D4DBF /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-SupaNotesSwiftUITests-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
 		7080CE29609421420ACF4575 /* [CP] Embed Pods Frameworks */ = {
@@ -243,6 +292,13 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		BFA960A03023D41B007659EA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C1A9B7DB3D0D4B3E9A7C0001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -251,55 +307,17 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		C1A9B7DC3D0D4B3E9A7C0001 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		BFA960A03023D41B007659EA /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		C1A9B7E23D0D4B3E9A7C0003 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BFA960A33023D41B007659EA /* SupaNotesSwift */;
+			targetProxy = C1A9B7E13D0D4B3E9A7C0002 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
-		C1A9B7DE3D0D4B3E9A7C0001 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 7ARN6P5ZCL;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
-				PRODUCT_BUNDLE_IDENTIFIER = SupaNotes.SupaNotesSwiftUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = SupaNotesSwift;
-			};
-			name = Debug;
-		};
-		C1A9B7DF3D0D4B3E9A7C0001 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 7ARN6P5ZCL;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
-				PRODUCT_BUNDLE_IDENTIFIER = SupaNotes.SupaNotesSwiftUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = SupaNotesSwift;
-			};
-			name = Release;
-		};
 		BFA960AD3023D41C007659EA /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -425,26 +443,6 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = FA3D114174564515B822ADC7 /* Pods-SupaNotesSwift.debug.xcconfig */;
 			buildSettings = {
-				"HEADER_SEARCH_PATHS[sdk=iphoneos*]" = (
-					"$(inherited)",
-					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device",
-					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device/symengine/utilities/cereal/include",
-					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device/flint",
-				);
-				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = (
-					"$(inherited)",
-					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device",
-				);
-				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
-					"$(inherited)",
-					"-lsymengine",
-					"-lflint",
-					"-lmpfr",
-					"-lgmp",
-				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
@@ -452,6 +450,12 @@
 				DEVELOPMENT_TEAM = 7ARN6P5ZCL;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				"HEADER_SEARCH_PATHS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device",
+					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device/symengine/utilities/cereal/include",
+					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device/flint",
+				);
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -462,14 +466,26 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device",
+				);
 				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = "$(inherited)";
+				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"-lsymengine",
+					"-lflint",
+					"-lmpfr",
+					"-lgmp",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = SupaNotes.SupaNotesSwift;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/SupaNotesSwift/SymEngineBridge.h";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/SupaNotesSwift/SymEngineBridge.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -480,26 +496,6 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = D91FCE5B5503B3528AE7A602 /* Pods-SupaNotesSwift.release.xcconfig */;
 			buildSettings = {
-				"HEADER_SEARCH_PATHS[sdk=iphoneos*]" = (
-					"$(inherited)",
-					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device",
-					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device/symengine/utilities/cereal/include",
-					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device/flint",
-				);
-				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = (
-					"$(inherited)",
-					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device",
-				);
-				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
-					"$(inherited)",
-					"-lsymengine",
-					"-lflint",
-					"-lmpfr",
-					"-lgmp",
-				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
@@ -507,6 +503,12 @@
 				DEVELOPMENT_TEAM = 7ARN6P5ZCL;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				"HEADER_SEARCH_PATHS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device",
+					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device/symengine/utilities/cereal/include",
+					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device/flint",
+				);
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -517,32 +519,71 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device",
+				);
 				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = "$(inherited)";
+				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"-lsymengine",
+					"-lflint",
+					"-lmpfr",
+					"-lgmp",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = SupaNotes.SupaNotesSwift;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/SupaNotesSwift/SymEngineBridge.h";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/SupaNotesSwift/SymEngineBridge.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
+		C1A9B7DE3D0D4B3E9A7C0001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 0FA392FF914AA06967A2DB77 /* Pods-SupaNotesSwiftUITests.debug.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 7ARN6P5ZCL;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				PRODUCT_BUNDLE_IDENTIFIER = SupaNotes.SupaNotesSwiftTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SupaNotesSwift.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SupaNotesSwift";
+			};
+			name = Debug;
+		};
+		C1A9B7DF3D0D4B3E9A7C0001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 246FB30F59271C7FCF89D4DA /* Pods-SupaNotesSwiftUITests.release.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 7ARN6P5ZCL;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				PRODUCT_BUNDLE_IDENTIFIER = SupaNotes.SupaNotesSwiftTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SupaNotesSwift.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SupaNotesSwift";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		C1A9B7E03D0D4B3E9A7C0001 /* Build configuration list for SupaNotesSwiftUITests */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				C1A9B7DE3D0D4B3E9A7C0001 /* Debug */,
-				C1A9B7DF3D0D4B3E9A7C0001 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		BFA9609F3023D41B007659EA /* Build configuration list for PBXProject "SupaNotesSwift" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -557,6 +598,15 @@
 			buildConfigurations = (
 				BFA960B03023D41C007659EA /* Debug */,
 				BFA960B13023D41C007659EA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C1A9B7E03D0D4B3E9A7C0001 /* Build configuration list for PBXNativeTarget "SupaNotesSwiftUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C1A9B7DE3D0D4B3E9A7C0001 /* Debug */,
+				C1A9B7DF3D0D4B3E9A7C0001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

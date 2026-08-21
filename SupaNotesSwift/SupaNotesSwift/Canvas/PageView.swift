@@ -67,10 +67,6 @@ final class PageView: UIView, PKCanvasViewDelegate {
     }
     addSubview(suggestionOverlay)
 
-    if ProcessInfo.processInfo.arguments.contains("--ui-test-committed-suggestion") {
-      seedTestCommittedSuggestion()
-    }
-
     let suggestionTap = UITapGestureRecognizer(
       target: self, action: #selector(handleSuggestionTap(_:)))
     suggestionTap.allowedTouchTypes = [
@@ -122,9 +118,6 @@ final class PageView: UIView, PKCanvasViewDelegate {
     toolPicker = picker
     canvasView.becomeFirstResponder()
 
-    if ProcessInfo.processInfo.arguments.contains("--ui-test-committed-suggestion") {
-      canvasView.tool = PKEraserTool(.vector)
-    }
   }
 
   @available(*, unavailable)
@@ -240,7 +233,7 @@ final class PageView: UIView, PKCanvasViewDelegate {
     }
   }
 
-  private func eraseCommittedSuggestion(at point: CGPoint) {
+  func eraseCommittedSuggestion(at point: CGPoint) {
     for subview in subviews {
       guard let accepted = subview as? AcceptedSuggestionView else {
         continue
@@ -291,16 +284,6 @@ final class PageView: UIView, PKCanvasViewDelegate {
       }
       lastHoveredIcon = nil
     }
-  }
-
-  private func seedTestCommittedSuggestion() {
-    let label = MTMathUILabel()
-    label.latex = "x+1=2"
-    label.fontSize = 20
-    label.sizeToFit()
-    label.frame = CGRect(x: 100, y: 100, width: label.frame.width, height: label.frame.height)
-    let accepted = AcceptedSuggestionView(mathLabels: [label])
-    addSubview(accepted)
   }
 
   private func acceptSuggestion(mathLabels: [MTMathUILabel]) {

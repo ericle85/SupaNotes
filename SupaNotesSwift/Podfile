@@ -5,6 +5,10 @@ target 'SupaNotesSwift' do
 
   pod 'GoogleMLKit/DigitalInkRecognition', '~> 7.0'
   pod 'iosMath', '~> 0.9'
+
+  target 'SupaNotesSwiftUITests' do
+    inherit! :search_paths
+  end
 end
 
 MLKIT_FRAMEWORKS = %w[MLKitCommon MLKitDigitalInkRecognition MLKitMDD].freeze

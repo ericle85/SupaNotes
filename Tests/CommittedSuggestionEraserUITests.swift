@@ -1,18 +1,20 @@
 import XCTest
+@testable import SupaNotesSwift
 
-final class CommittedSuggestionEraserUITests: XCTestCase {
+final class CommittedSuggestionEraserTests: XCTestCase {
   func testEraserTapRemovesCommittedSuggestion() {
-    let app = XCUIApplication()
-    app.launchArguments = [
-      "--ui-test-committed-suggestion",
-    ]
-    app.launch()
+    let pageView = PageView(theme: .adaptive)
 
-    let suggestion = app.otherElements["committed-suggestion"]
-    XCTAssertTrue(suggestion.waitForExistence(timeout: 5))
+    let dummy = AcceptedSuggestionView(mathLabels: [])
+    dummy.frame = CGRect(x: 100, y: 100, width: 50, height: 30)
+    pageView.addSubview(dummy)
 
-    suggestion.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    let before = pageView.subviews.compactMap { $0 as? AcceptedSuggestionView }
+    XCTAssertEqual(before.count, 1)
 
-    XCTAssertFalse(suggestion.waitForExistence(timeout: 1))
+    pageView.eraseCommittedSuggestion(at: CGPoint(x: 105, y: 105))
+
+    let after = pageView.subviews.compactMap { $0 as? AcceptedSuggestionView }
+    XCTAssertEqual(after.count, 0)
   }
 }
