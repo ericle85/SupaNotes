@@ -1,28 +1,22 @@
 import Foundation
-
 #if !targetEnvironment(simulator)
     import MLKitDigitalInkRecognition
 
     typealias CachedDigitalInkRecognizer = DigitalInkRecognizer
-
     func downloadDigitalInkModelIfNeeded() async throws {
         let identifier = DigitalInkRecognitionModelIdentifier(forLanguageTag: "en")!
         let model = DigitalInkRecognitionModel(modelIdentifier: identifier)
         let modelManager = ModelManager.modelManager()
-
         if modelManager.isModelDownloaded(model) {
             return
         }
-
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             var successObserver: NSObjectProtocol?
             var failObserver: NSObjectProtocol?
-
             func removeObservers() {
                 if let successObserver { NotificationCenter.default.removeObserver(successObserver) }
                 if let failObserver { NotificationCenter.default.removeObserver(failObserver) }
             }
-
             successObserver = NotificationCenter.default.addObserver(
                 forName: .mlkitModelDownloadDidSucceed,
                 object: nil,
@@ -31,7 +25,6 @@ import Foundation
                 removeObservers()
                 continuation.resume()
             }
-
             failObserver = NotificationCenter.default.addObserver(
                 forName: .mlkitModelDownloadDidFail,
                 object: nil,
@@ -45,7 +38,6 @@ import Foundation
                         )
                 continuation.resume(throwing: error)
             }
-
             let conditions = ModelDownloadConditions()
             modelManager.download(model, conditions: conditions)
         }
@@ -72,23 +64,16 @@ import Foundation
             return MLKitDigitalInkRecognition.Stroke(points: mlPoints)
         }
         let ink = Ink(strokes: inkStrokes)
-
         let result = try await recognizer.recognize(ink: ink)
-
         guard let topCandidate = result.candidates.first else {
             return ""
         }
-
         print("[DigitalInk] Recognized: \(topCandidate.text)")
         return topCandidate.text
     }
-
 #else
-
     typealias CachedDigitalInkRecognizer = Any
-
     func downloadDigitalInkModelIfNeeded() async throws {}
-
     func makeDigitalInkRecognizer() throws -> CachedDigitalInkRecognizer {
         return ()
     }
@@ -98,5 +83,4 @@ import Foundation
     ) async throws -> String {
         return ""
     }
-
 #endif
