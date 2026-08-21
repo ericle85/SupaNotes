@@ -3,13 +3,22 @@ import subprocess
 import sys
 import os
 
-BRIDGE_CPP = os.path.join(
+BRIDGE_DIR = os.path.join(
     os.path.dirname(__file__),
     "..",
     "SupaNotesSwift",
     "SupaNotesSwift",
-    "SymEngineBridge.cpp",
+    "SymEngineBridge",
 )
+BRIDGE_CPPS = [
+    os.path.join(BRIDGE_DIR, f)
+    for f in [
+        "SymEngineBridgeImpl.cpp",
+        "LatexParsing.cpp",
+        "LatexFormatting.cpp",
+        "ExpressionSimplification.cpp",
+    ]
+]
 DYLIB_PATH = "/tmp/libSymEngineBridge.dylib"
 
 PYTHON_ENGINE_DIR = os.path.join(
@@ -54,10 +63,10 @@ def compile_bridge():
         [
             "c++", "-shared", "-fPIC", "-std=c++17",
             "-I/opt/homebrew/include",
+            f"-I{BRIDGE_DIR}",
             "-L/opt/homebrew/lib", "-lsymengine", "-lflint", "-lgmp",
             "-o", DYLIB_PATH,
-            BRIDGE_CPP,
-        ],
+        ] + BRIDGE_CPPS,
         capture_output=True,
         text=True,
     )

@@ -2,67 +2,80 @@ import PencilKit
 import UIKit
 
 final class CanvasView: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegate {
-    let scrollView = UIScrollView()
-    let pageView: PageView
-    var momentumStopGesture: UIGestureRecognizer?
-    let shareButton = UIButton(type: .system)
+  let scrollView = UIScrollView()
+  let pageView: PageView
+  var momentumStopGesture: UIGestureRecognizer?
+  let shareButton = UIButton(type: .system)
 
-    init(theme: GridTheme = .adaptive) {
-        pageView = PageView(theme: theme)
-        super.init(frame: .zero)
-        backgroundColor = .systemGray3
+  init(theme: GridTheme = .adaptive) {
+    pageView = PageView(theme: theme)
+    super.init(frame: .zero)
+    backgroundColor = .systemGray3
 
-        scrollView.delegate = self
-        scrollView.minimumZoomScale = 0.75
-        scrollView.maximumZoomScale = 2
-        scrollView.bouncesZoom = true
-        scrollView.showsVerticalScrollIndicator = false
-        scrollView.showsHorizontalScrollIndicator = false
+    setupScrollView()
+    setupShareButton()
+    pageView.onDrawingStateChanged = { [weak self] in self?.setZoomEnabled(!$0) }
+  }
 
-        let fingerOnly = [UITouch.TouchType.direct.rawValue as NSNumber]
-        scrollView.panGestureRecognizer.allowedTouchTypes = fingerOnly
-        scrollView.pinchGestureRecognizer?.allowedTouchTypes = fingerOnly
-        let stopMomentum = UILongPressGestureRecognizer(
-            target: self, action: #selector(handleMomentumStop(_:))
-        )
-        stopMomentum.minimumPressDuration = 0
-        stopMomentum.cancelsTouchesInView = false
-        stopMomentum.delegate = self
-        momentumStopGesture = stopMomentum
-        addSubview(scrollView)
+  private func setupScrollView() {
+    scrollView.delegate = self
+    scrollView.minimumZoomScale = 0.75
+    scrollView.maximumZoomScale = 2
+    scrollView.bouncesZoom = true
+    scrollView.showsVerticalScrollIndicator = false
+    scrollView.showsHorizontalScrollIndicator = false
 
-        scrollView.addGestureRecognizer(stopMomentum)
-        scrollView.addSubview(pageView)
+    let fingerOnly = [UITouch.TouchType.direct.rawValue as NSNumber]
+    scrollView.panGestureRecognizer.allowedTouchTypes = fingerOnly
+    scrollView.pinchGestureRecognizer?.allowedTouchTypes = fingerOnly
 
-        shareButton.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
-        shareButton.addTarget(self, action: #selector(shareTapped), for: .touchUpInside)
-        shareButton.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(shareButton)
+    let stopMomentum = makeMomentumStopGesture()
+    momentumStopGesture = stopMomentum
 
-        NSLayoutConstraint.activate([
-            shareButton.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 12),
-            shareButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
-        ])
-        pageView.onDrawingStateChanged = { [weak self] in self?.setZoomEnabled(!$0) }
-    }
+    addSubview(scrollView)
+    scrollView.addGestureRecognizer(stopMomentum)
+    scrollView.addSubview(pageView)
+  }
 
-    @available(*, unavailable)
-    required init?(coder _: NSCoder) {
-        fatalError()
-    }
+  private func makeMomentumStopGesture() -> UILongPressGestureRecognizer {
+    let gesture = UILongPressGestureRecognizer(
+      target: self, action: #selector(handleMomentumStop(_:))
+    )
+    gesture.minimumPressDuration = 0
+    gesture.cancelsTouchesInView = false
+    gesture.delegate = self
+    return gesture
+  }
 
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        scrollView.frame = bounds
-        scrollView.contentSize = PageView.pageSize
-        centerContent()
-    }
+  private func setupShareButton() {
+    shareButton.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
+    shareButton.addTarget(self, action: #selector(shareTapped), for: .touchUpInside)
+    shareButton.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(shareButton)
 
-    func centerContent() {
-        let bounds = scrollView.bounds
-        let size = pageView.frame.size
-        let x = max(0, (bounds.width - size.width) / 2)
-        let y = max(0, (bounds.height - size.height) / 2)
-        scrollView.contentInset = UIEdgeInsets(top: y, left: x, bottom: y, right: x)
-    }
+    NSLayoutConstraint.activate([
+      shareButton.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 12),
+      shareButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
+    ])
+  }
+
+  @available(*, unavailable)
+  required init?(coder _: NSCoder) {
+    fatalError()
+  }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    scrollView.frame = bounds
+    scrollView.contentSize = PageView.pageSize
+    centerContent()
+  }
+
+  func centerContent() {
+    let bounds = scrollView.bounds
+    let size = pageView.frame.size
+    let x = max(0, (bounds.width - size.width) / 2)
+    let y = max(0, (bounds.height - size.height) / 2)
+    scrollView.contentInset = UIEdgeInsets(top: y, left: x, bottom: y, right: x)
+  }
 }
