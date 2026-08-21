@@ -47,6 +47,13 @@ final class StrokeCollector {
     lastProcessedStrokeCount = drawing.strokes.count
   }
 
+  func syncIfStrokesRemoved() {
+    guard let drawing = drawingProvider?() else { return }
+    if drawing.strokes.count < lastProcessedStrokeCount {
+      lastProcessedStrokeCount = drawing.strokes.count
+    }
+  }
+
   func pencilLifted() {
     debounceTimer?.invalidate()
     debounceTimer = Timer.scheduledTimer(

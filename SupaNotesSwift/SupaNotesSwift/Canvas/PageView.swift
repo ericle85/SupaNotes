@@ -128,6 +128,10 @@ final class PageView: UIView, PKCanvasViewDelegate {
     strokeCollector.pencilLifted()
   }
 
+  func canvasViewDrawingDidChange(_: PKCanvasView) {
+    strokeCollector.syncIfStrokesRemoved()
+  }
+
   private func showSuggestion(result: PipelineResult, strokes: [PKStroke], bbox: CGRect) {
     guard let suggestion = result.suggestion else { return }
     let bounds = strokesBounds(strokes)
