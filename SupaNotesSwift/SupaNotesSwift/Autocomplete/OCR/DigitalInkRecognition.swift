@@ -1,4 +1,6 @@
 import Foundation
+
+#if !targetEnvironment(simulator)
 import MLKitDigitalInkRecognition
 
 func downloadDigitalInkModelIfNeeded() async throws {
@@ -75,3 +77,11 @@ func recognizeDigitalInk(strokes: [[StrokePoint]]) async throws -> String {
   print("[DigitalInk] Recognized: \(topCandidate.text)")
   return topCandidate.text
 }
+
+#else
+
+func recognizeDigitalInk(strokes: [[StrokePoint]]) async throws -> String {
+  return ""
+}
+
+#endif

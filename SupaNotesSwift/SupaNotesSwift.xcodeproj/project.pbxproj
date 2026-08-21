@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		51C1ACE36CC6B685FA8C3F17 /* Pods_SupaNotesSwift.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 84132BD795FA1AFB1F5DA00A /* Pods_SupaNotesSwift.framework */; };
+		C1A9B7D73D0D4B3E9A7C0001 /* CommittedSuggestionEraserUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A9B7D63D0D4B3E9A7C0001 /* CommittedSuggestionEraserUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -15,6 +16,8 @@
 		BFA960A43023D41B007659EA /* SupaNotesSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SupaNotesSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D91FCE5B5503B3528AE7A602 /* Pods-SupaNotesSwift.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SupaNotesSwift.release.xcconfig"; path = "Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift.release.xcconfig"; sourceTree = "<group>"; };
 		FA3D114174564515B822ADC7 /* Pods-SupaNotesSwift.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SupaNotesSwift.debug.xcconfig"; path = "Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift.debug.xcconfig"; sourceTree = "<group>"; };
+		C1A9B7D53D0D4B3E9A7C0001 /* SupaNotesSwiftUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SupaNotesSwiftUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C1A9B7D63D0D4B3E9A7C0001 /* CommittedSuggestionEraserUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommittedSuggestionEraserUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -61,6 +64,7 @@
 			isa = PBXGroup;
 			children = (
 				BFA960A63023D41B007659EA /* SupaNotesSwift */,
+				C1A9B7D43D0D4B3E9A7C0001 /* Tests */,
 				BFA960A53023D41B007659EA /* Products */,
 				99D08F376E88896751333AB3 /* Pods */,
 				3CFE1AF37DEB21507794F321 /* Frameworks */,
@@ -71,13 +75,39 @@
 			isa = PBXGroup;
 			children = (
 				BFA960A43023D41B007659EA /* SupaNotesSwift.app */,
+				C1A9B7D53D0D4B3E9A7C0001 /* SupaNotesSwiftUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		C1A9B7D43D0D4B3E9A7C0001 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				C1A9B7D63D0D4B3E9A7C0001 /* CommittedSuggestionEraserUITests.swift */,
+			);
+			path = ../Tests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		C1A9B7D83D0D4B3E9A7C0001 /* SupaNotesSwiftUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C1A9B7E03D0D4B3E9A7C0001 /* Build configuration list for SupaNotesSwiftUITests */;
+			buildPhases = (
+				C1A9B7DB3D0D4B3E9A7C0001 /* Sources */,
+				C1A9B7DC3D0D4B3E9A7C0001 /* Frameworks */,
+				C1A9B7DD3D0D4B3E9A7C0001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SupaNotesSwiftUITests;
+			productName = SupaNotesSwiftUITests;
+			productReference = C1A9B7D53D0D4B3E9A7C0001 /* SupaNotesSwiftUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		BFA960A33023D41B007659EA /* SupaNotesSwift */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = BFA960AF3023D41C007659EA /* Build configuration list for PBXNativeTarget "SupaNotesSwift" */;
@@ -129,13 +159,21 @@
 			productRefGroup = BFA960A53023D41B007659EA /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
-			targets = (
+			 targets = (
 				BFA960A33023D41B007659EA /* SupaNotesSwift */,
+				C1A9B7D83D0D4B3E9A7C0001 /* SupaNotesSwiftUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		C1A9B7DD3D0D4B3E9A7C0001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		BFA960A23023D41B007659EA /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -205,6 +243,21 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		C1A9B7DB3D0D4B3E9A7C0001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C1A9B7D73D0D4B3E9A7C0001 /* CommittedSuggestionEraserUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C1A9B7DC3D0D4B3E9A7C0001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		BFA960A03023D41B007659EA /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -215,6 +268,38 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+		C1A9B7DE3D0D4B3E9A7C0001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 7ARN6P5ZCL;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				PRODUCT_BUNDLE_IDENTIFIER = SupaNotes.SupaNotesSwiftUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SupaNotesSwift;
+			};
+			name = Debug;
+		};
+		C1A9B7DF3D0D4B3E9A7C0001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 7ARN6P5ZCL;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				PRODUCT_BUNDLE_IDENTIFIER = SupaNotes.SupaNotesSwiftUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SupaNotesSwift;
+			};
+			name = Release;
+		};
 		BFA960AD3023D41C007659EA /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -340,22 +425,25 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = FA3D114174564515B822ADC7 /* Pods-SupaNotesSwift.debug.xcconfig */;
 			buildSettings = {
-				HEADER_SEARCH_PATHS = (
+				"HEADER_SEARCH_PATHS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device",
 					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device/symengine/utilities/cereal/include",
 					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device/flint",
 				);
-				LIBRARY_SEARCH_PATHS = (
+				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device",
 				);
-				OTHER_LDFLAGS = (
+				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"-lsymengine",
 					"-lflint",
 					"-lmpfr",
 					"-lgmp",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
 				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -392,22 +480,25 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = D91FCE5B5503B3528AE7A602 /* Pods-SupaNotesSwift.release.xcconfig */;
 			buildSettings = {
-				HEADER_SEARCH_PATHS = (
+				"HEADER_SEARCH_PATHS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device",
 					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device/symengine/utilities/cereal/include",
 					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device/flint",
 				);
-				LIBRARY_SEARCH_PATHS = (
+				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"$(SRCROOT)/../ThirdParty/SymEngine-iOS/device",
 				);
-				OTHER_LDFLAGS = (
+				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"-lsymengine",
 					"-lflint",
 					"-lmpfr",
 					"-lgmp",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
 				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -443,6 +534,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		C1A9B7E03D0D4B3E9A7C0001 /* Build configuration list for SupaNotesSwiftUITests */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C1A9B7DE3D0D4B3E9A7C0001 /* Debug */,
+				C1A9B7DF3D0D4B3E9A7C0001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		BFA9609F3023D41B007659EA /* Build configuration list for PBXProject "SupaNotesSwift" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

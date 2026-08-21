@@ -1,4 +1,23 @@
 #include "SymEngineBridge.h"
+#include <TargetConditionals.h>
+
+#if TARGET_OS_SIMULATOR
+
+#include <cstdlib>
+
+extern "C" const char *symengine_simplify_expression(const char *expression) {
+  return nullptr;
+}
+
+extern "C" const char *symengine_solve_equation(const char *expression) {
+  return nullptr;
+}
+
+extern "C" void symengine_free_string(const char *value) {
+  std::free(const_cast<char *>(value));
+}
+
+#else
 
 #include <cstdlib>
 #include <cstring>
@@ -558,3 +577,5 @@ extern "C" const char *symengine_solve_equation(const char *expression) {
 extern "C" void symengine_free_string(const char *value) {
   std::free(const_cast<char *>(value));
 }
+
+#endif

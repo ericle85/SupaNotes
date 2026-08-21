@@ -7,10 +7,39 @@ target 'SupaNotesSwift' do
   pod 'iosMath', '~> 0.9'
 end
 
+MLKIT_FRAMEWORKS = %w[MLKitCommon MLKitDigitalInkRecognition MLKitMDD].freeze
+
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.0'
     end
+  end
+
+  xcconfig_dir = "Pods/Target Support Files/Pods-SupaNotesSwift"
+  Dir.glob("#{xcconfig_dir}/*.xcconfig").each do |path|
+    content = File.read(path)
+
+    content.gsub!(/^EXCLUDED_ARCHS\[sdk=iphonesimulator\*\]\s*=.*$/, '')
+
+    if content =~ /^OTHER_LDFLAGS\s*=\s*(.+)$/
+      full_flags = $1
+      sim_flags = full_flags
+      MLKIT_FRAMEWORKS.each do |fw|
+        sim_flags = sim_flags.gsub(/-framework\s+"#{fw}"/, '')
+      end
+      content.gsub!(/^OTHER_LDFLAGS\s*=.*$/, "OTHER_LDFLAGS[sdk=iphoneos*] = #{full_flags}\nOTHER_LDFLAGS[sdk=iphonesimulator*] = #{sim_flags}")
+    end
+
+    if content =~ /^FRAMEWORK_SEARCH_PATHS\s*=\s*(.+)$/
+      full_paths = $1
+      sim_paths = full_paths
+      MLKIT_FRAMEWORKS.each do |fw|
+        sim_paths = sim_paths.gsub(/"\$\{PODS_ROOT\}\/#{fw}\/Frameworks"\s*/, '')
+      end
+      content.gsub!(/^FRAMEWORK_SEARCH_PATHS\s*=.*$/, "FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*] = #{full_paths}\nFRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*] = #{sim_paths}")
+    end
+
+    File.write(path, content)
   end
 end
