@@ -20,7 +20,8 @@ post_install do |installer|
     end
   end
 
-  xcconfig_dir = "Pods/Target Support Files/Pods-SupaNotesSwift"
+  %w[Pods-SupaNotesSwift Pods-SupaNotesSwiftUITests].each do |dir_name|
+  xcconfig_dir = "Pods/Target Support Files/#{dir_name}"
   Dir.glob("#{xcconfig_dir}/*.xcconfig").each do |path|
     content = File.read(path)
 
@@ -45,5 +46,6 @@ post_install do |installer|
     end
 
     File.write(path, content)
+  end
   end
 end

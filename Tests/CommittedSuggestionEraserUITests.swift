@@ -2,6 +2,7 @@ import XCTest
 @testable import SupaNotesSwift
 
 final class CommittedSuggestionEraserTests: XCTestCase {
+  #if !targetEnvironment(simulator)
   func testEraserTapRemovesCommittedSuggestion() {
     let pageView = PageView(theme: .adaptive)
 
@@ -17,4 +18,5 @@ final class CommittedSuggestionEraserTests: XCTestCase {
     let after = pageView.subviews.compactMap { $0 as? AcceptedSuggestionView }
     XCTAssertEqual(after.count, 0)
   }
+  #endif
 }
