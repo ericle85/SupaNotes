@@ -67,6 +67,10 @@ final class PageView: UIView, PKCanvasViewDelegate {
     }
     addSubview(suggestionOverlay)
 
+    if ProcessInfo.processInfo.arguments.contains("--ui-test-committed-suggestion") {
+      seedTestCommittedSuggestion()
+    }
+
     let suggestionTap = UITapGestureRecognizer(
       target: self, action: #selector(handleSuggestionTap(_:)))
     suggestionTap.allowedTouchTypes = [
@@ -98,6 +102,13 @@ final class PageView: UIView, PKCanvasViewDelegate {
     if isSuggestionButtonHit(point) {
       return self
     }
+    if canvasView.tool is PKEraserTool {
+      for subview in subviews where subview is AcceptedSuggestionView {
+        if subview.frame.contains(point) {
+          return self
+        }
+      }
+    }
     return super.hitTest(point, with: event)
   }
 
@@ -110,6 +121,10 @@ final class PageView: UIView, PKCanvasViewDelegate {
     picker.setVisible(true, forFirstResponder: canvasView)
     toolPicker = picker
     canvasView.becomeFirstResponder()
+
+    if ProcessInfo.processInfo.arguments.contains("--ui-test-committed-suggestion") {
+      canvasView.tool = PKEraserTool(.vector)
+    }
   }
 
   @available(*, unavailable)
@@ -204,6 +219,13 @@ final class PageView: UIView, PKCanvasViewDelegate {
   }
 
   @objc private func handleSuggestionTap(_ gesture: UITapGestureRecognizer) {
+    let tapPoint = gesture.location(in: self)
+
+    if canvasView.tool is PKEraserTool {
+      eraseCommittedSuggestion(at: tapPoint)
+      return
+    }
+
     if suggestionOverlay.isHidden {
       return
     }
@@ -215,6 +237,18 @@ final class PageView: UIView, PKCanvasViewDelegate {
     if suggestionOverlay.denyButtonFrame.contains(point) {
       suggestionOverlay.handleDeny()
       return
+    }
+  }
+
+  private func eraseCommittedSuggestion(at point: CGPoint) {
+    for subview in subviews {
+      guard let accepted = subview as? AcceptedSuggestionView else {
+        continue
+      }
+      if accepted.frame.contains(point) {
+        accepted.removeFromSuperview()
+        return
+      }
     }
   }
 
@@ -257,6 +291,16 @@ final class PageView: UIView, PKCanvasViewDelegate {
       }
       lastHoveredIcon = nil
     }
+  }
+
+  private func seedTestCommittedSuggestion() {
+    let label = MTMathUILabel()
+    label.latex = "x+1=2"
+    label.fontSize = 20
+    label.sizeToFit()
+    label.frame = CGRect(x: 100, y: 100, width: label.frame.width, height: label.frame.height)
+    let accepted = AcceptedSuggestionView(mathLabels: [label])
+    addSubview(accepted)
   }
 
   private func acceptSuggestion(mathLabels: [MTMathUILabel]) {

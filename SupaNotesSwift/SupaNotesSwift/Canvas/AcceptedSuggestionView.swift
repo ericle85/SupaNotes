@@ -6,6 +6,7 @@ final class AcceptedSuggestionView: UIView {
   init(mathLabels: [MTMathUILabel]) {
     super.init(frame: .zero)
     isUserInteractionEnabled = false
+    accessibilityIdentifier = "committed-suggestion"
 
     var combined = CGRect.null
     for label in mathLabels {
