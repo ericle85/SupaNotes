@@ -2,6 +2,7 @@ import Foundation
 
 struct TextSuggestion {
   let text: String
+  let currentText: String
   let anchorX: CGFloat
   let lineYCenter: CGFloat
   let lineHeight: CGFloat
@@ -56,6 +57,7 @@ func generateSuggestion(
     let placement = computePlacement(strokes: strokes)
     return TextSuggestion(
       text: ghostText,
+      currentText: currentText,
       anchorX: placement.anchorX,
       lineYCenter: placement.yCenter,
       lineHeight: placement.height

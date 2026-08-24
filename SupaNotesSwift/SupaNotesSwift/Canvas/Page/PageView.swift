@@ -12,6 +12,7 @@ final class PageView: UIView, PKCanvasViewDelegate {
   let lineUnderlineLayer: CAShapeLayer
   let suggestionOverlay = MathSuggestionOverlay()
   let ghostLabel = makeGhostLabel()
+  let textSuggestionBox = TextSuggestionBox()
   var lastHoveredIcon: UIImageView?
   private var isDrawing = false
 
@@ -28,6 +29,7 @@ final class PageView: UIView, PKCanvasViewDelegate {
     canvasView.layer.addSublayer(lineUnderlineLayer)
     setupSuggestionOverlay(frame: frame)
     addSubview(ghostLabel)
+    addSubview(textSuggestionBox)
     connectCollector()
     setupGestures()
   }
@@ -110,7 +112,6 @@ final class PageView: UIView, PKCanvasViewDelegate {
   func canvasViewDidBeginUsingTool(_: PKCanvasView) {
     isDrawing = true
     onDrawingStateChanged?(true)
-    suggestionOverlay.hide()
     hideGhostText()
   }
 
@@ -150,11 +151,20 @@ final class PageView: UIView, PKCanvasViewDelegate {
       y: suggestion.lineYCenter - ghostLabel.frame.height / 2
     )
     ghostLabel.isHidden = false
+
+    textSuggestionBox.show(
+      currentText: suggestion.currentText,
+      suggestion: suggestion.text,
+      rightEdgeX: suggestion.anchorX,
+      lineYCenter: suggestion.lineYCenter,
+      lineHeight: suggestion.lineHeight
+    )
   }
 
   func hideGhostText() {
     ghostLabel.isHidden = true
     ghostLabel.text = nil
+    textSuggestionBox.hide()
     strokeCollector.isSuggestionActive = false
   }
 
