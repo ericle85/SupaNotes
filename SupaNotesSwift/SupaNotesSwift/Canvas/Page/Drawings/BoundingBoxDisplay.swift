@@ -16,3 +16,22 @@ func showBoundingBox(_ rect: CGRect, on layer: CAShapeLayer) {
     ).cgPath
     layer.isHidden = false
 }
+
+func makeLineUnderlineLayer() -> CAShapeLayer {
+    let layer = CAShapeLayer()
+    layer.fillColor = nil
+    layer.strokeColor = UIColor.systemRed.cgColor
+    layer.lineWidth = 2
+    return layer
+}
+
+func showLineUnderlines(_ rects: [CGRect], on layer: CAShapeLayer) {
+    let path = UIBezierPath()
+    for rect in rects {
+        let y = rect.maxY + 2
+        path.move(to: CGPoint(x: rect.minX, y: y))
+        path.addLine(to: CGPoint(x: rect.maxX, y: y))
+    }
+    layer.path = path.cgPath
+    layer.isHidden = rects.isEmpty
+}

@@ -9,6 +9,7 @@ final class PageView: UIView, PKCanvasViewDelegate {
   var toolPicker: PKToolPicker?
   let strokeCollector = StrokeCollector()
   let boundingBoxLayer: CAShapeLayer
+  let lineUnderlineLayer: CAShapeLayer
   let suggestionOverlay = MathSuggestionOverlay()
   var lastHoveredIcon: UIImageView?
 
@@ -16,11 +17,13 @@ final class PageView: UIView, PKCanvasViewDelegate {
     let frame = CGRect(origin: .zero, size: Self.pageSize)
     gridView = GridBackgroundView(frame: frame, theme: theme)
     boundingBoxLayer = makeBoundingBoxLayer()
+    lineUnderlineLayer = makeLineUnderlineLayer()
     super.init(frame: frame)
 
     addSubview(gridView)
     setupCanvasView(frame: frame)
     canvasView.layer.addSublayer(boundingBoxLayer)
+    canvasView.layer.addSublayer(lineUnderlineLayer)
     setupSuggestionOverlay(frame: frame)
     connectCollector()
     setupGestures()
@@ -62,9 +65,9 @@ final class PageView: UIView, PKCanvasViewDelegate {
 
   private func connectCollector() {
     strokeCollector.drawingProvider = { [weak self] in self?.canvasView.drawing ?? PKDrawing() }
-    strokeCollector.onBoundingBox = { [weak self] in
+    strokeCollector.onLinesChanged = { [weak self] rects in
       guard let self else { return }
-      showBoundingBox($0, on: self.boundingBoxLayer)
+      showLineUnderlines(rects, on: self.lineUnderlineLayer)
     }
   }
 
