@@ -13,7 +13,7 @@ final class TextSuggestionBox: UIView {
 
   override init(frame: CGRect) {
     super.init(frame: frame)
-    isUserInteractionEnabled = false
+    isUserInteractionEnabled = true
     isHidden = true
     backgroundColor = .clear
     clipsToBounds = false
@@ -31,6 +31,37 @@ final class TextSuggestionBox: UIView {
     textBox.addSubview(suggestionLabel)
     addSubview(acceptIcon)
     addSubview(denyIcon)
+
+    for icon in [acceptIcon, denyIcon] {
+      icon.isUserInteractionEnabled = true
+      icon.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.95)
+      icon.layer.borderWidth = 0.5
+      icon.layer.borderColor = UIColor.separator.cgColor
+      let hover = UIHoverGestureRecognizer(target: self, action: #selector(handleIconHover(_:)))
+      icon.addGestureRecognizer(hover)
+    }
+  }
+
+  override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+    for icon in [acceptIcon, denyIcon] {
+      let converted = icon.convert(point, from: self)
+      if icon.bounds.contains(converted) {
+        return icon
+      }
+    }
+    return nil
+  }
+
+  @objc private func handleIconHover(_ gesture: UIHoverGestureRecognizer) {
+    guard let icon = gesture.view else { return }
+    switch gesture.state {
+    case .began, .changed:
+      UIView.animate(withDuration: 0.15) { icon.transform = CGAffineTransform(scaleX: 1.4, y: 1.4) }
+    case .ended, .cancelled:
+      UIView.animate(withDuration: 0.15) { icon.transform = .identity }
+    default:
+      break
+    }
   }
 
   @available(*, unavailable)
@@ -62,7 +93,7 @@ final class TextSuggestionBox: UIView {
     let totalWidth = max(boxWidth, buttonsRowWidth)
     let totalHeight = buttonSize + 2 + boxHeight
 
-    let boxRight = rightEdgeX
+    let boxRight = rightEdgeX + 12
     let frameX = boxRight - totalWidth
     let frameY = lineYCenter - lineHeight / 2 - totalHeight - 2
 
@@ -79,8 +110,8 @@ final class TextSuggestionBox: UIView {
     )
 
     let buttonsX = totalWidth - buttonsRowWidth
-    acceptIcon.frame = CGRect(x: buttonsX, y: 0, width: buttonSize, height: buttonSize)
-    denyIcon.frame = CGRect(
+    denyIcon.frame = CGRect(x: buttonsX, y: 0, width: buttonSize, height: buttonSize)
+    acceptIcon.frame = CGRect(
       x: buttonsX + buttonSize + buttonGap, y: 0,
       width: buttonSize, height: buttonSize
     )
