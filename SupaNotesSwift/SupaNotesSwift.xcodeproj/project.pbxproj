@@ -8,10 +8,12 @@
 
 /* Begin PBXBuildFile section */
 		51C1ACE36CC6B685FA8C3F17 /* Pods_SupaNotesSwift.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 84132BD795FA1AFB1F5DA00A /* Pods_SupaNotesSwift.framework */; };
-		C1A9B7D73D0D4B3E9A7C0001 /* CommittedSuggestionEraserUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A9B7D63D0D4B3E9A7C0001 /* CommittedSuggestionEraserUITests.swift */; };
 		A1B2C3D40001000000000001 /* StrokeNormalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40001000000000002 /* StrokeNormalizationTests.swift */; };
 		A1B2C3D40001000000000003 /* StrokePreprocessingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40001000000000004 /* StrokePreprocessingTests.swift */; };
 		A1B2C3D40001000000000005 /* StrokeFeaturesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40001000000000006 /* StrokeFeaturesTests.swift */; };
+		BF974DBB303CC6CA00616234 /* LiteRTLM in Frameworks */ = {isa = PBXBuildFile; productRef = BF974DBA303CC6CA00616234 /* LiteRTLM */; };
+		BF974DBD303CC6CA00616234 /* LiteRTLMFoundationModels in Frameworks */ = {isa = PBXBuildFile; productRef = BF974DBC303CC6CA00616234 /* LiteRTLMFoundationModels */; };
+		C1A9B7D73D0D4B3E9A7C0001 /* CommittedSuggestionEraserUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A9B7D63D0D4B3E9A7C0001 /* CommittedSuggestionEraserUITests.swift */; };
 		DA1FB989983B8EE1522D0C67 /* Pods_SupaNotesSwiftUITests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4F1B0F2645DE21CDB17F1ED4 /* Pods_SupaNotesSwiftUITests.framework */; };
 /* End PBXBuildFile section */
 
@@ -30,12 +32,12 @@
 		246FB30F59271C7FCF89D4DA /* Pods-SupaNotesSwiftUITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SupaNotesSwiftUITests.release.xcconfig"; path = "Target Support Files/Pods-SupaNotesSwiftUITests/Pods-SupaNotesSwiftUITests.release.xcconfig"; sourceTree = "<group>"; };
 		4F1B0F2645DE21CDB17F1ED4 /* Pods_SupaNotesSwiftUITests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_SupaNotesSwiftUITests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		84132BD795FA1AFB1F5DA00A /* Pods_SupaNotesSwift.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_SupaNotesSwift.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		BFA960A43023D41B007659EA /* SupaNotesSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SupaNotesSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		C1A9B7D53D0D4B3E9A7C0001 /* SupaNotesSwiftUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SupaNotesSwiftUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		C1A9B7D63D0D4B3E9A7C0001 /* CommittedSuggestionEraserUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommittedSuggestionEraserUITests.swift; sourceTree = "<group>"; };
 		A1B2C3D40001000000000002 /* StrokeNormalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokeNormalizationTests.swift; sourceTree = "<group>"; };
 		A1B2C3D40001000000000004 /* StrokePreprocessingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokePreprocessingTests.swift; sourceTree = "<group>"; };
 		A1B2C3D40001000000000006 /* StrokeFeaturesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokeFeaturesTests.swift; sourceTree = "<group>"; };
+		BFA960A43023D41B007659EA /* SupaNotesSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SupaNotesSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C1A9B7D53D0D4B3E9A7C0001 /* SupaNotesSwiftUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SupaNotesSwiftUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C1A9B7D63D0D4B3E9A7C0001 /* CommittedSuggestionEraserUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommittedSuggestionEraserUITests.swift; sourceTree = "<group>"; };
 		D91FCE5B5503B3528AE7A602 /* Pods-SupaNotesSwift.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SupaNotesSwift.release.xcconfig"; path = "Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift.release.xcconfig"; sourceTree = "<group>"; };
 		FA3D114174564515B822ADC7 /* Pods-SupaNotesSwift.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SupaNotesSwift.debug.xcconfig"; path = "Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -43,8 +45,6 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		BFA960A63023D41B007659EA /* SupaNotesSwift */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = SupaNotesSwift;
 			sourceTree = "<group>";
 		};
@@ -56,6 +56,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				51C1ACE36CC6B685FA8C3F17 /* Pods_SupaNotesSwift.framework in Frameworks */,
+				BF974DBD303CC6CA00616234 /* LiteRTLMFoundationModels in Frameworks */,
+				BF974DBB303CC6CA00616234 /* LiteRTLM in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -87,7 +89,6 @@
 				0FA392FF914AA06967A2DB77 /* Pods-SupaNotesSwiftUITests.debug.xcconfig */,
 				246FB30F59271C7FCF89D4DA /* Pods-SupaNotesSwiftUITests.release.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -95,7 +96,7 @@
 			isa = PBXGroup;
 			children = (
 				BFA960A63023D41B007659EA /* SupaNotesSwift */,
-				C1A9B7D43D0D4B3E9A7C0001 /* Tests */,
+				C1A9B7D43D0D4B3E9A7C0001 /* ../Tests */,
 				BFA960A53023D41B007659EA /* Products */,
 				99D08F376E88896751333AB3 /* Pods */,
 				3CFE1AF37DEB21507794F321 /* Frameworks */,
@@ -111,7 +112,7 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		C1A9B7D43D0D4B3E9A7C0001 /* Tests */ = {
+		C1A9B7D43D0D4B3E9A7C0001 /* ../Tests */ = {
 			isa = PBXGroup;
 			children = (
 				C1A9B7D63D0D4B3E9A7C0001 /* CommittedSuggestionEraserUITests.swift */,
@@ -191,6 +192,9 @@
 			);
 			mainGroup = BFA9609B3023D41B007659EA;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				BF974DB9303CC6CA00616234 /* XCRemoteSwiftPackageReference "LiteRT-LM" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BFA960A53023D41B007659EA /* Products */;
 			projectDirPath = "";
@@ -228,9 +232,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -267,9 +275,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-SupaNotesSwift/Pods-SupaNotesSwift-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -624,6 +636,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		BF974DB9303CC6CA00616234 /* XCRemoteSwiftPackageReference "LiteRT-LM" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google-ai-edge/LiteRT-LM";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.11.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BF974DBA303CC6CA00616234 /* LiteRTLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BF974DB9303CC6CA00616234 /* XCRemoteSwiftPackageReference "LiteRT-LM" */;
+			productName = LiteRTLM;
+		};
+		BF974DBC303CC6CA00616234 /* LiteRTLMFoundationModels */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BF974DB9303CC6CA00616234 /* XCRemoteSwiftPackageReference "LiteRT-LM" */;
+			productName = LiteRTLMFoundationModels;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = BFA9609C3023D41B007659EA /* Project object */;
 }

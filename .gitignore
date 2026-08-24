@@ -139,3 +139,4 @@ prototype/tests/router_decodes.json
 __pycache__/
 *.py[cod]
 *$py.class
+SupaNotesSwift/SupaNotesSwift/Resources/gemma-4-E2B-it-gpu.litertlm

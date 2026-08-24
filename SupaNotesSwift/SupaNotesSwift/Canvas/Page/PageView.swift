@@ -11,7 +11,9 @@ final class PageView: UIView, PKCanvasViewDelegate {
   let boundingBoxLayer: CAShapeLayer
   let lineUnderlineLayer: CAShapeLayer
   let suggestionOverlay = MathSuggestionOverlay()
+  let ghostLabel = makeGhostLabel()
   var lastHoveredIcon: UIImageView?
+  private var isDrawing = false
 
   init(theme: GridTheme) {
     let frame = CGRect(origin: .zero, size: Self.pageSize)
@@ -25,6 +27,7 @@ final class PageView: UIView, PKCanvasViewDelegate {
     canvasView.layer.addSublayer(boundingBoxLayer)
     canvasView.layer.addSublayer(lineUnderlineLayer)
     setupSuggestionOverlay(frame: frame)
+    addSubview(ghostLabel)
     connectCollector()
     setupGestures()
   }
@@ -69,6 +72,20 @@ final class PageView: UIView, PKCanvasViewDelegate {
       guard let self else { return }
       showLineUnderlines(rects, on: self.lineUnderlineLayer)
     }
+    strokeCollector.onSuggestionNeeded = { [weak self] strokes in
+      guard let self else { return }
+      self.strokeCollector.isSuggestionActive = true
+      Task {
+        let suggestion = await generateSuggestion(strokes: strokes)
+        await MainActor.run {
+          guard !self.isDrawing, let suggestion else {
+            self.strokeCollector.isSuggestionActive = false
+            return
+          }
+          self.showGhostText(suggestion)
+        }
+      }
+    }
   }
 
   func setDrawingWithUndo(_ newDrawing: PKDrawing, replacing oldDrawing: PKDrawing) {
@@ -91,11 +108,14 @@ final class PageView: UIView, PKCanvasViewDelegate {
   }
 
   func canvasViewDidBeginUsingTool(_: PKCanvasView) {
+    isDrawing = true
     onDrawingStateChanged?(true)
     suggestionOverlay.hide()
+    hideGhostText()
   }
 
   func canvasViewDidEndUsingTool(_: PKCanvasView) {
+    isDrawing = false
     onDrawingStateChanged?(false)
   }
 
@@ -121,8 +141,32 @@ final class PageView: UIView, PKCanvasViewDelegate {
     gridView.setNeedsDisplay()
   }
 
+  func showGhostText(_ suggestion: TextSuggestion) {
+    ghostLabel.text = suggestion.text
+    ghostLabel.font = UIFont.systemFont(ofSize: suggestion.lineHeight * 0.8)
+    ghostLabel.sizeToFit()
+    ghostLabel.frame.origin = CGPoint(
+      x: suggestion.anchorX + 4,
+      y: suggestion.lineYCenter - ghostLabel.frame.height / 2
+    )
+    ghostLabel.isHidden = false
+  }
+
+  func hideGhostText() {
+    ghostLabel.isHidden = true
+    ghostLabel.text = nil
+    strokeCollector.isSuggestionActive = false
+  }
+
   @available(*, unavailable)
   required init?(coder _: NSCoder) {
     fatalError()
   }
+}
+
+private func makeGhostLabel() -> UILabel {
+  let label = UILabel()
+  label.textColor = UIColor.gray.withAlphaComponent(0.5)
+  label.isHidden = true
+  return label
 }
