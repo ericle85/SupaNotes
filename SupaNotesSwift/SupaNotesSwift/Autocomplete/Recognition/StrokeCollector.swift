@@ -8,7 +8,9 @@ struct StrokeLine {
 }
 
 func strokeYOverlapsLine(_ line: StrokeLine, _ strokeYMin: CGFloat, _ strokeYMax: CGFloat) -> Bool {
-  return line.yMin <= strokeYMax && strokeYMin <= line.yMax
+  let lineHeight = line.yMax - line.yMin
+  let tolerance = lineHeight * 0.4
+  return (line.yMin - tolerance) <= strokeYMax && strokeYMin <= line.yMax
 }
 
 func convertPKStrokesToStrokePoints(_ strokes: [PKStroke]) -> [[StrokePoint]] {

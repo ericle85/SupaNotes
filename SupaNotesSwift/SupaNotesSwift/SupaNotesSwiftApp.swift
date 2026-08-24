@@ -7,6 +7,7 @@ struct SupaNotesSwiftApp: App {
             ContentView()
                 .task {
                     try? await AutocompleteModelCache.shared.prepare()
+                    await TextSuggestionEngine.shared.prepare()
                 }
         }
     }
