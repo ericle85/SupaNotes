@@ -94,10 +94,11 @@ final class PageView: UIView, PKCanvasViewDelegate {
 
   func canvasViewDidEndUsingTool(_: PKCanvasView) {
     onDrawingStateChanged?(false)
-    strokeCollector.pencilLifted()
   }
 
-  func canvasViewDrawingDidChange(_: PKCanvasView) {}
+  func canvasViewDrawingDidChange(_: PKCanvasView) {
+    strokeCollector.pencilLifted()
+  }
 
   private func eraserHitsSuggestion(at point: CGPoint) -> Bool {
     guard canvasView.tool is PKEraserTool else { return false }

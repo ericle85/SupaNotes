@@ -36,17 +36,15 @@ final class StrokeCollector {
     var onBoundingBox: ((CGRect) -> Void)?
 
     func pencilLifted() {
-        DispatchQueue.main.async { [weak self] in
-            guard let self, let drawing = self.drawingProvider?() else { return }
-            guard let lastStroke = drawing.strokes.last else { return }
+        guard let drawing = drawingProvider?() else { return }
+        guard let lastStroke = drawing.strokes.last else { return }
 
-            self.onBoundingBox?(lastStroke.renderBounds)
+        onBoundingBox?(lastStroke.renderBounds)
 
-            let converted = convertPKStrokesToStrokePoints([lastStroke])
+        let converted = convertPKStrokesToStrokePoints([lastStroke])
 
-            Task {
-                await runOCRPipeline(strokes: converted)
-            }
+        Task {
+            await runOCRPipeline(strokes: converted)
         }
     }
 }
