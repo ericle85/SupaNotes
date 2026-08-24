@@ -3,20 +3,6 @@ import UIKit
 import iosMath
 
 extension PageView {
-  func showSuggestion(result: PipelineResult, strokes: [PKStroke], bbox: CGRect) {
-    guard let suggestion = result.suggestion else { return }
-    let bounds = strokesBounds(strokes)
-    guard
-      let position = computeSuggestionPosition(
-        bbox: bbox, mode: result.placement, strokeBounds: bounds
-      )
-    else { return }
-    suggestionOverlay.show(
-      suggestion: suggestion, mode: result.placement, position: position,
-      strokeHeight: estimateStrokeHeight(strokeBounds: bounds), strokesBBox: bbox
-    )
-  }
-
   func suggestionButtonHit(at point: CGPoint) -> Bool {
     guard !suggestionOverlay.isHidden else { return false }
     let overlayPoint = convert(point, to: suggestionOverlay)

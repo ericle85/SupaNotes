@@ -60,34 +60,16 @@ final class PageView: UIView, PKCanvasViewDelegate {
     addSubview(suggestionOverlay)
   }
 
-  private func handleBoundingBox(_ bbox: CGRect) {
-    showBoundingBox(bbox, on: boundingBoxLayer)
-  }
-
-  private func handleScribble(bounds: CGRect, startIndex: Int) {
-    applyScribbleErase(
-      canvasView: canvasView,
-      scribbleBounds: bounds,
-      scribbleStartIndex: startIndex,
-      boundingBoxLayer: boundingBoxLayer,
-      onDrawingChanged: setDrawingWithUndo
-    )
-  }
-
   private func connectCollector() {
     strokeCollector.drawingProvider = { [weak self] in self?.canvasView.drawing ?? PKDrawing() }
-    strokeCollector.onBoundingBox = { [weak self] in self?.handleBoundingBox($0) }
-    strokeCollector.onScribbleDetected = { [weak self] in
-      self?.handleScribble(bounds: $0, startIndex: $1)
-    }
-    strokeCollector.onSuggestion = { [weak self] in
-      self?.showSuggestion(result: $0, strokes: $1, bbox: $2)
+    strokeCollector.onBoundingBox = { [weak self] in
+      guard let self else { return }
+      showBoundingBox($0, on: self.boundingBoxLayer)
     }
   }
 
   func setDrawingWithUndo(_ newDrawing: PKDrawing, replacing oldDrawing: PKDrawing) {
     canvasView.drawing = newDrawing
-    strokeCollector.syncStrokeCount()
 
     canvasView.undoManager?.registerUndo(withTarget: self) {
       $0.setDrawingWithUndo(oldDrawing, replacing: newDrawing)
@@ -108,7 +90,6 @@ final class PageView: UIView, PKCanvasViewDelegate {
   func canvasViewDidBeginUsingTool(_: PKCanvasView) {
     onDrawingStateChanged?(true)
     suggestionOverlay.hide()
-    strokeCollector.pencilTouched()
   }
 
   func canvasViewDidEndUsingTool(_: PKCanvasView) {
@@ -116,9 +97,7 @@ final class PageView: UIView, PKCanvasViewDelegate {
     strokeCollector.pencilLifted()
   }
 
-  func canvasViewDrawingDidChange(_: PKCanvasView) {
-    strokeCollector.syncIfStrokesRemoved()
-  }
+  func canvasViewDrawingDidChange(_: PKCanvasView) {}
 
   private func eraserHitsSuggestion(at point: CGPoint) -> Bool {
     guard canvasView.tool is PKEraserTool else { return false }

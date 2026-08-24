@@ -1,13 +1,11 @@
+import PencilKit
 import UIKit
 
 extension CanvasView {
     @objc func shareTapped() {
-        let collector = pageView.strokeCollector
-        guard !collector.lastPipelineStrokes.isEmpty,
-              let folderURL = exportStrokeBundle(
-                  strokes: collector.lastPipelineStrokes,
-                  pipelineResult: collector.lastPipelineResult
-              ) else { return }
+        let strokes = pageView.canvasView.drawing.strokes
+        guard !strokes.isEmpty,
+              let folderURL = exportStrokeBundle(strokes: strokes) else { return }
 
         let activity = UIActivityViewController(activityItems: [folderURL], applicationActivities: nil)
         activity.popoverPresentationController?.sourceView = shareButton

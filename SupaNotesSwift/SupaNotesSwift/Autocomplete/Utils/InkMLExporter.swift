@@ -35,10 +35,7 @@ func exportStrokesToInkML(_ strokes: [PKStroke]) -> String {
     return xml
 }
 
-func exportStrokeBundle(
-    strokes: [PKStroke],
-    pipelineResult: PipelineResult?
-) -> URL? {
+func exportStrokeBundle(strokes: [PKStroke]) -> URL? {
     let timestamp = Int(Date().timeIntervalSince1970)
     let folderName = "strokes_\(timestamp)"
     let folderURL = FileManager.default.temporaryDirectory.appendingPathComponent(folderName)
@@ -49,12 +46,6 @@ func exportStrokeBundle(
         let inkml = exportStrokesToInkML(strokes)
         let inkmlURL = folderURL.appendingPathComponent("strokes.inkml")
         try inkml.write(to: inkmlURL, atomically: true, encoding: .utf8)
-
-        if let pipelineResult {
-            let jsonData = try JSONEncoder().encode(pipelineResult)
-            let jsonURL = folderURL.appendingPathComponent("pipeline_output.json")
-            try jsonData.write(to: jsonURL)
-        }
 
         return folderURL
     } catch {

@@ -32,76 +32,20 @@ func convertPKStrokesToStrokePoints(_ strokes: [PKStroke]) -> [[StrokePoint]] {
 }
 
 final class StrokeCollector {
-    private var lastProcessedStrokeCount = 0
-    private var debounceTimer: Timer?
-
-    var onBoundingBox: ((CGRect) -> Void)?
-    var onScribbleDetected: ((CGRect, Int) -> Void)?
-    var onSuggestion: ((PipelineResult, [PKStroke], CGRect) -> Void)?
-
-    private(set) var lastPipelineResult: PipelineResult?
-    private(set) var lastPipelineStrokes: [PKStroke] = []
     var drawingProvider: (() -> PKDrawing)?
-
-    func syncStrokeCount() {
-        guard let drawing = drawingProvider?() else { return }
-        lastProcessedStrokeCount = drawing.strokes.count
-    }
-
-    func syncIfStrokesRemoved() {
-        guard let drawing = drawingProvider?() else { return }
-        if drawing.strokes.count < lastProcessedStrokeCount {
-            lastProcessedStrokeCount = drawing.strokes.count
-        }
-    }
+    var onBoundingBox: ((CGRect) -> Void)?
 
     func pencilLifted() {
-        debounceTimer?.invalidate()
-        debounceTimer = Timer.scheduledTimer(
-            withTimeInterval: 0.75,
-            repeats: false
-        ) { [weak self] _ in
+        DispatchQueue.main.async { [weak self] in
             guard let self, let drawing = self.drawingProvider?() else { return }
-            self.flushStrokes(drawing: drawing)
-        }
-    }
+            guard let lastStroke = drawing.strokes.last else { return }
 
-    func pencilTouched() {
-        debounceTimer?.invalidate()
-        debounceTimer = nil
-    }
+            self.onBoundingBox?(lastStroke.renderBounds)
 
-    private func flushStrokes(drawing: PKDrawing) {
-        let allStrokes = drawing.strokes
-        let currentCount = allStrokes.count
-        if currentCount <= lastProcessedStrokeCount {
-            return
-        }
+            let converted = convertPKStrokesToStrokePoints([lastStroke])
 
-        let newStrokes = Array(allStrokes[lastProcessedStrokeCount ..< currentCount])
-        lastProcessedStrokeCount = currentCount
-        lastPipelineStrokes = newStrokes
-
-        var boundingBox = CGRect.null
-        for stroke in newStrokes {
-            boundingBox = boundingBox.union(stroke.renderBounds)
-        }
-        onBoundingBox?(boundingBox)
-
-        let converted = convertPKStrokesToStrokePoints(newStrokes)
-        let scribbleBounds = boundingBox
-        let scribbleStartIndex = lastProcessedStrokeCount - newStrokes.count
-
-        Task { [weak self] in
-            let result = await runAutocompletePipeline(strokes: converted)
-            await MainActor.run {
-                self?.lastPipelineResult = result
-                if result.classification == "scribble" {
-                    self?.onScribbleDetected?(scribbleBounds, scribbleStartIndex)
-                }
-                if result.suggestion != nil {
-                    self?.onSuggestion?(result, newStrokes, boundingBox)
-                }
+            Task {
+                await runOCRPipeline(strokes: converted)
             }
         }
     }
