@@ -6,7 +6,6 @@ let CLASSIFIER_CLASSES = ["math", "google", "scribble", "none"]
 
 class ClassifierModelInference {
   private let model: MLModel
-
   init() throws {
     let config = MLModelConfiguration()
     config.computeUnits = .all

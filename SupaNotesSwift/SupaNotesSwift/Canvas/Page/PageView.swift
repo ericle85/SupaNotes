@@ -78,7 +78,20 @@ final class PageView: UIView, PKCanvasViewDelegate {
       guard let self else { return }
       self.strokeCollector.isSuggestionActive = true
       Task {
-        let suggestion = await generateSuggestion(strokes: strokes)
+        var suggestion = await generateSuggestion(strokes: strokes)
+
+        if let s = suggestion {
+          let freshStrokes = await MainActor.run {
+            self.strokeCollector.activeLineStrokes()
+          }
+          if let fresh = freshStrokes {
+            let freshText = try? await ocr(strokes: fresh)
+            if freshText != s.currentText {
+              suggestion = await generateSuggestion(strokes: fresh)
+            }
+          }
+        }
+
         await MainActor.run {
           guard !self.isDrawing, let suggestion else {
             self.strokeCollector.isSuggestionActive = false

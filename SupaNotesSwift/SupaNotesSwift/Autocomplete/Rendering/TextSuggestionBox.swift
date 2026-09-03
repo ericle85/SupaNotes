@@ -24,7 +24,8 @@ final class TextSuggestionBox: UIView {
     textBox.layer.borderColor = UIColor.separator.cgColor
 
     currentTextLabel.textColor = .label
-    suggestionLabel.textColor = .systemGreen
+    suggestionLabel.textColor = .label
+    suggestionLabel.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.5)
 
     addSubview(textBox)
     textBox.addSubview(currentTextLabel)

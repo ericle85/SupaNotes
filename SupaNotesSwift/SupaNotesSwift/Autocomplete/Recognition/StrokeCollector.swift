@@ -143,6 +143,17 @@ final class StrokeCollector {
     reportLineRects(strokes: strokes)
   }
 
+  func activeLineStrokes() -> [[StrokePoint]]? {
+    guard let drawing = drawingProvider?() else { return nil }
+    let strokes = drawing.strokes
+    guard !strokes.isEmpty else { return nil }
+    let lastIndex = strokes.count - 1
+    guard let line = lines.first(where: { $0.strokeIndices.contains(lastIndex) }) else { return nil }
+    let validIndices = line.strokeIndices.filter { $0 < strokes.count }
+    guard !validIndices.isEmpty else { return nil }
+    return convertPKStrokesToStrokePoints(validIndices.map { strokes[$0] })
+  }
+
   private func reportLineRects(strokes: [PKStroke]) {
     let rects = lines.map { line -> CGRect in
       let lineStrokes = line.strokeIndices.map { strokes[$0] }
